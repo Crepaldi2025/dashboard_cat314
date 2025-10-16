@@ -11,3 +11,4 @@ streamlit-folium
 folium
 cartopy
 geopandas
+geobr
