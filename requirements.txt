@@ -9,7 +9,7 @@ earthengine-api
 streamlit-folium
 folium
 cartopy
-geopandas==0.11.1
-shapely==1.8.5.post1
+geopandas==0.14.4
+shapely==2.0.4
 geobr==0.2.2
 geemap
