@@ -12,3 +12,4 @@ folium
 cartopy
 geopandas
 geobr
+geemap
