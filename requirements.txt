@@ -1,18 +1,9 @@
-streamlit
-pandas
-numpy
-xarray
-matplotlib
-cdsapi
-pathlib
-earthengine-api
-streamlit-folium
-folium
-geobr
-cartopy==0.21.1
-geopandas==0.14.0
-geemap==0.18.2
-fiona==1.9.4
-pyproj==3.6.1
-shapely==2.0.4
-
+streamlit == 1.45.1
+folium == 0.17.0
+pandas == 2.3.3
+plotly == 5.23.0
+geopandas == 1.0.0
+earthengine-api == 1.5.11
+geemap == 0.35.3
+streamlit_folium == 0.22.0
+setuptools == 75.1.0
