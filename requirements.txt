@@ -16,9 +16,7 @@ geemap
 fiona           
 pyproj         
 shapely         
-libgdal-dev
-gdal-bin
-libproj-dev
 proj-data
 proj-tools
 pytz
+
