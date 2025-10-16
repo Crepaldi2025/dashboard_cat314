@@ -3,5 +3,5 @@ libgdal-dev
 gdal-bin
 libproj-dev
 proj-data
-proj-bin  # Substitui 'proj-tools'
+proj-bin
 libgeos-dev
