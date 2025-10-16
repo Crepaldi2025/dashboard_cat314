@@ -1,0 +1,13 @@
+# requirements.txt
+streamlit
+pandas
+numpy
+xarray
+matplotlib
+cdsapi
+pathlib
+earthengine-api  # Para o ee
+streamlit-folium
+folium
+cartopy
+geopandas
