@@ -9,7 +9,7 @@ earthengine-api
 streamlit-folium
 folium
 cartopy
-geopandas
-shapely
-git+https://github.com/ipeaGIT/geobr.git
+geopandas>=0.14.0
+shapely>=2.0.0
+git+https://gitlab.com/open-geodata/geobr.git@main
 geemap
