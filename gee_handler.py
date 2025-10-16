@@ -3,7 +3,7 @@ import streamlit as st
 import json
 from collections import defaultdict
 import ee
-# import geobr
+import geobr
 import pandas as pd
 
 ERA5_VARS = {
@@ -224,3 +224,4 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     
 
     return df
+
