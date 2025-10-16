@@ -9,9 +9,9 @@ earthengine-api
 streamlit-folium
 folium
 cartopy
-geobr
+geobr>=0.3.0a,<0.4.0
 geemap
-fiona==1.9.4
 pyproj==3.6.1
 shapely==2.0.4
 geopandas==0.14.0
+
