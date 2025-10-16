@@ -11,5 +11,5 @@ folium
 cartopy
 geopandas>=0.14.0
 shapely>=2.0.0
-git+https://gitlab.com/open-geodata/geobr.git@main
+requests
 geemap
