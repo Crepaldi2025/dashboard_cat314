@@ -112,7 +112,7 @@ def main():
     inicializar_gee()
 
     ui.configurar_pagina()
-    if not initialize_gee(): return
+    
 
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
@@ -154,4 +154,5 @@ def main():
             ui.renderizar_pagina_principal(opcao_menu)
 
 if __name__ == "__main__":
+
     main()
