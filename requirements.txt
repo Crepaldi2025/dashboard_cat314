@@ -6,10 +6,19 @@ xarray
 matplotlib
 cdsapi
 pathlib
-earthengine-api  # Para o ee
+earthengine-api  
 streamlit-folium
 folium
 cartopy
 geopandas
 geobr
 geemap
+fiona           
+pyproj         
+shapely         
+libgdal-dev
+gdal-bin
+libproj-dev
+proj-data
+proj-tools
+pytz
