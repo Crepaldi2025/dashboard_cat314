@@ -8,3 +8,4 @@ geemap == 0.35.3
 streamlit_folium == 0.22.0
 setuptools == 75.1.0
 geobr==0.2.2
+openpyxl
