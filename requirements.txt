@@ -1,4 +1,3 @@
-# requirements.txt
 streamlit
 pandas
 numpy
@@ -6,14 +5,14 @@ xarray
 matplotlib
 cdsapi
 pathlib
-earthengine-api  
+earthengine-api
 streamlit-folium
 folium
 cartopy
 geopandas
 geobr
 geemap
-fiona           
-pyproj         
-shapely         
+fiona
+pyproj
+shapely
 pytz
