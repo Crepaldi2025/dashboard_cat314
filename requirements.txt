@@ -16,7 +16,4 @@ geemap
 fiona           
 pyproj         
 shapely         
-proj-data
-proj-tools
 pytz
-
