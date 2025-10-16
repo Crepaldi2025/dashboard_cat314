@@ -1,3 +1,4 @@
+# requirements.txt
 streamlit
 pandas
 numpy
@@ -8,8 +9,10 @@ pathlib
 earthengine-api
 streamlit-folium
 folium
-cartopy
-geopandas>=0.14.0
-shapely>=2.0.0
-requests
-geemap
+geobr
+cartopy==0.21.1
+geopandas==0.14.0
+geemap==0.18.2
+fiona==1.9.4
+pyproj==3.6.1
+shapely==2.0.4
