@@ -1,17 +1,38 @@
-# ui.py
+# ==================================================================================
+# ui.py — Interface do usuário do sistema Clima-Cast-Crepaldi
+# ==================================================================================
+
 import streamlit as st
 from datetime import datetime
 import calendar
 from dateutil.relativedelta import relativedelta
+import locale
+
+# ==================================================================================
+# CONFIGURAÇÃO INICIAL (DEVE VIR ANTES DE QUALQUER OUTRA CHAMADA STREAMLIT)
+# ==================================================================================
+
+st.set_page_config(
+    page_title="Clima-Cast-Crepaldi",
+    page_icon="🛰️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Protege contra erro de locale no Streamlit Cloud
+try:
+    locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
+except locale.Error:
+    locale.setlocale(locale.LC_TIME, "C")
+
+# ==================================================================================
+# FUNÇÕES PRINCIPAIS
+# ==================================================================================
 
 def configurar_pagina():
-    """Configura as propriedades da página."""
-    st.set_page_config(
-        page_title="Clima-Cast-Crepaldi",
-        page_icon="🛰️",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+    """Configura o título e separador inicial."""
+    st.title("🛰️ Clima-Cast-Crepaldi")
+    st.markdown("---")
 
 def reset_analysis_state():
     """Callback para limpar o estado dos resultados sempre que um filtro é alterado."""
@@ -114,7 +135,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         return opcao_selecionada
 
-# Em ui.py, a função renderizar_pagina_principal deve ficar assim
 
 def renderizar_pagina_principal(opcao_navegacao):
     """Exibe o conteúdo da página principal com o logo."""
@@ -123,11 +143,9 @@ def renderizar_pagina_principal(opcao_navegacao):
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        # Cria sub-colunas para alinhar o logo e o título
         logo_col, title_col = st.columns([1, 5])
         with logo_col:
-            # Caminho corrigido para buscar o logo na pasta principal
-            st.image("logo.png", width=70) 
+            st.image("logo.png", width=70)
         with title_col:
             st.title(f"Clima-Cast-Crepaldi: {opcao_navegacao}")
 
@@ -137,6 +155,7 @@ def renderizar_pagina_principal(opcao_navegacao):
     
     st.markdown("---")
     st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
+
 
 def renderizar_resumo_selecao():
     """Mostra um resumo dos filtros selecionados."""
@@ -171,11 +190,9 @@ def renderizar_resumo_selecao():
             st.markdown(f"**Tipo de Mapa:** `{st.session_state.map_type}`")
     st.info("Por favor, confira suas seleções. A busca pelos dados será iniciada com base nestes parâmetros.")
 
+
 def renderizar_validacao_mapa():
-    """
-    Exibe a mensagem de conferência e o botão para validar a área.
-    Para polígonos, verifica se a geometria foi capturada.
-    """
+    """Exibe a mensagem de conferência e o botão para validar a área."""
     st.info("Confira a área de interesse no mapa acima. Se estiver correto, clique em 'Validar Área' para continuar.")
     
     disable_validation = False
@@ -190,8 +207,9 @@ def renderizar_validacao_mapa():
         st.session_state['show_confirmation_map'] = False
         st.rerun()
 
+
 def renderizar_pagina_sobre():
-    """Exibe o conteúdo da página "Sobre o Aplicativo"."""
+    """Exibe o conteúdo da página 'Sobre o Aplicativo'."""
     st.title("🛰️ Sobre o Clima-Cast-Crepaldi")
     st.markdown("---")
     st.markdown("""
