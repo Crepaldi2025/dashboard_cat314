@@ -8,7 +8,7 @@ import ee
 # Inicialização padronizada e robusta do Google Earth Engine
 # ============================================================
 
-PROJECT_ID = "gee-crepaldi-2025"  # <--- use exatamente seu project_id
+PROJECT_ID = "gee-crepaldi-2025b"  # <--- use exatamente seu project_id
 
 def inicializar_gee():
     """
