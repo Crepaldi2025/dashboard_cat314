@@ -1,6 +1,5 @@
 numpy==1.26.4
 matplotlib==3.8.4
-cartopy==0.22.0
 
 streamlit==1.45.1
 folium==0.17.0
