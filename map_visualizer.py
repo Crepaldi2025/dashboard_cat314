@@ -138,9 +138,19 @@ def create_colorbar(vis_params, unit_label=""):
 # ==================================================================================
 # MAPA ESTÁTICO (ERA5-LAND)
 # ==================================================================================
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-from matplotlib import patheffects
+# ==================================================================================
+# CARTOPY (opcional — desativado no Streamlit Cloud)
+# ==================================================================================
+try:
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+    from matplotlib import patheffects
+    HAS_CARTOPY = True
+except Exception:
+    HAS_CARTOPY = False
+    ccrs = None
+    cfeature = None
+    patheffects = None
 
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """
