@@ -4,28 +4,38 @@ import json
 from collections import defaultdict
 import ee
 
+# ============================================================
+# Inicialização padronizada e robusta do Google Earth Engine
+# ============================================================
+
+PROJECT_ID = "gee-crepaldi-2025"  # <--- use exatamente seu project_id
+
 def inicializar_gee():
     """
-    Inicializa o Google Earth Engine.
-    - Local: usa credenciais do 'earthengine authenticate'
-    - Streamlit Cloud: usa Service Account configurada em st.secrets
+    Inicializa o Google Earth Engine de forma robusta.
+    1️⃣ Primeiro tenta autenticação local (earthengine authenticate)
+    2️⃣ Se falhar, tenta via Service Account (para Streamlit Cloud)
     """
     try:
-        # Verifica se está no Streamlit Cloud (há segredos configurados)
-        if "earthengine_service_account" in st.secrets:
-            service_account = st.secrets["earthengine_service_account"]["client_email"]
-            private_key = st.secrets["earthengine_service_account"]["private_key"]
+        ee.Initialize(project=PROJECT_ID)
+        st.success(f"✅ Conectado ao Google Earth Engine localmente ({PROJECT_ID}).")
+        return "local"
+    except Exception as e_local:
+        try:
+            if "earthengine_service_account" not in st.secrets:
+                raise e_local
+            creds_dict = dict(st.secrets["earthengine_service_account"])
+            credentials = ee.ServiceAccountCredentials(
+                creds_dict["client_email"],
+                key_data=json.dumps(creds_dict)
+            )
+            ee.Initialize(credentials, project=PROJECT_ID)
+            st.success(f"✅ Conectado ao Google Earth Engine via Service Account ({PROJECT_ID}).")
+            return "service_account"
+        except Exception as e_service:
+            st.error(f"⚠️ Falha ao conectar com o Google Earth Engine: {e_service}")
+            return None
 
-            # Cria credenciais usando a conta de serviço
-            credentials = ee.ServiceAccountCredentials(service_account, key_data=private_key)
-            ee.Initialize(credentials)
-            st.success("✅ Conectado ao Google Earth Engine via Service Account.")
-        else:
-            # Executa localmente com credenciais já autenticadas
-            ee.Initialize()
-            st.info("✅ Conectado ao Google Earth Engine com credenciais locais.")
-    except Exception as e:
-        st.error(f"⚠️ Falha ao conectar com o Google Earth Engine: {e}")
 import geobr
 import pandas as pd
 

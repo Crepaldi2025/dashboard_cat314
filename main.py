@@ -22,18 +22,6 @@ except locale.Error:
     except locale.Error:
         st.warning("Locale 'pt_BR.UTF-8' não encontrado. Nomes de meses podem aparecer em inglês.")
 
-def initialize_gee():
-    """Tenta inicializar a conexão com o Google Earth Engine."""
-    try:
-        PROJECT_ID = 'gee-crepaldi-2025'
-        ee.Initialize(project=PROJECT_ID)
-        st.success("✅ Conectado ao Google Earth Engine (gee-crepaldi-2025).")
-        return True
-    except Exception as e:
-        st.error(f"Falha ao conectar com o Google Earth Engine: {e}")
-        return False
-
-
 def run_full_analysis():
     """Executa toda a lógica de busca de dados e exibição de resultados."""
     with st.spinner("Processando dados no Google Earth Engine..."):
