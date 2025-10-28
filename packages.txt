@@ -1,0 +1,3 @@
+locales
+language-pack-pt
+language-pack-pt-base
