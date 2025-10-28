@@ -20,7 +20,7 @@ except locale.Error:
         # Fallback para sistemas Windows
         locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
     except locale.Error:
-        st.warning("Locale 'pt_BR.UTF-8' não encontrado. Nomes de meses podem aparecer em inglês.")
+        pass
 
 def run_full_analysis():
     """Executa toda a lógica de busca de dados e exibição de resultados."""
