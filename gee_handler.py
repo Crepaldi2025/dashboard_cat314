@@ -8,7 +8,7 @@ import ee
 # Inicialização padronizada e robusta do Google Earth Engine
 # ============================================================
 
-PROJECT_ID = "gee-crepaldi-2025b"  # <--- use exatamente seu project_id
+PROJECT_ID = "gee-crepaldi-2025b" 
 
 def inicializar_gee():
     """
@@ -30,7 +30,7 @@ def inicializar_gee():
                 key_data=json.dumps(creds_dict)
             )
             ee.Initialize(credentials, project=PROJECT_ID)
-            st.success(f"✅ Conectado ao Google Earth Engine via Service Account ({PROJECT_ID}).")
+            #st.success(f"✅ Conectado ao Google Earth Engine via Service Account ({PROJECT_ID}).")
             return "service_account"
         except Exception as e_service:
             st.error(f"⚠️ Falha ao conectar com o Google Earth Engine: {e_service}")
