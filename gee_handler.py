@@ -23,13 +23,12 @@ PROJECT_ID = "gee-crepaldi-2025b"  # ID do projeto no GEE
 # ------------------------------------------------------------------------------
 # INICIALIZAÇÃO DO GEE — COM CACHE E FALLBACK AUTOMÁTICO
 # ------------------------------------------------------------------------------
+
 @st.cache_resource(show_spinner=False)
 def inicializar_gee():
     """
-    Inicializa o Google Earth Engine de forma eficiente e cacheada.
-    - Evita reconexões desnecessárias
-    - Tenta primeiro conexão local (ee.Authenticate)
-    - Em fallback, usa Service Account (para Streamlit Cloud)
+    Inicializa o Google Earth Engine de forma cacheada e silenciosa (sem mensagens Streamlit).
+    Retorna o modo de inicialização: 'local', 'service_account' ou None.
     """
     if ee.data._initialized:
         return "já_inicializado"
@@ -37,7 +36,6 @@ def inicializar_gee():
     try:
         ee.Initialize(project=PROJECT_ID)
         st.session_state['gee_status'] = "local"
-        st.toast("✅ Earth Engine conectado localmente.")
         return "local"
     except Exception as e_local:
         try:
@@ -50,13 +48,11 @@ def inicializar_gee():
             )
             ee.Initialize(credentials, project=PROJECT_ID)
             st.session_state['gee_status'] = "service_account"
-            st.toast("✅ Earth Engine via Service Account.")
             return "service_account"
         except Exception as e_service:
-            st.error(f"⚠️ Falha ao conectar com o Google Earth Engine: {e_service}")
+            st.session_state['gee_status'] = f"erro: {e_service}"
             return None
-
-
+            
 # ------------------------------------------------------------------------------
 # DICIONÁRIO DE VARIÁVEIS ERA5-LAND
 # ------------------------------------------------------------------------------
@@ -345,3 +341,4 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values(by='date').dropna()
     return df
+
