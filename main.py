@@ -20,7 +20,7 @@ except locale.Error:
         # Fallback para sistemas Windows
         locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
     except locale.Error:
-        
+        pass
 
 def initialize_gee():
     """Tenta inicializar a conexão com o Google Earth Engine."""
