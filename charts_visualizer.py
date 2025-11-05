@@ -1,14 +1,14 @@
 # ==================================================================================
-# charts_visualizer.py — Clima-Cast-Crepaldi (versão estável)
+# charts_visualizer.py — Clima-Cast-Crepaldi (versão estável e leve)
 # ==================================================================================
 import streamlit as st
 import plotly.express as px
 import pandas as pd
 
 def display_time_series_chart(df, variavel, unit):
-    """Exibe série temporal simples (uma linha)."""
+    """Exibe série temporal simples (média diária)."""
     if df is None or df.empty:
-        st.warning("Sem dados para o período selecionado.")
+        st.warning("Sem dados disponíveis para o período selecionado.")
         return
 
     df = df.copy()
@@ -19,7 +19,7 @@ def display_time_series_chart(df, variavel, unit):
         x="date",
         y="value",
         title=f"Série Temporal de {variavel}",
-        labels={"date": "Data", "value": f"{variavel} ({unit})"},
+        labels={"date": "Data", "value": f"{variavel} ({unit})"}
     )
     fig.update_traces(line=dict(width=2, color="#4F6BED"))
     fig.update_layout(
