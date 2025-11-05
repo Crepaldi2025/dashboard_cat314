@@ -40,7 +40,7 @@ def _create_base_map(center, zoom, basemap='SATELLITE'):
     mapa = geemap.Map(center=center, zoom=zoom)
     mapa.add_basemap(basemap)
 
- @st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def create_colorbar(vis_params, unit_label=""):
     """
     Gera uma colorbar horizontal refinada (fundo branco translúcido),
@@ -281,6 +281,7 @@ def add_colorbar_with_background(mapa, vis_params, unit_label=""):
 
     except Exception as e:
         st.warning(f"⚠️ Falha ao adicionar colorbar estilizada: {e}")
+
 
 
 
