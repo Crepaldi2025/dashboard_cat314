@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (versão final otimizada 2025-11)
+# main.py — Clima-Cast-Crepaldi (versão otimizada final — novembro/2025)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -83,11 +83,14 @@ def run_full_analysis():
                 )
 
                 if mapa_final:
+                    # preview reduzido (sem perder resolução original)
                     st.image(
                         mapa_final,
                         caption="Mapa Estático com Legenda",
-                        use_container_width=True,
+                        width=700,       # ✅ preview controlado
+                        output_format="PNG",
                     )
+
                     with st.expander("💾 Opções de Exportação de Mapa"):
                         col1, col2 = st.columns(2)
                         with col1:
