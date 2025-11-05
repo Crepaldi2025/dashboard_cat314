@@ -134,17 +134,24 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 # ------------------------------------------------------------------------------
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """
-    Gera mapa estático com colorbar incorporada e resolução aprimorada (2048 px).
-    Exporta imagem única com legenda.
+    Gera mapa estático de alta resolução (4096 px) com colorbar incorporada.
+    O resultado é salvo em memória e reutilizado sem reprocessar o GEE.
     """
     import io
+    from PIL import Image
+    import requests
 
     if ee_image is None or feature is None:
         st.error("❌ Imagem ou geometria ausente.")
-        return None, None, None
+        return None
 
     try:
-        # 1️⃣ Gera imagem base do GEE
+        # Verifica se o resultado já foi gerado
+        cache_key = f"map_{st.session_state.variavel}_{st.session_state.tipo_periodo}"
+        if cache_key in st.session_state:
+            return st.session_state[cache_key]
+
+        # --- 1️⃣ Gera imagem base do GEE ---
         region = feature.geometry().bounds()
         background = ee.Image(1).visualize(palette=['ffffff'], min=0, max=1)
         outline = ee.Image().byte().paint(featureCollection=feature, color=1, width=2)
@@ -152,37 +159,39 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
 
         png_url = final_image.getThumbURL({
             'region': region.getInfo()['coordinates'],
-            'dimensions': 2048,
+            'dimensions': 4096,        # alta resolução (antes: 1024/2048)
             'format': 'png'
         })
 
-        # 2️⃣ Lê imagem do mapa e converte para RGB
-        response = requests.get(png_url)
+        response = requests.get(png_url, timeout=60)
         mapa_img = Image.open(io.BytesIO(response.content)).convert("RGB")
         mapa_w, mapa_h = mapa_img.size
 
-        # 3️⃣ Gera colorbar e converte para RGB
+        # --- 2️⃣ Gera colorbar refinada ---
         colorbar_bytes = create_colorbar(vis_params, unit_label)
         colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGB")
 
-        # 4️⃣ Redimensiona colorbar proporcionalmente à largura do mapa
+        # Redimensiona para combinar largura
         colorbar_w, colorbar_h = colorbar_img.size
-        new_h = int(colorbar_h * (mapa_w / colorbar_w))
-        colorbar_resized = colorbar_img.resize((mapa_w, new_h), Image.Resampling.LANCZOS)
+        scale_h = int(colorbar_h * (mapa_w / colorbar_w))
+        colorbar_resized = colorbar_img.resize((mapa_w, scale_h), Image.Resampling.LANCZOS)
 
-        # 5️⃣ Combina mapa + colorbar verticalmente
-        combined_h = mapa_h + new_h
-        combined_img = Image.new("RGB", (mapa_w, combined_h), (255, 255, 255))
-        combined_img.paste(mapa_img, (0, 0))
-        combined_img.paste(colorbar_resized, (0, mapa_h))
+        # --- 3️⃣ Combina mapa + colorbar ---
+        combined = Image.new("RGB", (mapa_w, mapa_h + scale_h), (255, 255, 255))
+        combined.paste(mapa_img, (0, 0))
+        combined.paste(colorbar_resized, (0, mapa_h))
 
-        # 6️⃣ Exporta imagem final
+        # --- 4️⃣ Salva imagem única em buffer ---
         buf = io.BytesIO()
-        combined_img.save(buf, format="PNG", quality=95)
+        combined.save(buf, format="PNG", quality=98)
         buf.seek(0)
+        final_bytes = buf.getvalue()
 
-        return buf.getvalue(), buf.getvalue(), buf.getvalue()
+        # --- 5️⃣ Guarda no session_state para reutilização ---
+        st.session_state[cache_key] = final_bytes
+        return final_bytes
 
     except Exception as e:
         st.error(f"⚠️ Falha ao gerar mapa estático com colorbar: {e}")
-        return None, None, None
+        return None
+
