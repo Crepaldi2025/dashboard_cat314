@@ -138,9 +138,7 @@ def create_colorbar(vis_params, unit_label=""):
 # ==================================================================================
 # MAPA ESTÁTICO (ERA5-LAND)
 # ==================================================================================
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-from matplotlib import patheffects
+
 
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """
@@ -184,3 +182,4 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
     mapa.add_colorbar(vis_params, label=unit_label, layer_name='Dados Climáticos')
     mapa.to_streamlit(height=500)
+
