@@ -175,7 +175,6 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
 # MAPA INTERATIVO (ERA5-LAND)
 # ------------------------------------------------------------------------------
 def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
-    """Gera e exibe um mapa interativo leve com cache e legenda."""
     if ee_image is None or feature is None:
         st.error("❌ Imagem ou geometria ausente.")
         return
@@ -183,8 +182,16 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     centroid = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
     centroid.reverse()
 
-    mapa = _create_base_map(center=centroid, zoom=7)
+    # ✅ cria mapa base SEM basemap fixo
+    mapa = geemap.Map(center=centroid, zoom=7)
+    
+    # 🔹 adiciona camada ERA5-Land primeiro
     mapa.addLayer(ee_image, vis_params, 'Dados Climáticos')
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
+
+    # 🔹 só depois adiciona o basemap (fica no fundo)
+    mapa.add_basemap('SATELLITE')
     mapa.add_colorbar(vis_params, label=unit_label, layer_name='Dados Climáticos')
     mapa.to_streamlit(height=500)
+
+
