@@ -4,21 +4,81 @@
 import streamlit as st
 
 # ==================================================================================
-# BARRA LATERAL DE NAVEGAÇÃO
+# BARRA LATERAL COMPLETA
 # ==================================================================================
 def render_sidebar():
-    """Renderiza a barra lateral de navegação principal."""
+    """Renderiza a barra lateral com todas as opções de navegação e filtros."""
     st.sidebar.title("🌤️ Clima-Cast-Crepaldi")
     st.sidebar.markdown("---")
 
-    # Menu principal
-    page = st.sidebar.radio(
-        "Escolha a seção:",
+    # ------------------------------------------------------------
+    # 1. Menu principal (nível 1)
+    # ------------------------------------------------------------
+    main_page = st.sidebar.radio(
+        "Selecione o módulo:",
         ["Mapas", "Séries Temporais", "Sobre"]
     )
+    st.session_state.page = main_page
 
-    # Salva a página no estado da sessão
-    st.session_state.page = page
+    st.sidebar.markdown("---")
+
+    # ------------------------------------------------------------
+    # 2. Subopções para MAPAS
+    # ------------------------------------------------------------
+    if main_page == "Mapas":
+        st.sidebar.subheader("🗺️ Configurações de Mapas")
+
+        st.session_state.tipo_area = st.sidebar.selectbox(
+            "Tipo de área:",
+            ["Município", "Estado", "Polígono", "Círculo"]
+        )
+
+        st.session_state.tipo_variavel = st.sidebar.selectbox(
+            "Variável meteorológica:",
+            ["Precipitação", "Temperatura Média", "Temperatura Máxima", "Temperatura Mínima", "Umidade do Solo"]
+        )
+
+        st.session_state.tipo_periodo = st.sidebar.selectbox(
+            "Período de análise:",
+            ["Mensal", "Sazonal", "Anual", "Personalizado"]
+        )
+
+        if st.session_state.tipo_periodo == "Personalizado":
+            st.sidebar.date_input("Data inicial:")
+            st.sidebar.date_input("Data final:")
+
+        st.sidebar.markdown("---")
+        st.sidebar.info("Após ajustar as opções, retorne à aba principal para gerar os mapas.")
+
+    # ------------------------------------------------------------
+    # 3. Subopções para SÉRIES TEMPORAIS
+    # ------------------------------------------------------------
+    elif main_page == "Séries Temporais":
+        st.sidebar.subheader("📈 Configurações de Séries Temporais")
+
+        st.session_state.tipo_area = st.sidebar.selectbox(
+            "Tipo de área:",
+            ["Município", "Estado", "Polígono", "Círculo"]
+        )
+
+        st.session_state.tipo_variavel = st.sidebar.selectbox(
+            "Variável meteorológica:",
+            ["Precipitação", "Temperatura Média", "Temperatura Máxima", "Temperatura Mínima", "Umidade do Solo"]
+        )
+
+        st.session_state.periodo_series = st.sidebar.selectbox(
+            "Escala temporal:",
+            ["Diário", "Mensal", "Sazonal", "Anual"]
+        )
+
+        st.sidebar.markdown("---")
+        st.sidebar.info("As séries são calculadas com base na área e variável selecionadas.")
+
+    # ------------------------------------------------------------
+    # 4. Página SOBRE (sem subopções)
+    # ------------------------------------------------------------
+    elif main_page == "Sobre":
+        pass
 
     st.sidebar.markdown("---")
     st.sidebar.caption("Desenvolvido por **P. C. Crepaldi** — Disciplina CAT314 / UNIFEI")
@@ -37,15 +97,11 @@ def render_about_page():
         **CAT314 – Ferramentas de Previsão de Curtíssimo Prazo (Nowcasting)**,
         do curso de **Ciências Atmosféricas da Universidade Federal de Itajubá (UNIFEI)**.
 
-        **Objetivo:** integrar dados meteorológicos provenientes de reanálises globais
-        (como o **ERA5-Land**) e produtos de satélite do **Google Earth Engine**, 
-        apresentando-os em uma plataforma **visual, dinâmica e acessível**.
-
         ---
         **Módulos principais:**
-        - 🗺️ **Mapas** — visualização interativa e estática de variáveis climáticas;
-        - 📈 **Séries Temporais** — análise e gráficos de tendência para áreas selecionadas;
-        - ℹ️ **Sobre** — informações do projeto e autoria.
+        - 🗺️ *Mapas*: visualização interativa e estática de variáveis climáticas;
+        - 📈 *Séries Temporais*: análise estatística e tendências;
+        - ℹ️ *Sobre*: informações institucionais e autoria.
 
         ---
         **Orientador:** Prof. Enrique Vieira Mattos  
