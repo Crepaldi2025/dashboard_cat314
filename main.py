@@ -3,9 +3,20 @@
 # ==================================================================================
 import streamlit as st
 
-# ✅ Este comando deve ser o primeiro Streamlit do arquivo
+# ⚠️ ESTE COMANDO DEVE VIR ANTES DE QUALQUER OUTRA COISA DO STREAMLIT
 st.set_page_config(page_title="Clima-Cast-Crepaldi", page_icon="🌤️", layout="wide")
 
+# Somente depois disso, os demais imports
+import ee
+import locale
+import pandas as pd
+
+# Agora os módulos que usam Streamlit internamente
+import ui
+import gee_handler
+import map_visualizer
+import charts_visualizer
+import utils
 import ui
 import gee_handler
 import map_visualizer
@@ -167,3 +178,4 @@ def main():
 # ==================================================================================
 if __name__ == "__main__":
     main()
+
