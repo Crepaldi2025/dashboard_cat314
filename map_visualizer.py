@@ -191,15 +191,25 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     mapa = geemap.Map(center=centroid, zoom=6)
     mapa.add_basemap('SATELLITE')
 
-    # 🔹 Cria explicitamente o tile layer do GEE (garante renderização)
+       # 🔹 Cria explicitamente o tile layer do GEE (garante renderização)
     try:
+        # Cria camada a partir da imagem GEE
         layer = geemap.ee_tile_layer(ee_image, vis_params, name="Dados Climáticos")
-        mapa.add_layer(layer)
+        
+        # Adiciona corretamente o TileLayer no mapa (folium)
+        mapa.add_child(layer)
+
+        # Adiciona contorno e legenda
         mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
         mapa.add_colorbar(vis_params, label=unit_label, layer_name='Dados Climáticos')
+
+        # Exibe o mapa no Streamlit
         mapa.to_streamlit(height=550)
+
     except Exception as e:
         st.error(f"⚠️ Falha ao adicionar camada do GEE: {e}")
+
+
 
 
 
