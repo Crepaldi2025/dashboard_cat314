@@ -16,24 +16,22 @@ Esse dicionário é usado para converter a escolha do usuário (ex: "Março") em
 reconhecidos pelo módulo `calendar`.
 """
 
+from datetime import date
+import calendar
+
 MESES_PARA_NUMEROS = {
+    # Português
     "Janeiro": 1, "Fevereiro": 2, "Março": 3, "Abril": 4, "Maio": 5, "Junho": 6,
-    "Julho": 7, "Agosto": 8, "Setembro": 9, "Outubro": 10, "Novembro": 11, "Dezembro": 12
+    "Julho": 7, "Agosto": 8, "Setembro": 9, "Outubro": 10, "Novembro": 11, "Dezembro": 12,
+    # Inglês (fallback para Streamlit Cloud)
+    "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6,
+    "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12
 }
 
 def get_date_range(tipo_periodo, session_state):
     """
     Retorna as datas de início e fim de análise com base no tipo de período selecionado.
-    Parâmetros
-    ----------
-    tipo_periodo : str
-    Pode ser "Personalizado", "Mensal" ou "Anual".
-    session_state : streamlit.runtime.state.session_state
-    Contém os valores selecionados pelo usuário na interface (datas, mês, ano etc.).
-    Retorna
-    -------
-    tuple (date, date)
-    Datas de início e fim do período correspondente.
+    Tolerante a nomes de meses em português ou inglês (ex: 'Março' ou 'March').
     """
     if tipo_periodo == "Personalizado":
         return session_state.data_inicio, session_state.data_fim
@@ -45,10 +43,16 @@ def get_date_range(tipo_periodo, session_state):
     elif tipo_periodo == "Mensal":
         ano = session_state.ano_mensal
         mes_nome = session_state.mes_mensal
-        mes_num = MESES_PARA_NUMEROS[mes_nome.capitalize()]
+
+        # 🔧 tenta ambas as formas: português e inglês
+        mes_num = MESES_PARA_NUMEROS.get(mes_nome, MESES_PARA_NUMEROS.get(mes_nome.capitalize()))
+        if mes_num is None:
+            raise KeyError(f"Nome de mês '{mes_nome}' não reconhecido. Verifique o locale ou a seleção.")
+
         ultimo_dia = calendar.monthrange(ano, mes_num)[1]
         return date(ano, mes_num, 1), date(ano, mes_num, ultimo_dia)
-    
-# Caso o tipo de período não seja reconhecido, retorna None (tratado posteriormente em main.py)
-    
+
+    # fallback de segurança
     return None, None
+
+   
