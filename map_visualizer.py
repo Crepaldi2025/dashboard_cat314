@@ -134,8 +134,8 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 # ------------------------------------------------------------------------------
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """
-    Gera mapa estático de alta resolução (4096 px) com colorbar incorporada.
-    O resultado é salvo em memória e reutilizado sem reprocessar o GEE.
+    Gera mapa estático com colorbar incorporada e ajuste dinâmico de resolução.
+    Evita exceder o limite de 48 MB do Google Earth Engine.
     """
     import io
     from PIL import Image
@@ -146,7 +146,7 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         return None
 
     try:
-        # Verifica se o resultado já foi gerado
+        # Verifica cache
         cache_key = f"map_{st.session_state.variavel}_{st.session_state.tipo_periodo}"
         if cache_key in st.session_state:
             return st.session_state[cache_key]
@@ -157,41 +157,55 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         outline = ee.Image().byte().paint(featureCollection=feature, color=1, width=2)
         final_image = background.blend(ee_image.visualize(**vis_params)).blend(outline)
 
-        png_url = final_image.getThumbURL({
-            'region': region.getInfo()['coordinates'],
-            'dimensions': 4096,        # alta resolução (antes: 1024/2048)
-            'format': 'png'
-        })
+        # --- 2️⃣ Tentativa progressiva de resolução ---
+        for dims in [3072, 2560, 2048, 1536]:
+            try:
+                png_url = final_image.getThumbURL({
+                    'region': region.getInfo()['coordinates'],
+                    'dimensions': dims,
+                    'format': 'png'
+                })
+                response = requests.get(png_url, timeout=60)
+                mapa_img = Image.open(io.BytesIO(response.content)).convert("RGB")
+                mapa_w, mapa_h = mapa_img.size
+                break
+            except Exception as ee_error:
+                if "50331648" in str(ee_error) or "Total request size" in str(ee_error):
+                    st.warning(f"⚠️ Reduzindo resolução ({dims}px → próxima tentativa)...")
+                    continue
+                else:
+                    raise ee_error
+        else:
+            st.error("❌ Não foi possível gerar imagem dentro dos limites do GEE.")
+            return None
 
-        response = requests.get(png_url, timeout=60)
-        mapa_img = Image.open(io.BytesIO(response.content)).convert("RGB")
-        mapa_w, mapa_h = mapa_img.size
-
-        # --- 2️⃣ Gera colorbar refinada ---
+        # --- 3️⃣ Gera colorbar refinada ---
         colorbar_bytes = create_colorbar(vis_params, unit_label)
         colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGB")
 
-        # Redimensiona para combinar largura
+        # Redimensiona colorbar proporcionalmente
         colorbar_w, colorbar_h = colorbar_img.size
         scale_h = int(colorbar_h * (mapa_w / colorbar_w))
         colorbar_resized = colorbar_img.resize((mapa_w, scale_h), Image.Resampling.LANCZOS)
 
-        # --- 3️⃣ Combina mapa + colorbar ---
+        # --- 4️⃣ Combina mapa + colorbar ---
         combined = Image.new("RGB", (mapa_w, mapa_h + scale_h), (255, 255, 255))
         combined.paste(mapa_img, (0, 0))
         combined.paste(colorbar_resized, (0, mapa_h))
 
-        # --- 4️⃣ Salva imagem única em buffer ---
+        # --- 5️⃣ Salva imagem final ---
         buf = io.BytesIO()
         combined.save(buf, format="PNG", quality=98)
         buf.seek(0)
         final_bytes = buf.getvalue()
 
-        # --- 5️⃣ Guarda no session_state para reutilização ---
+        # --- 6️⃣ Armazena em cache para exportações ---
         st.session_state[cache_key] = final_bytes
         return final_bytes
 
     except Exception as e:
         st.error(f"⚠️ Falha ao gerar mapa estático com colorbar: {e}")
         return None
+
+
 
