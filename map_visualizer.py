@@ -206,6 +206,41 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
     except Exception as e:
         st.error(f"⚠️ Falha ao gerar mapa estático com colorbar: {e}")
         return None
+def export_interactive_snapshot(ee_image, feature, vis_params, unit_label=""):
+    """
+    Gera um mapa estático com a mesma renderização do mapa interativo (tiles do GEE).
+    Produz um PNG nítido e idêntico ao visual do geemap.
+    """
+    import geemap
+    import io
+    from PIL import Image
+
+    if ee_image is None or feature is None:
+        st.error("❌ Imagem ou geometria ausente.")
+        return None
+
+    # Define o centro da área
+    centroid = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
+    centroid.reverse()
+
+    # Cria o mapa base
+    m = geemap.Map(center=centroid, zoom=6)
+    m.add_basemap("SATELLITE")
+    m.addLayer(ee_image, vis_params, "Dados ERA5-LAND")
+    m.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno')
+    m.add_colorbar_branca(
+        colors=vis_params["palette"],
+        vmin=vis_params["min"],
+        vmax=vis_params["max"],
+        label=unit_label
+    )
+
+    # Renderiza o mapa em memória
+    buf = io.BytesIO()
+    img = m.screenshot()
+    img.save(buf, format="PNG", quality=98)
+    buf.seek(0)
+    return buf.getvalue()
 
 
 
