@@ -39,14 +39,13 @@ def _create_base_map(center, zoom, basemap='SATELLITE'):
     """Cria e retorna um mapa base do geemap cacheado."""
     mapa = geemap.Map(center=center, zoom=zoom)
     mapa.add_basemap(basemap)
-    return mapa
 
-
-@st.cache_data(show_spinner=False)
+ @st.cache_data(show_spinner=False)
 def create_colorbar(vis_params, unit_label=""):
     """
-    Gera uma colorbar estilizada (semelhante à do mapa interativo),
-    com fundo branco translúcido, ticks regulares e gradiente horizontal.
+    Gera uma colorbar horizontal refinada (fundo branco translúcido),
+    padronizada até 500 mm para mapas de precipitação.
+    Mantém estilo idêntico ao mapa interativo.
     """
     import matplotlib.pyplot as plt
     import matplotlib as mpl
@@ -57,31 +56,36 @@ def create_colorbar(vis_params, unit_label=""):
     vmax = vis_params["max"]
     colors = vis_params["palette"]
 
-    # Cria colormap contínuo
+    # 🔹 Padronização específica para precipitação (até 500 mm)
+    if "mm" in unit_label.lower() or "precip" in unit_label.lower():
+        vmin, vmax = 0, 500
+
+    # 🔹 Cria colormap contínuo
     cmap = mpl.colors.LinearSegmentedColormap.from_list("custom", colors)
 
-    # Define ticks regulares (ex.: 10 em 10)
-    step = max(1, round((vmax - vmin) / 6))
+    # 🔹 Define ticks regulares (a cada 100 mm, 10°C etc.)
+    step = 100 if "mm" in unit_label.lower() else max(1, round((vmax - vmin) / 6))
     ticks = np.arange(vmin, vmax + step, step)
 
-    # Figura compacta
-    fig, ax = plt.subplots(figsize=(5, 0.35))
+    # 🔹 Cria figura compacta e limpa
+    fig, ax = plt.subplots(figsize=(5.5, 0.35))
     norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
     cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal', ticks=ticks)
 
-    # Ajusta aparência
+    # 🔹 Aparência refinada
     cb.outline.set_visible(False)
-    cb.set_label(f"{unit_label}", fontsize=9, labelpad=2)
-    cb.ax.tick_params(labelsize=8)
-    ax.set_facecolor((1, 1, 1, 0.8))  # fundo branco translúcido
+    cb.ax.tick_params(labelsize=8, length=3)
+    cb.set_label(f"{unit_label}", fontsize=9, labelpad=3, fontweight='bold')
+    ax.set_facecolor((1, 1, 1, 0.85))  # fundo branco translúcido
     fig.patch.set_alpha(0.0)
 
-    # Renderiza imagem em memória
+    # 🔹 Renderiza imagem
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.05, transparent=True)
     plt.close(fig)
     buf.seek(0)
     return buf.getvalue()
+
 
 
 # ------------------------------------------------------------------------------
@@ -277,6 +281,7 @@ def add_colorbar_with_background(mapa, vis_params, unit_label=""):
 
     except Exception as e:
         st.warning(f"⚠️ Falha ao adicionar colorbar estilizada: {e}")
+
 
 
 
