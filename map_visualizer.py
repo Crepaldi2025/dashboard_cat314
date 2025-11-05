@@ -169,65 +169,67 @@ def display_polygon_draw_map():
 # ------------------------------------------------------------------------------
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """
-    Gera o mapa estático (PNG/JPG) com a colorbar embutida na própria imagem.
+    Gera mapa estático com colorbar incorporada (única imagem final).
     """
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
     import io
     import requests
+    import numpy as np
 
     if ee_image is None or feature is None:
-        st.error("❌ Imagem ou geometria ausente. Verifique se a área foi validada e o período contém dados.")
+        st.error("❌ Imagem ou geometria ausente.")
         return None, None, None
 
     try:
+        # --- 1️⃣ gera imagem base do GEE
         region = feature.geometry().bounds()
         background = ee.Image(1).visualize(palette=['ffffff'], min=0, max=1)
         outline = ee.Image().byte().paint(featureCollection=feature, color=1, width=2)
         final_image = background.blend(ee_image.visualize(**vis_params)).blend(outline)
 
-        # URLs de imagem do GEE
+        # --- 2️⃣ obtém imagem PNG
         png_url = final_image.getThumbURL({
             'region': region.getInfo()['coordinates'],
             'dimensions': 1024,
             'format': 'png'
         })
-        jpg_url = final_image.getThumbURL({
-            'region': region.getInfo()['coordinates'],
-            'dimensions': 1024,
-            'format': 'jpg'
-        })
+        response = requests.get(png_url)
+        mapa_img = mpimg.imread(io.BytesIO(response.content))
 
-        # Faz download da imagem principal
-        mapa_bytes = requests.get(png_url).content
-        mapa_img = mpimg.imread(io.BytesIO(mapa_bytes))
-
-        # Gera a colorbar (imagem em bytes)
+        # --- 3️⃣ gera colorbar refinada
         colorbar_bytes = create_colorbar(vis_params, unit_label)
         colorbar_img = mpimg.imread(io.BytesIO(colorbar_bytes))
 
-        # 🔹 Combina mapa + colorbar verticalmente
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.axis("off")
-        ax.imshow(mapa_img)
-        plt.subplots_adjust(bottom=0.15)
+        # --- 4️⃣ combina ambas verticalmente (mapa + colorbar)
+        mapa_h, mapa_w, _ = mapa_img.shape
+        color_h, color_w, _ = colorbar_img.shape
 
-        # Posição da colorbar (logo abaixo do mapa)
-        fig.figimage(colorbar_img, xo=100, yo=10, origin='lower', alpha=1.0)
+        # ajusta largura da colorbar ao mapa
+        scale = mapa_w / color_w
+        from PIL import Image
+        colorbar_resized = np.array(
+            Image.fromarray((colorbar_img * 255).astype(np.uint8)).resize(
+                (mapa_w, int(color_h * scale)), Image.LANCZOS
+            )
+        ) / 255.0
 
-        # Salva figura final em memória
+        # concatena mapa e colorbar
+        combined = np.vstack((mapa_img, colorbar_resized))
+
+        # --- 5️⃣ salva imagem final
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', pad_inches=0)
-        plt.close(fig)
+        plt.imsave(buf, combined)
         buf.seek(0)
 
-        # Retorna URLs + imagem combinada para exibição
-        return png_url, jpg_url, buf.getvalue()
+        # --- 6️⃣ retorna a imagem final para exibição e exportação
+        return buf.getvalue(), buf.getvalue(), buf.getvalue()
 
     except Exception as e:
-        st.error(f"⚠️ Falha ao gerar o mapa estático: {e}")
+        st.error(f"⚠️ Falha ao gerar mapa estático com colorbar: {e}")
         return None, None, None
 
+        
 
 # ------------------------------------------------------------------------------
 # MAPA INTERATIVO (ERA5-LAND)
@@ -308,6 +310,7 @@ def add_colorbar_with_background(mapa, vis_params, unit_label=""):
 
     except Exception as e:
         st.warning(f"⚠️ Falha ao adicionar colorbar estilizada: {e}")
+
 
 
 
