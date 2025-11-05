@@ -1,28 +1,21 @@
 # ==================================================================================
-# main.py — Versão otimizada do Clima-Cast-Crepaldi
+# main.py — Clima-Cast-Crepaldi (versão otimizada 2025-11)
 # ==================================================================================
-# Ajustes:
-#   ✅ Inicialização "sob demanda" do Earth Engine (lazy initialization)
-#   ✅ Carga de dados geográficos adiada e cacheada
-#   ✅ Estrutura principal simplificada para melhor tempo de resposta
-# ==================================================================================
-
 import streamlit as st
 import ui
 import gee_handler
 import map_visualizer
 import charts_visualizer
-import ee
 import utils
-import requests
+import ee
 import io
 import pandas as pd
 import copy
 import locale
 
-# ------------------------------------------------------------------------------
-# Configuração regional — garante datas e números no formato brasileiro
-# ------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# Locale padrão (Português do Brasil)
+# --------------------------------------------------------------------------
 try:
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 except locale.Error:
@@ -31,16 +24,14 @@ except locale.Error:
     except locale.Error:
         pass
 
-
-# ------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Função principal de análise
-# ------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 def run_full_analysis():
     """Executa toda a lógica de busca de dados e exibição de resultados."""
 
-    # 🔹 Inicializa o Google Earth Engine somente aqui (lazy init)
     from gee_handler import inicializar_gee
-    status = inicializar_gee()  # apenas uma chamada, retorna modo de conexão
+    status = inicializar_gee()
 
     if status == "local":
         st.toast("✅ Conectado ao Earth Engine (modo local).")
@@ -48,208 +39,195 @@ def run_full_analysis():
         st.toast("✅ Conectado ao Earth Engine via Service Account.")
     elif status is None:
         st.error("⚠️ Falha ao conectar ao Google Earth Engine.")
-        return  # interrompe se não conectou
+        return
 
-    # 🔄 Processamento principal
     with st.spinner("🔄 Processando dados no Google Earth Engine..."):
         geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
         if not geometry:
-            st.error("Não foi possível definir a geometria da área de interesse. Verifique os filtros de localização.")
+            st.error("Não foi possível definir a geometria da área de interesse.")
             return
 
-
-        # Obtém período de análise
-        start_date, end_date = utils.get_date_range(st.session_state.tipo_periodo, st.session_state)
+        start_date, end_date = utils.get_date_range(
+            st.session_state.tipo_periodo, st.session_state
+        )
         if not (start_date and end_date):
             st.error("Período de análise inválido.")
             return
 
         variable_config = gee_handler.ERA5_VARS[st.session_state.variavel]
+        nav_option = st.session_state.nav_option
 
-        # ----------------------------------------------------------------------
-        # BLOCO 1 — Modo Mapas
-        # ----------------------------------------------------------------------
-        if st.session_state.nav_option == "Mapas":
+        # ------------------------------------------------------------------
+        # MODO MAPAS
+        # ------------------------------------------------------------------
+        if nav_option == "Mapas":
             ee_image = gee_handler.get_era5_image(
-                st.session_state.variavel,
-                start_date, end_date,
-                geometry
+                st.session_state.variavel, start_date, end_date, geometry
             )
             if not ee_image:
                 return
 
-            final_vis_params = copy.deepcopy(variable_config['vis_params'])
-            if (st.session_state.variavel == "Precipitação Total" and
-                st.session_state.tipo_periodo == "Anual"):
-                final_vis_params['max'] = 3000
+            final_vis_params = copy.deepcopy(variable_config["vis_params"])
+            if (
+                st.session_state.variavel == "Precipitação Total"
+                and st.session_state.tipo_periodo == "Anual"
+            ):
+                final_vis_params["max"] = 3000
 
             st.subheader("🗺️ Resultado da Análise")
 
-            # --- Mapa Estático ---
+            # ---------- mapa estático ----------
             if st.session_state.map_type == "Estático":
-                png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
-                    ee_image, feature, final_vis_params, variable_config['unit']
+                mapa_final, _, _ = map_visualizer.create_static_map(
+                    ee_image, feature, final_vis_params, variable_config["unit"]
                 )
-                if not (png_url and jpg_url and colorbar_img):
-                    return
+                if mapa_final:
+                    st.image(
+                        mapa_final,
+                        caption="Mapa Estático com Legenda",
+                        use_container_width=True,
+                    )
+                    with st.expander("💾 Opções de Exportação de Mapa"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.download_button(
+                                label="Exportar (PNG)",
+                                data=mapa_final,
+                                file_name="mapa_com_legenda.png",
+                                mime="image/png",
+                                use_container_width=True,
+                            )
+                        with col2:
+                            st.download_button(
+                                label="Exportar (JPEG)",
+                                data=mapa_final,
+                                file_name="mapa_com_legenda.jpeg",
+                                mime="image/jpeg",
+                                use_container_width=True,
+                            )
 
-                st.image(png_url, caption="Mapa Estático Gerado")
-                st.image(colorbar_img, caption="Legenda", width=600)
-
-                with st.expander("💾 Opções de Exportação de Mapa"):
-                    map_btn1, map_btn2 = st.columns(2)
-                    with map_btn1:
-                        st.download_button(
-                            label="Exportar (PNG)",
-                            data=requests.get(png_url).content,
-                            file_name="mapa.png",
-                            mime="image/png",
-                            use_container_width=True
+                    with st.expander("📋 Tabela de Dados Amostrados"):
+                        df_table = gee_handler.get_sampled_data_as_dataframe(
+                            ee_image, geometry, st.session_state.variavel
                         )
-                    with map_btn2:
-                        st.download_button(
-                            label="Exportar (JPEG)",
-                            data=requests.get(jpg_url).content,
-                            file_name="mapa.jpeg",
-                            mime="image/jpeg",
-                            use_container_width=True
-                        )
+                        if not df_table.empty:
+                            st.dataframe(df_table)
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                st.download_button(
+                                    "Exportar (CSV)",
+                                    data=df_table.to_csv(index=False).encode("utf-8"),
+                                    file_name="dados_mapa.csv",
+                                    mime="text/csv",
+                                    use_container_width=True,
+                                )
+                            with c2:
+                                output = io.BytesIO()
+                                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                                    df_table.to_excel(
+                                        writer, index=False, sheet_name="Dados"
+                                    )
+                                st.download_button(
+                                    "Exportar (XLSX)",
+                                    data=output.getvalue(),
+                                    file_name="dados_mapa.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True,
+                                )
+                        else:
+                            st.warning("Não foi possível amostrar dados para a tabela.")
 
-            # --- Mapa Interativo ---
+            # ---------- mapa interativo ----------
             elif st.session_state.map_type == "Interativo":
                 map_visualizer.create_interactive_map(
-                    ee_image, feature, final_vis_params, variable_config['unit']
+                    ee_image, feature, final_vis_params, variable_config["unit"]
                 )
 
-            # --- Tabela de Dados ---
-            with st.expander("📊 Tabela de Dados Amostrados"):
-                df_table = gee_handler.get_sampled_data_as_dataframe(
-                    ee_image, geometry, st.session_state.variavel
-                )
-                if not df_table.empty:
-                    st.dataframe(df_table)
-                    tbl_btn1, tbl_btn2 = st.columns(2)
-                    with tbl_btn1:
-                        st.download_button(
-                            label="Exportar (CSV)",
-                            data=df_table.to_csv(index=False).encode('utf-8'),
-                            file_name="dados_mapa.csv",
-                            mime="text/csv",
-                            use_container_width=True
-                        )
-                    with tbl_btn2:
-                        output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                            df_table.to_excel(writer, index=False, sheet_name='Dados')
-                        st.download_button(
-                            label="Exportar (XLSX)",
-                            data=output.getvalue(),
-                            file_name="dados_mapa.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
-                else:
-                    st.warning("⚠️ Não foi possível amostrar dados para a tabela.")
-
-        # ----------------------------------------------------------------------
-        # BLOCO 2 — Modo Séries Temporais
-        # ----------------------------------------------------------------------
-        elif st.session_state.nav_option == "Séries Temporais":
+        # ------------------------------------------------------------------
+        # MODO SÉRIES TEMPORAIS
+        # ------------------------------------------------------------------
+        elif nav_option == "Séries Temporais":
             df_series = gee_handler.get_time_series_data(
-                st.session_state.variavel,
-                start_date, end_date,
-                geometry
+                st.session_state.variavel, start_date, end_date, geometry
             )
-
             st.subheader("📈 Resultado da Análise")
+
             charts_visualizer.display_time_series_chart(
-                df_series,
-                st.session_state.variavel,
-                variable_config['unit']
+                df_series, st.session_state.variavel, variable_config["unit"]
             )
 
             if not df_series.empty:
                 with st.expander("💾 Exportar Dados da Série Temporal"):
                     st.dataframe(df_series)
-                    tbl_btn1, tbl_btn2 = st.columns(2)
-                    with tbl_btn1:
+                    c1, c2 = st.columns(2)
+                    with c1:
                         st.download_button(
-                            label="Exportar (CSV)",
-                            data=df_series.to_csv(index=False).encode('utf-8'),
+                            "Exportar (CSV)",
+                            data=df_series.to_csv(index=False).encode("utf-8"),
                             file_name="dados_serie_temporal.csv",
                             mime="text/csv",
-                            use_container_width=True
+                            use_container_width=True,
                         )
-                    with tbl_btn2:
+                    with c2:
                         output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                            df_series.to_excel(writer, index=False, sheet_name='Dados')
+                        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                            df_series.to_excel(writer, index=False, sheet_name="Dados")
                         st.download_button(
-                            label="Exportar (XLSX)",
+                            "Exportar (XLSX)",
                             data=output.getvalue(),
                             file_name="dados_serie_temporal.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
+                            use_container_width=True,
                         )
 
-
-# ------------------------------------------------------------------------------
-# Função principal — controle da interface e fluxo lógico
-# ------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# Função principal da aplicação
+# --------------------------------------------------------------------------
 def main():
-    """Organiza e executa o fluxo do aplicativo Streamlit."""
+    """Organiza e executa a aplicação Streamlit."""
 
-    # 🔹 Configura layout e interface inicial
+    from gee_handler import inicializar_gee
+    inicializar_gee()  # Inicialização silenciosa e cacheada
+
     ui.configurar_pagina()
-
-    # 🔹 Sidebar dinâmica — dados só são carregados quando necessários
-    opcao_menu = ui.renderizar_sidebar()
+    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
+    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
 
     if opcao_menu == "Sobre o Aplicativo":
         ui.renderizar_pagina_sobre()
-        return
-
-    # 🔹 Após validação da área (fase principal)
-    if st.session_state.get('area_validada', False):
-        ui.renderizar_pagina_principal(opcao_menu)
-        ui.renderizar_resumo_selecao()
-        run_full_analysis()
-
-    # 🔹 Etapa de confirmação da área (círculo ou polígono)
-    elif st.session_state.get('show_confirmation_map', False):
-        ui.renderizar_pagina_principal(opcao_menu)
-        ui.renderizar_resumo_selecao()
-        tipo_loc = st.session_state.get('tipo_localizacao')
-
-        if tipo_loc == "Círculo (Lat/Lon/Raio)":
-            map_visualizer.display_circle_map(
-                st.session_state.latitude,
-                st.session_state.longitude,
-                st.session_state.raio
-            )
-            ui.renderizar_validacao_mapa()
-        elif tipo_loc == "Polígono":
-            map_visualizer.display_polygon_draw_map()
-            ui.renderizar_validacao_mapa()
-
-    # 🔹 Gatilho inicial após clicar em "Gerar Análise"
-    elif st.session_state.get('analysis_triggered', False):
-        st.session_state.analysis_triggered = False  # Consome o gatilho
-        tipo_loc = st.session_state.get('tipo_localizacao')
-        if tipo_loc in ["Estado", "Município"]:
-            st.session_state.area_validada = True
-        else:
-            st.session_state.show_confirmation_map = True
-        st.rerun()
-
-    # 🔹 Tela inicial
     else:
-        ui.renderizar_pagina_principal(opcao_menu)
+        if st.session_state.get("area_validada", False):
+            ui.renderizar_pagina_principal(opcao_menu)
+            ui.renderizar_resumo_selecao()
+            run_full_analysis()
 
+        elif st.session_state.get("show_confirmation_map", False):
+            ui.renderizar_pagina_principal(opcao_menu)
+            ui.renderizar_resumo_selecao()
+            tipo_loc = st.session_state.get("tipo_localizacao")
+            if tipo_loc == "Círculo (Lat/Lon/Raio)":
+                map_visualizer.display_circle_map(
+                    st.session_state.latitude,
+                    st.session_state.longitude,
+                    st.session_state.raio,
+                )
+                ui.renderizar_validacao_mapa()
+            elif tipo_loc == "Polígono":
+                map_visualizer.display_polygon_draw_map()
+                ui.renderizar_validacao_mapa()
 
-# ------------------------------------------------------------------------------
-# Execução principal
-# ------------------------------------------------------------------------------
+        elif st.session_state.get("analysis_triggered", False):
+            st.session_state.analysis_triggered = False
+            tipo_loc = st.session_state.get("tipo_localizacao")
+            if tipo_loc in ["Estado", "Município"]:
+                st.session_state.area_validada = True
+            else:
+                st.session_state.show_confirmation_map = True
+            st.rerun()
+
+        else:
+            ui.renderizar_pagina_principal(opcao_menu)
+
+# --------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
-
