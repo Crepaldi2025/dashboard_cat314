@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (versão estável - restaurada)
+# main.py — Clima-Cast-Crepaldi (versão estável restaurada)
 # ==================================================================================
 import streamlit as st
 import ui
