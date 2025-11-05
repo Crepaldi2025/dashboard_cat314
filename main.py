@@ -40,13 +40,23 @@ def run_full_analysis():
 
     # 🔹 Inicializa o Google Earth Engine somente aqui (lazy init)
     from gee_handler import inicializar_gee
-    inicializar_gee()
+    status = inicializar_gee()  # apenas uma chamada, retorna modo de conexão
 
+    if status == "local":
+        st.toast("✅ Conectado ao Earth Engine (modo local).")
+    elif status == "service_account":
+        st.toast("✅ Conectado ao Earth Engine via Service Account.")
+    elif status is None:
+        st.error("⚠️ Falha ao conectar ao Google Earth Engine.")
+        return  # interrompe se não conectou
+
+    # 🔄 Processamento principal
     with st.spinner("🔄 Processando dados no Google Earth Engine..."):
         geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
         if not geometry:
             st.error("Não foi possível definir a geometria da área de interesse. Verifique os filtros de localização.")
             return
+
 
         # Obtém período de análise
         start_date, end_date = utils.get_date_range(st.session_state.tipo_periodo, st.session_state)
@@ -242,3 +252,4 @@ def main():
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
+
