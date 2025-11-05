@@ -20,7 +20,7 @@ except locale.Error:
         # Fallback para sistemas Windows
         locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
     except locale.Error:
-        st.warning("Locale 'pt_BR.UTF-8' não encontrado. Nomes de meses podem aparecer em inglês.")
+        
 
 def initialize_gee():
     """Tenta inicializar a conexão com o Google Earth Engine."""
@@ -155,4 +155,5 @@ def main():
             ui.renderizar_pagina_principal(opcao_menu)
 
 if __name__ == "__main__":
+
     main()
