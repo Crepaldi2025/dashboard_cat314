@@ -1,11 +1,11 @@
 # ==================================================================================
-# gee_handler.py — Módulo de integração com Google Earth Engine (GEE)
+# gee_handler.py — Clima-Cast-Crepaldi (versão com extremos espaciais - nov/2025)
 # ==================================================================================
-# Melhorias nesta versão:
-#   ✅ Inicialização cacheada e sob demanda do GEE (lazy + @st.cache_resource)
-#   ✅ Leitura e cache otimizado de dados geopolíticos locais
-#   ✅ Redução do I/O e das mensagens de interface pesadas
-#   ✅ Mantida compatibilidade total com main.py e ui_paginas.py
+# Recursos:
+#   ✅ Conexão robusta com o Google Earth Engine (local ou service account)
+#   ✅ Dados do ERA5-LAND (DAILY_AGGR)
+#   ✅ Séries temporais com média, percentil 95 e máximo espacial
+#   ✅ Backup comentado da versão original (caso queira reverter)
 # ==================================================================================
 
 import streamlit as st
@@ -16,49 +16,34 @@ import geobr
 import pandas as pd
 
 # ------------------------------------------------------------------------------
-# CONFIGURAÇÕES GERAIS
+# Inicialização padronizada do Google Earth Engine
 # ------------------------------------------------------------------------------
-PROJECT_ID = "gee-crepaldi-2025b"  # ID do projeto no GEE
+PROJECT_ID = "gee-crepaldi-2025b"
 
-# ------------------------------------------------------------------------------
-# INICIALIZAÇÃO DO GEE — COM CACHE E FALLBACK AUTOMÁTICO
-# ------------------------------------------------------------------------------
-
-@st.cache_resource(show_spinner=False)
 def inicializar_gee():
-    """
-    Inicializa o Google Earth Engine de forma cacheada e silenciosa (sem mensagens Streamlit).
-    Retorna o modo de inicialização: 'local', 'service_account' ou None.
-    """
-    if ee.data._initialized:
-        return "já_inicializado"
-
+    """Inicializa o Earth Engine com fallback para Service Account (Streamlit Cloud)."""
     try:
         ee.Initialize(project=PROJECT_ID)
-        st.session_state['gee_status'] = "local"
         return "local"
-    except Exception as e_local:
+    except Exception:
         try:
-            if "earthengine_service_account" not in st.secrets:
-                raise e_local
             creds_dict = dict(st.secrets["earthengine_service_account"])
             credentials = ee.ServiceAccountCredentials(
-                creds_dict["client_email"],
-                key_data=json.dumps(creds_dict)
+                creds_dict["client_email"], key_data=json.dumps(creds_dict)
             )
             ee.Initialize(credentials, project=PROJECT_ID)
-            st.session_state['gee_status'] = "service_account"
             return "service_account"
-        except Exception as e_service:
-            st.session_state['gee_status'] = f"erro: {e_service}"
+        except Exception as e:
+            st.error(f"⚠️ Falha ao conectar com o Google Earth Engine: {e}")
             return None
-            
+
 # ------------------------------------------------------------------------------
-# DICIONÁRIO DE VARIÁVEIS ERA5-LAND
+# Configuração das variáveis ERA5-LAND
 # ------------------------------------------------------------------------------
 ERA5_VARS = {
     "Temperatura do Ar (2m)": {
-        "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean",
+        "band": "temperature_2m", "result_band": "temperature_2m",
+        "unit": "°C", "aggregation": "mean",
         "vis_params": {"min": 0, "max": 40,
                        "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00',
                                    '#FFFF00', '#FFA500', '#FF0000', '#800000']}
@@ -74,271 +59,248 @@ ERA5_VARS = {
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'],
         "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
         "vis_params": {"min": 0, "max": 30,
-                       "palette": ['#FFFFFF', '#B0E0E6', '#4682B4',
-                                   '#DAA520', '#FF4500', '#8B0000']}
+                       "palette": ['#FFFFFF', '#B0E0E6', '#4682B4', '#DAA520',
+                                   '#FF4500', '#8B0000']}
     }
 }
 
-
 # ------------------------------------------------------------------------------
-# DADOS GEOPOLÍTICOS DO BRASIL — CACHE OTIMIZADO
+# Dados geopolíticos locais (cacheados)
 # ------------------------------------------------------------------------------
-@st.cache_data(show_spinner=False)
+@st.cache_data
 def get_brazilian_geopolitical_data_local():
-    """
-    Lê o arquivo local de municípios e retorna estrutura UF → Municípios.
-    A leitura é feita uma única vez por sessão (cache).
-    Tolerante a entradas incompletas do JSON (NoneType-safe).
-    """
+    """Lê o arquivo JSON de municípios locais e organiza por UF."""
     try:
-        with open('municipios_ibge.json', 'r', encoding='utf-8') as f:
+        with open("municipios_ibge.json", "r", encoding="utf-8") as f:
             municipios_data = json.load(f)
-    except FileNotFoundError:
-        st.warning("⚠️ Arquivo 'municipios_ibge.json' não encontrado no diretório do app.")
-        return {}, {}
+
+        geo_data = defaultdict(list)
+        uf_name_map = {}
+
+        for municipio in municipios_data:
+            microrregiao = municipio.get("microrregiao")
+            if microrregiao:
+                mesorregiao = microrregiao.get("mesorregiao", {})
+                uf_data = mesorregiao.get("UF", {})
+                uf_sigla = uf_data.get("sigla")
+                uf_nome = uf_data.get("nome")
+                nome_municipio = municipio.get("nome")
+                if uf_sigla and uf_nome:
+                    uf_name_map[uf_sigla] = uf_nome
+                if uf_sigla and nome_municipio:
+                    geo_data[uf_sigla].append(nome_municipio)
+
+        sorted_geo_data = {uf: sorted(geo_data[uf]) for uf in sorted(geo_data.keys())}
+        return sorted_geo_data, uf_name_map
     except Exception as e:
-        st.error(f"❌ Erro ao abrir o arquivo 'municipios_ibge.json': {e}")
+        st.error(f"Erro ao processar arquivo de municípios: {e}")
         return {}, {}
-
-    geo_data = defaultdict(list)
-    uf_name_map = {}
-
-    for municipio in municipios_data:
-        if not isinstance(municipio, dict):
-            continue  # pula entradas malformadas
-
-        microrregiao = municipio.get("microrregiao")
-        if not microrregiao:
-            continue
-
-        mesorregiao = microrregiao.get("mesorregiao") if isinstance(microrregiao, dict) else None
-        if not mesorregiao:
-            continue
-
-        uf_data = mesorregiao.get("UF") if isinstance(mesorregiao, dict) else None
-        if not uf_data or not isinstance(uf_data, dict):
-            continue
-
-        uf_sigla = uf_data.get("sigla")
-        uf_nome = uf_data.get("nome")
-        nome_municipio = municipio.get("nome")
-
-        if uf_sigla and uf_nome and nome_municipio:
-            geo_data[uf_sigla].append(nome_municipio)
-            uf_name_map[uf_sigla] = uf_nome
-
-    sorted_geo_data = {uf: sorted(muns) for uf, muns in sorted(geo_data.items())}
-    return sorted_geo_data, uf_name_map
-
-
 
 # ------------------------------------------------------------------------------
-# GEOMETRIA DA ÁREA DE INTERESSE
+# Geometrias de interesse
 # ------------------------------------------------------------------------------
 def get_area_of_interest_geometry(session_state):
-    """Obtém a geometria da área de interesse (Estado, Município, Círculo ou Polígono)."""
-    tipo_loc = session_state.tipo_localizacao
+    """Obtém a geometria de interesse (Estado, Município, Polígono, Círculo)."""
+    tipo = session_state.tipo_localizacao
 
-    # --- Estado ---
-    if tipo_loc == "Estado":
-        estado_selecionado_str = session_state.estado
-        if estado_selecionado_str == "Selecione...":
+    if tipo == "Estado":
+        uf = session_state.estado.split(" - ")[-1]
+        estados = geobr.read_state()
+        gdf = estados[estados["abbrev_state"] == uf]
+        if gdf.empty:
             return None, None
-        uf_sigla = estado_selecionado_str.split(' - ')[-1]
-        try:
-            todos_estados_gdf = geobr.read_state()
-            estado_gdf = todos_estados_gdf[todos_estados_gdf['abbrev_state'] == uf_sigla]
-            if estado_gdf.empty:
-                return None, None
-            estado_geojson = json.loads(estado_gdf.to_json())['features'][0]['geometry']
-            ee_geometry = ee.Geometry(estado_geojson, proj='EPSG:4326', geodesic=False)
-            ee_feature = ee.Feature(ee_geometry, {'abbrev_state': uf_sigla})
-            return ee_geometry, ee_feature
-        except Exception as e:
-            st.error(f"Ocorreu um erro ao buscar a geometria do estado: {e}")
-            return None, None
+        geojson = json.loads(gdf.to_json())["features"][0]["geometry"]
+        geom = ee.Geometry(geojson, proj="EPSG:4326", geodesic=False)
+        feat = ee.Feature(geom, {"abbrev_state": uf})
+        return geom, feat
 
-    # --- Município ---
-    elif tipo_loc == "Município":
-        estado_selecionado_str = session_state.get('estado', 'Selecione...')
-        municipio_nome = session_state.get('municipio', 'Selecione...')
-        if estado_selecionado_str == "Selecione..." or municipio_nome == "Selecione...":
-            st.warning("Por favor, selecione um estado e um município válidos.")
+    elif tipo == "Município":
+        uf = session_state.estado.split(" - ")[-1]
+        muni = session_state.municipio
+        gdf = geobr.read_municipality(code_muni=uf, year=2020)
+        gdf = gdf[gdf["name_muni"] == muni]
+        if gdf.empty:
             return None, None
-        uf_sigla = estado_selecionado_str.split(' - ')[-1]
+        geojson = json.loads(gdf.to_json())["features"][0]["geometry"]
+        geom = ee.Geometry(geojson, proj="EPSG:4326", geodesic=False)
+        feat = ee.Feature(geom, {"name_muni": muni, "abbrev_state": uf})
+        return geom, feat
+
+    elif tipo == "Círculo (Lat/Lon/Raio)":
         try:
-            with st.spinner(f"Buscando geometria para {municipio_nome}, {uf_sigla}..."):
-                municipios_do_estado_gdf = geobr.read_municipality(code_muni=uf_sigla, year=2020)
-            municipio_gdf = municipios_do_estado_gdf[municipios_do_estado_gdf['name_muni'] == municipio_nome]
-            if municipio_gdf.empty:
-                return None, None
-            municipio_geojson = json.loads(municipio_gdf.to_json())['features'][0]['geometry']
-            ee_geometry = ee.Geometry(municipio_geojson, proj='EPSG:4326', geodesic=False)
-            ee_feature = ee.Feature(ee_geometry, {'name_muni': municipio_nome, 'abbrev_state': uf_sigla})
-            return ee_geometry, ee_feature
+            lat, lon, raio_km = session_state.latitude, session_state.longitude, session_state.raio
+            ponto = ee.Geometry.Point([lon, lat])
+            geom = ponto.buffer(raio_km * 1000)
+            feat = ee.Feature(geom, {"latitude": lat, "longitude": lon, "raio_km": raio_km})
+            return geom, feat
         except Exception as e:
-            st.error(f"Ocorreu um erro ao buscar a geometria do município: {e}")
+            st.error(f"Erro ao criar círculo: {e}")
             return None, None
 
-    # --- Círculo ---
-    elif tipo_loc == "Círculo (Lat/Lon/Raio)":
-        try:
-            latitude = session_state.latitude
-            longitude = session_state.longitude
-            raio_km = session_state.raio
-            ponto_central = ee.Geometry.Point([longitude, latitude])
-            raio_em_metros = raio_km * 1000
-            ee_geometry = ponto_central.buffer(raio_em_metros)
-            ee_feature = ee.Feature(ee_geometry, {'latitude': latitude, 'longitude': longitude, 'raio_km': raio_km})
-            return ee_geometry, ee_feature
-        except Exception as e:
-            st.error(f"Ocorreu um erro ao criar a geometria do círculo: {e}")
-            return None, None
-
-    # --- Polígono desenhado ---
-    elif tipo_loc == "Polígono":
-        if 'drawn_geometry' not in session_state:
-            st.warning("Nenhum polígono foi capturado do mapa.")
+    elif tipo == "Polígono":
+        if "drawn_geometry" not in session_state:
+            st.warning("Nenhum polígono desenhado.")
             return None, None
         try:
-            polygon_geojson = session_state.drawn_geometry
-            ee_geometry = ee.Geometry(polygon_geojson, proj='EPSG:4326', geodesic=False)
-            ee_feature = ee.Feature(ee_geometry)
-            return ee_geometry, ee_feature
+            geom = ee.Geometry(session_state.drawn_geometry, proj="EPSG:4326", geodesic=False)
+            feat = ee.Feature(geom)
+            return geom, feat
         except Exception as e:
-            st.error(f"Ocorreu um erro ao processar a geometria do polígono desenhado: {e}")
+            st.error(f"Erro ao processar polígono: {e}")
             return None, None
 
     return None, None
 
-
 # ------------------------------------------------------------------------------
-# PROCESSAMENTO DE DADOS ERA5-LAND (MAPAS)
+# Busca de imagem ERA5-LAND (mapas)
 # ------------------------------------------------------------------------------
 def get_era5_image(variable, start_date, end_date, geometry):
-    """Busca e processa os dados do ERA5-Land para mapas."""
-    if variable not in ERA5_VARS:
+    """Busca e agrega imagens do ERA5-LAND."""
+    config = ERA5_VARS.get(variable)
+    if not config:
         return None
 
-    config = ERA5_VARS[variable]
-    bands_to_select = config.get('bands', config.get('band'))
-    image_collection = (
-        ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR')
-        .filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-        .select(bands_to_select)
-    )
+    bands = config.get("bands", config.get("band"))
+    ic = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR") \
+        .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")) \
+        .select(bands)
 
-    if image_collection.size().getInfo() == 0:
-        st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
+    if ic.size().getInfo() == 0:
+        st.warning("Sem dados para o período selecionado.")
         return None
 
     if variable == "Velocidade do Vento (10m)":
-        def calculate_wind_speed(image):
-            wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
-            return image.addBands(wind_speed)
-        image_collection = image_collection.map(calculate_wind_speed)
+        def calc_ws(img):
+            ws = img.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config["result_band"])
+            return img.addBands(ws)
+        ic = ic.map(calc_ws)
 
-    if config['aggregation'] == 'mean':
-        aggregated_image = image_collection.select(config['result_band']).mean()
-    elif config['aggregation'] == 'sum':
-        aggregated_image = image_collection.select(config['result_band']).sum()
+    agg = config["aggregation"]
+    if agg == "mean":
+        img = ic.select(config["result_band"]).mean()
+    elif agg == "sum":
+        img = ic.select(config["result_band"]).sum()
     else:
-        aggregated_image = None
+        img = ic.select(config["result_band"]).first()
 
-    if aggregated_image:
-        final_image = aggregated_image.clip(geometry).float()
-        if config['unit'] == "°C":
-            final_image = final_image.subtract(273.15)
-        if config['unit'] == "mm":
-            final_image = final_image.multiply(1000)
-        if final_image.bandNames().size().getInfo() == 0:
-            return None
-        return final_image
-
-    return None
-
+    img = img.clip(geometry).float()
+    if config["unit"] == "°C":
+        img = img.subtract(273.15)
+    elif config["unit"] == "mm":
+        img = img.multiply(1000)
+    return img
 
 # ------------------------------------------------------------------------------
-# AMOSTRAGEM E EXPORTAÇÃO DE DADOS TABULARES
+# Amostragem para tabela (mapa)
 # ------------------------------------------------------------------------------
-@st.cache_data(show_spinner=False)
-def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
-    """Amostra a imagem do GEE e retorna os dados como um DataFrame para tabela."""
+@st.cache_data
+def get_sampled_data_as_dataframe(img, geom, variable):
+    """Extrai amostras do mapa como DataFrame."""
+    import pandas as pd
     if variable not in ERA5_VARS:
         return pd.DataFrame()
     config = ERA5_VARS[variable]
-    band_name = config['result_band']
-    unit = config['unit']
+    band = config["result_band"]
+    unit = config["unit"]
 
-    sample = _ee_image.select(band_name).sample(region=_geometry, scale=10000, numPixels=500, geometries=True)
-    features = sample.getInfo().get('features', [])
-    if not features:
-        return pd.DataFrame()
-
+    sample = img.select(band).sample(region=geom, scale=10000, numPixels=500, geometries=True)
+    features = sample.getInfo().get("features", [])
     data = []
-    for feature in features:
-        value = feature['properties'].get(band_name)
-        if value is not None:
-            coords = feature['geometry']['coordinates']
-            data.append({
-                'Longitude': coords[0],
-                'Latitude': coords[1],
-                f'{variable.split(" (")[0]} ({unit})': value
-            })
+    for f in features:
+        val = f["properties"].get(band)
+        if val is not None:
+            coords = f["geometry"]["coordinates"]
+            data.append({"Longitude": coords[0], "Latitude": coords[1], f"{variable} ({unit})": val})
     return pd.DataFrame(data)
 
-
 # ------------------------------------------------------------------------------
-# EXTRAÇÃO DE SÉRIES TEMPORAIS
+# SÉRIES TEMPORAIS (NOVA VERSÃO - com extremos espaciais)
 # ------------------------------------------------------------------------------
-@st.cache_data(show_spinner=False)
-def get_time_series_data(variable, start_date, end_date, _geometry):
-    """Extrai a série temporal de uma variável ERA5-Land para uma dada geometria."""
+@st.cache_data
+def get_time_series_data(variable, start_date, end_date, geometry):
+    """
+    Extrai séries temporais diárias com estatísticas espaciais:
+    - mean (média)
+    - p95  (percentil 95)
+    - max  (máximo)
+    """
     if variable not in ERA5_VARS:
         return pd.DataFrame()
+
     config = ERA5_VARS[variable]
+    bands = config.get("bands", config.get("band"))
 
-    bands_to_select = config.get('bands', config.get('band'))
-    image_collection = (
-        ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR')
-        .filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-        .select(bands_to_select)
-    )
+    ic = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR") \
+        .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")) \
+        .select(bands)
 
-    if image_collection.size().getInfo() == 0:
-        st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
-        return pd.DataFrame()
-
+    # Para vento: calcula o módulo
     if variable == "Velocidade do Vento (10m)":
-        def calculate_wind_speed(image):
-            wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
-            return image.addBands(wind_speed)
-        image_collection = image_collection.map(calculate_wind_speed)
+        def calc_ws(img):
+            ws = img.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config["result_band"])
+            return img.addBands(ws)
+        ic = ic.map(calc_ws)
 
-    def extract_value(image):
-        mean_value = image.select(config['result_band']).reduceRegion(
-            reducer=ee.Reducer.mean(),
-            geometry=_geometry,
-            scale=10000
-        ).get(config['result_band'])
+    band = config["result_band"]
 
-        final_value = ee.Number(mean_value)
-        if config['unit'] == "°C":
-            final_value = final_value.subtract(273.15)
-        elif config['unit'] == "mm":
-            final_value = final_value.multiply(1000)
+    def extract_stats(img):
+        stats = img.select(band).reduceRegion(
+            reducer=ee.Reducer.mean()
+                .combine(ee.Reducer.percentile([95]), sharedInputs=True)
+                .combine(ee.Reducer.max(), sharedInputs=True),
+            geometry=geometry,
+            scale=10000,
+            bestEffort=True,
+            maxPixels=1e9
+        )
+        mean = ee.Number(stats.get(f"{band}_mean"))
+        p95 = ee.Number(stats.get(f"{band}_p95"))
+        maxv = ee.Number(stats.get(f"{band}_max"))
 
-        return image.set('date', image.date().format('YYYY-MM-dd')).set('value', final_value)
+        if config["unit"] == "°C":
+            mean, p95, maxv = mean.subtract(273.15), p95.subtract(273.15), maxv.subtract(273.15)
+        elif config["unit"] == "mm":
+            mean, p95, maxv = mean.multiply(1000), p95.multiply(1000), maxv.multiply(1000)
 
-    time_series = image_collection.map(extract_value)
-    data = time_series.reduceColumns(ee.Reducer.toList(2), ['date', 'value']).getInfo()['list']
+        return img.set("date", img.date().format("YYYY-MM-dd")) \
+                  .set("mean", mean).set("p95", p95).set("max", maxv)
 
+    ts = ic.select(band).map(extract_stats)
+    data = ts.reduceColumns(ee.Reducer.toList(4), ["date", "mean", "p95", "max"]).get("list").getInfo()
     if not data:
-        st.warning("Não foi possível extrair a série temporal.")
         return pd.DataFrame()
 
-    df = pd.DataFrame(data, columns=['date', 'value'])
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values(by='date').dropna()
-    return df
+    df = pd.DataFrame(data, columns=["date", "mean", "p95", "max"])
+    df["date"] = pd.to_datetime(df["date"])
+    return df.sort_values("date")
 
+# ------------------------------------------------------------------------------
+# 🔙 VERSÃO ORIGINAL (para restaurar se desejar)
+# ------------------------------------------------------------------------------
+"""
+@st.cache_data
+def get_time_series_data(variable, start_date, end_date, geometry):
+    '''Versão original simples — apenas média diária.'''
+    if variable not in ERA5_VARS: return pd.DataFrame()
+    config = ERA5_VARS[variable]
+    bands = config.get('bands', config.get('band'))
+    ic = ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR').filterDate(
+        start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+    ).select(bands)
+    if variable == 'Velocidade do Vento (10m)':
+        def ws(img): return img.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
+        ic = ic.map(lambda i: i.addBands(ws(i)))
+    def extract(img):
+        val = img.select(config['result_band']).reduceRegion(
+            reducer=ee.Reducer.mean(), geometry=geometry, scale=10000
+        ).get(config['result_band'])
+        v = ee.Number(val)
+        if config['unit'] == '°C': v = v.subtract(273.15)
+        elif config['unit'] == 'mm': v = v.multiply(1000)
+        return img.set('date', img.date().format('YYYY-MM-dd')).set('value', v)
+    ts = ic.map(extract)
+    lst = ts.reduceColumns(ee.Reducer.toList(2), ['date', 'value']).get('list').getInfo()
+    df = pd.DataFrame(lst, columns=['date', 'value'])
+    df['date'] = pd.to_datetime(df['date'])
+    return df.sort_values('date')
+"""
