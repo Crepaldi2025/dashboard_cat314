@@ -232,8 +232,8 @@ def add_colorbar_with_background(mapa, vis_params, unit_label=""):
         colorbar_html = f"""
         <div style="
             position: fixed;
-            bottom: 15px;
-            left: 15px;
+            bottom: 10px;
+            left: 10px;
             background-color: rgba(255, 255, 255, 0.75);
             padding: 4px 7px;
             border-radius: 5px;
@@ -250,4 +250,5 @@ def add_colorbar_with_background(mapa, vis_params, unit_label=""):
 
     except Exception as e:
         st.warning(f"⚠️ Falha ao adicionar colorbar estilizada: {e}")
+
 
