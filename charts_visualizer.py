@@ -1,75 +1,63 @@
-# ==================================================================================
-# charts_visualizer.py — Clima-Cast-Crepaldi (séries com extremos)
-# ==================================================================================
+# charts_visualizer.py
 import streamlit as st
-import plotly.graph_objects as go
-import plotly.express as px
 import pandas as pd
+import plotly.express as px
 
-def _format_axis(unit: str) -> str:
-    return f"{unit}" if unit else ""
-
-def display_time_series_chart(df: pd.DataFrame, variavel: str, unit: str):
+def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
-    Desenha a série temporal. Se houver colunas ['mean','p95','max'],
-    plota as três curvas; caso contrário, usa a coluna 'value' (modo legado).
+    Cria a figura do gráfico de linha interativo de série temporal usando Plotly.
+    (Função interna, indicada pelo underscore no início do nome)
     """
-    if df is None or df.empty:
-        st.warning("Sem dados para o período selecionado.")
-        return
+    variable_name = variable.split(" (")[0]
+    
+    fig = px.line(
+        df,
+        x='date',
+        y='value',
+        title=f'Série Temporal de {variable_name}',
+        labels={
+            "date": "Data",
+            "value": f"{variable_name} ({unit})"
+        },
+        template="plotly_white"
+    )
 
-    # Garante tipo datetime
-    if "date" in df.columns:
-        df = df.copy()
-        df["date"] = pd.to_datetime(df["date"])
-
-    # Caso 1 — Nova versão com estatísticas espaciais
-    has_extremos = all(col in df.columns for col in ["mean", "p95", "max"])
-
-    if has_extremos:
-        fig = go.Figure()
-
-        fig.add_trace(go.Scatter(
-            x=df["date"], y=df["mean"],
-            name="Média espacial",
-            mode="lines",
-            line=dict(width=2, color="#4F6BED")
-        ))
-        fig.add_trace(go.Scatter(
-            x=df["date"], y=df["p95"],
-            name="Percentil 95",
-            mode="lines",
-            line=dict(width=2, color="#FFA500")
-        ))
-        fig.add_trace(go.Scatter(
-            x=df["date"], y=df["max"],
-            name="Máximo (pixel)",
-            mode="lines",
-            line=dict(width=2, color="#D62728")
-        ))
-
-        fig.update_layout(
-            title=f"Série Temporal de {variavel}",
-            xaxis_title="Data",
-            yaxis_title=f"{variavel} ({_format_axis(unit)})",
-            hovermode="x unified",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-            margin=dict(l=40, r=20, t=60, b=40),
+    fig.update_layout(
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="1a", step="year", stepmode="backward"),
+                    dict(step="all", label="Tudo")
+                ])
+            ),
+            rangeslider=dict(visible=True),
+            type="date"
         )
+    )
+    return fig
 
-        st.plotly_chart(fig, use_container_width=True)
+def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
+    """
+    Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
+    """
+    if df.empty or 'date' not in df.columns or 'value' not in df.columns:
+        st.warning("Não há dados disponíveis para gerar o gráfico para o período selecionado.")
         return
 
-    # Caso 2 — Modo legado (apenas coluna 'value')
-    if "value" in df.columns:
-        fig = px.line(
-            df, x="date", y="value",
-            title=f"Série Temporal de {variavel}",
-            labels={"date": "Data", "value": f"{variavel} ({_format_axis(unit)})"}
-        )
-        fig.update_traces(line=dict(width=2, color="#4F6BED"))
-        st.plotly_chart(fig, use_container_width=True)
-        return
+    # 1. Cria a figura do gráfico
+    fig = _create_chart_figure(df, variable, unit)
+    
+    # 2. Exibe o gráfico no Streamlit
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Se não bateu nenhum caso
-    st.warning("Estrutura de dados inesperada para a série temporal.")
+    # 3. Exibe a caixa de informações com as instruções
+    st.info(
+        """
+        **Dica:** Utilize os controles interativos do gráfico:
+        - **Botões de Período (1m, 6m, 1a, Tudo):** Clique para aplicar um zoom rápido em períodos pré-definidos.
+        - **Controle Deslizante Inferior:** Arraste as alças para selecionar um intervalo de datas personalizado.
+        - **Passar o Mouse:** Posicione o cursor sobre a linha para ver a data e o valor exatos.
+        """
+    )
