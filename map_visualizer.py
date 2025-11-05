@@ -169,8 +169,8 @@ def display_polygon_draw_map():
 # ------------------------------------------------------------------------------
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """
-    Gera mapa estático com colorbar incorporada (única imagem final),
-    corrigindo canais RGB/RGBA e alinhamento proporcional.
+    Gera mapa estático com colorbar incorporada (formato RGB padronizado).
+    Corrige diferenças de canais e centraliza a legenda.
     """
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
@@ -196,23 +196,23 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
             'format': 'png'
         })
 
-        # --- 2️⃣ Lê mapa do GEE
+        # --- 2️⃣ Lê imagem do mapa e converte para RGB
         response = requests.get(png_url)
-        mapa_img = Image.open(io.BytesIO(response.content)).convert("RGBA")
+        mapa_img = Image.open(io.BytesIO(response.content)).convert("RGB")
         mapa_w, mapa_h = mapa_img.size
 
-        # --- 3️⃣ Gera colorbar
+        # --- 3️⃣ Gera colorbar e converte para RGB
         colorbar_bytes = create_colorbar(vis_params, unit_label)
-        colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
+        colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGB")
 
         # --- 4️⃣ Redimensiona colorbar proporcionalmente à largura do mapa
         colorbar_w, colorbar_h = colorbar_img.size
         new_h = int(colorbar_h * (mapa_w / colorbar_w))
         colorbar_resized = colorbar_img.resize((mapa_w, new_h), Image.LANCZOS)
 
-        # --- 5️⃣ Cria nova imagem combinada (mapa + colorbar)
+        # --- 5️⃣ Cria nova imagem combinada (mesma largura, somando alturas)
         combined_h = mapa_h + new_h
-        combined_img = Image.new("RGBA", (mapa_w, combined_h), (255, 255, 255, 255))
+        combined_img = Image.new("RGB", (mapa_w, combined_h), (255, 255, 255))
         combined_img.paste(mapa_img, (0, 0))
         combined_img.paste(colorbar_resized, (0, mapa_h))
 
@@ -226,6 +226,7 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
     except Exception as e:
         st.error(f"⚠️ Falha ao gerar mapa estático com colorbar: {e}")
         return None, None, None
+
 
         
 
@@ -308,6 +309,7 @@ def add_colorbar_with_background(mapa, vis_params, unit_label=""):
 
     except Exception as e:
         st.warning(f"⚠️ Falha ao adicionar colorbar estilizada: {e}")
+
 
 
 
