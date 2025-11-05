@@ -134,50 +134,59 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 # ------------------------------------------------------------------------------
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """
-    Gera mapa estático nítido (getThumbURL) e anexa colorbar com o mesmo estilo
-    do mapa interativo. Exporta uma única imagem (mapa + colorbar).
+    Gera mapa estático nítido, sem fundo preto, e adiciona uma colorbar
+    com o mesmo estilo do mapa interativo. Exporta uma única imagem (mapa + colorbar).
     """
     import io
-    from PIL import Image
     import requests
+    from PIL import Image, ImageOps
 
     if ee_image is None or feature is None:
         st.error("❌ Imagem ou geometria ausente.")
         return None, None, None
 
     try:
-        # 1️⃣  Gera imagem nítida do GEE (sem reamostrar)
+        # --- 1️⃣ Renderização nítida com fundo branco ---
         region = feature.geometry().bounds()
-        background = ee.Image(1).visualize(palette=['ffffff'], min=0, max=1)
+        # Cria fundo branco e mistura com a imagem original
+        background = ee.Image.constant(1).visualize(palette=["ffffff"], min=0, max=1)
         outline = ee.Image().byte().paint(featureCollection=feature, color=1, width=2)
-        final_image = background.blend(ee_image.visualize(**vis_params)).blend(outline)
+        final_image = (
+            background
+            .blend(ee_image.visualize(**vis_params))
+            .blend(outline)
+        )
 
+        # Thumbnail de alta resolução
         png_url = final_image.getThumbURL({
             "region": region.getInfo()["coordinates"],
-            "dimensions": 2048,        # resolução adequada e leve
-            "format": "png"
+            "dimensions": 2048,        # equilíbrio entre detalhe e tamanho
+            "format": "png",
+            "crs": "EPSG:4326"
         })
 
+        # --- 2️⃣ Lê imagem do GEE (sem pixelização de bordas) ---
         response = requests.get(png_url, timeout=60)
         mapa_img = Image.open(io.BytesIO(response.content)).convert("RGB")
+        mapa_img = ImageOps.expand(mapa_img, border=2, fill="white")  # elimina contorno preto
         mapa_w, mapa_h = mapa_img.size
 
-        # 2️⃣  Gera colorbar refinada
+        # --- 3️⃣ Gera colorbar refinada (igual ao interativo) ---
         colorbar_bytes = create_colorbar(vis_params, unit_label)
         colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGB")
 
-        # 3️⃣  Centraliza colorbar sem redimensionar o mapa
+        # Centraliza a colorbar abaixo do mapa
         cb_w, cb_h = colorbar_img.size
         padding = int((mapa_w - cb_w) / 2)
-        background_cb = Image.new("RGB", (mapa_w, cb_h + 20), (255, 255, 255))
-        background_cb.paste(colorbar_img, (padding, 10))
+        fundo_cb = Image.new("RGB", (mapa_w, cb_h + 20), (255, 255, 255))
+        fundo_cb.paste(colorbar_img, (padding, 10))
 
-        # 4️⃣  Concatena verticalmente (sem reamostrar mapa)
+        # --- 4️⃣ Junta mapa e colorbar (sem reamostrar) ---
         combined = Image.new("RGB", (mapa_w, mapa_h + cb_h + 20), (255, 255, 255))
         combined.paste(mapa_img, (0, 0))
-        combined.paste(background_cb, (0, mapa_h))
+        combined.paste(fundo_cb, (0, mapa_h))
 
-        # 5️⃣  Salva imagem final
+        # --- 5️⃣ Exporta imagem final ---
         buf = io.BytesIO()
         combined.save(buf, format="PNG", quality=98)
         buf.seek(0)
@@ -188,6 +197,7 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
     except Exception as e:
         st.error(f"⚠️ Falha ao gerar mapa estático com colorbar: {e}")
         return None, None, None
+
 
 def export_interactive_snapshot(ee_image, feature, vis_params, unit_label=""):
     """
@@ -263,4 +273,5 @@ def export_interactive_snapshot(ee_image, feature, vis_params, unit_label=""):
     except Exception as e:
         st.error(f"⚠️ Falha ao gerar mapa de alta qualidade: {e}")
         return None
+
 
