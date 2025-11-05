@@ -3,26 +3,17 @@
 # ==================================================================================
 import streamlit as st
 
-# ⚠️ ESTE COMANDO DEVE SER O PRIMEIRO DO APP
-st.set_page_config(
-    page_title="Clima-Cast-Crepaldi",
-    page_icon="🌤️",
-    layout="wide"
-)
+# ✅ ESTE É O PRIMEIRO COMANDO STREAMLIT DO APP
+st.set_page_config(page_title="Clima-Cast-Crepaldi", page_icon="🌤️", layout="wide")
 
-# ==================================================================================
-# IMPORTS — Somente após o set_page_config
-# ==================================================================================
-import locale
-import pandas as pd
-import ee
-
-# Importação dos módulos internos (usam Streamlit dentro de funções)
-import utils
 import ui
 import gee_handler
 import map_visualizer
 import charts_visualizer
+import ee
+import utils
+import pandas as pd
+import locale
 
 # ==================================================================================
 # Configuração de Locale (português com fallback)
@@ -33,7 +24,8 @@ except locale.Error:
     try:
         locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
     except locale.Error:
-        st.warning("Locale 'pt_BR.UTF-8' não encontrado. Meses podem aparecer em inglês.")
+        # usamos print() para não acionar o Streamlit antes da hora
+        print("Aviso: Locale 'pt_BR.UTF-8' não encontrado. Meses podem aparecer em inglês.")
 
 # ==================================================================================
 # Função: Análise de Mapas
@@ -43,43 +35,25 @@ def run_map_analysis():
     with st.spinner("🔄 Processando dados no Google Earth Engine..."):
         ee.Initialize()
 
-        # ------------------------------------------------------------
-        # 1. Coleta das opções do usuário
-        # ------------------------------------------------------------
         tipo_area = st.session_state.get("tipo_area", "Município")
         tipo_variavel = st.session_state.get("tipo_variavel", "Precipitação")
         tipo_periodo = st.session_state.get("tipo_periodo", "Mensal")
 
-        # ------------------------------------------------------------
-        # 2. Intervalo de datas
-        # ------------------------------------------------------------
         start_date, end_date = utils.get_date_range(tipo_periodo, st.session_state)
-
-        # ------------------------------------------------------------
-        # 3. Dataset e parâmetros de visualização
-        # ------------------------------------------------------------
         variable_config = utils.get_variable_config(tipo_variavel)
+
         dataset_id = variable_config["dataset"]
         vis_params = variable_config["vis_params"]
 
-        # ------------------------------------------------------------
-        # 4. Imagem agregada e região selecionada
-        # ------------------------------------------------------------
         ee_image = gee_handler.get_aggregated_image(dataset_id, tipo_variavel, start_date, end_date)
         feature = gee_handler.get_selected_feature(tipo_area, st.session_state)
 
-        # ------------------------------------------------------------
-        # 5. Configurações visuais finais
-        # ------------------------------------------------------------
         final_vis_params = {
             "min": vis_params["min"],
             "max": vis_params["max"],
             "palette": vis_params["palette"],
         }
 
-        # ------------------------------------------------------------
-        # 6. Exibição dos mapas
-        # ------------------------------------------------------------
         st.markdown("### 🗺️ Mapas de Visualização")
 
         # Mapa interativo
@@ -102,7 +76,7 @@ def run_map_analysis():
         st.success("✅ Mapas gerados com sucesso!")
 
 # ==================================================================================
-# Função: Análise de Séries Temporais
+# Função: Séries Temporais
 # ==================================================================================
 def run_time_series_analysis():
     """Executa a análise de séries temporais e exibe gráficos e tabelas."""
@@ -138,7 +112,7 @@ def run_time_series_analysis():
         st.success("✅ Séries temporais geradas com sucesso!")
 
 # ==================================================================================
-# Função principal do aplicativo
+# Função principal
 # ==================================================================================
 def main():
     """Função principal do Clima-Cast-Crepaldi."""
