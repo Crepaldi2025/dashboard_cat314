@@ -88,17 +88,19 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
     st_folium(mapa, width=900, height=500)
 
 def create_interactive_map(ee_image, feature, vis_params, unidade):
-    """Exibe um único mapa interativo com colorbar discreto (canto inferior esquerdo)."""
+    """Exibe um mapa interativo sem colorbar duplicada e com legenda discreta."""
     st.subheader("Resultado da Análise")
 
     mapa = geemap.Map(center=[-15, -55], zoom=5)
     mapa.add_basemap("SATELLITE")
 
-    # Adiciona camada principal — sem chamar add_colorbar automático
-    mapa.add_layer(ee_image, vis_params, "Resultado")
+    # Adiciona camada manualmente sem colorbar automático
+    tile_layer = geemap.ee_tile_layer(ee_image, vis_params, "Resultado", shown=True, opacity=1.0)
+    mapa.add_child(tile_layer)
 
-    # === Colorbar customizado e discreto ===
+    # === Colorbar discreto, contrastante e fixo no canto inferior esquerdo ===
     from branca.colormap import linear
+
     if "°" in unidade or "temp" in unidade.lower():
         cmap = linear.RdYlBu_11.scale(0, 40)
         label = "Temperatura (°C)"
@@ -116,9 +118,6 @@ def create_interactive_map(ee_image, feature, vis_params, unidade):
     cmap.add_to(mapa)
     cmap.position = "bottomleft"
 
-    # Exibição única (sem piscar)
+    # Renderização única
     st_folium(mapa, width=900, height=500)
-
-
-
 
