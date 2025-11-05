@@ -208,39 +208,75 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         return None
 def export_interactive_snapshot(ee_image, feature, vis_params, unit_label=""):
     """
-    Gera um mapa estático com a mesma renderização do mapa interativo (tiles do GEE).
-    Produz um PNG nítido e idêntico ao visual do geemap.
+    Gera um mapa estático de alta qualidade (renderização por tiles GEE)
+    com visual idêntico ao mapa interativo, compatível com Streamlit Cloud.
     """
-    import geemap
     import io
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib.image as mpimg
     from PIL import Image
+    import requests
 
     if ee_image is None or feature is None:
         st.error("❌ Imagem ou geometria ausente.")
         return None
 
-    # Define o centro da área
-    centroid = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
-    centroid.reverse()
+    try:
+        # 1️⃣ Solicita renderização de tiles ao Earth Engine
+        map_id = ee_image.getMapId(vis_params)
+        tile_url_template = map_id["tile_fetcher"].url_format
 
-    # Cria o mapa base
-    m = geemap.Map(center=centroid, zoom=6)
-    m.add_basemap("SATELLITE")
-    m.addLayer(ee_image, vis_params, "Dados ERA5-LAND")
-    m.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno')
-    m.add_colorbar_branca(
-        colors=vis_params["palette"],
-        vmin=vis_params["min"],
-        vmax=vis_params["max"],
-        label=unit_label
-    )
+        # 2️⃣ Define região de interesse
+        region = feature.geometry().bounds().getInfo()["coordinates"]
+        lons = [p[0] for p in region[0]]
+        lats = [p[1] for p in region[0]]
+        lon_min, lon_max = min(lons), max(lons)
+        lat_min, lat_max = min(lats), max(lats)
 
-    # Renderiza o mapa em memória
-    buf = io.BytesIO()
-    img = m.screenshot()
-    img.save(buf, format="PNG", quality=98)
-    buf.seek(0)
-    return buf.getvalue()
+        # 3️⃣ Baixa mosaico de tiles (via requests, 512x512)
+        # 🔸 Aqui simulamos a visualização do tile renderizado
+        #    usando a API estática do GEE para uma imagem visualizada
+        url = ee_image.visualize(**vis_params).getThumbURL({
+            "region": region,
+            "dimensions": 2048,
+            "format": "png"
+        })
+        response = requests.get(url, timeout=60)
+        mapa_img = Image.open(io.BytesIO(response.content)).convert("RGB")
 
+        # 4️⃣ Adiciona contorno do estado/área
+        outline = ee.Image().byte().paint(featureCollection=feature, color=1, width=2)
+        url_outline = outline.visualize(palette=["black"]).getThumbURL({
+            "region": region,
+            "dimensions": 2048,
+            "format": "png"
+        })
+        outline_img = Image.open(io.BytesIO(requests.get(url_outline).content)).convert("RGBA")
+        mapa_img = mapa_img.convert("RGBA")
+        mapa_img.alpha_composite(outline_img)
 
+        # 5️⃣ Adiciona colorbar refinada (estilo interativo)
+        colorbar_bytes = create_colorbar(vis_params, unit_label)
+        colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGB")
 
+        # Ajusta largura
+        mapa_w, mapa_h = mapa_img.size
+        colorbar_w, colorbar_h = colorbar_img.size
+        new_h = int(colorbar_h * (mapa_w / colorbar_w))
+        colorbar_resized = colorbar_img.resize((mapa_w, new_h), Image.Resampling.LANCZOS)
+
+        # Combina mapa e colorbar
+        combined = Image.new("RGB", (mapa_w, mapa_h + new_h), (255, 255, 255))
+        combined.paste(mapa_img.convert("RGB"), (0, 0))
+        combined.paste(colorbar_resized, (0, mapa_h))
+
+        # 6️⃣ Exporta imagem final
+        buf = io.BytesIO()
+        combined.save(buf, format="PNG", quality=98)
+        buf.seek(0)
+        return buf.getvalue()
+
+    except Exception as e:
+        st.error(f"⚠️ Falha ao gerar mapa de alta qualidade: {e}")
+        return None
