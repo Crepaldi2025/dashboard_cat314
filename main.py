@@ -30,8 +30,10 @@ except locale.Error:
 def run_full_analysis():
     """Executa toda a lógica de busca de dados e exibição de resultados."""
 
-    from gee_handler import inicializar_gee
-    status = inicializar_gee()
+    # A inicialização será feita apenas quando o usuário clicar em "Gerar Análise"
+    # Isso evita inicializações duplicadas e lentidão
+    pass
+
 
     if status == "local":
         st.toast("✅ Conectado ao Earth Engine (modo local).")
@@ -236,5 +238,6 @@ def main():
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
+
 
 
