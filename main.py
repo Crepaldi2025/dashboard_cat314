@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (versão leve e estável)
+# main.py — Clima-Cast-Crepaldi (versão leve, estável e compatível)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -25,7 +25,13 @@ except locale.Error:
         pass
 
 # --------------------------------------------------------------------------
-# Botão de limpeza de cache e reset de estado
+# Compatibilidade entre versões do Streamlit
+# --------------------------------------------------------------------------
+if not hasattr(st, "rerun"):
+    st.rerun = st.experimental_rerun
+
+# --------------------------------------------------------------------------
+# Botão de limpeza de cache e estado
 # --------------------------------------------------------------------------
 st.sidebar.markdown("### ⚙️ Diagnóstico rápido")
 if st.sidebar.button("🧹 Limpar cache e estado"):
@@ -40,7 +46,7 @@ if st.sidebar.button("🧹 Limpar cache e estado"):
 # Função principal de análise
 # --------------------------------------------------------------------------
 def run_full_analysis():
-    """Executa a lógica de análise com inicialização única do GEE."""
+    """Executa toda a lógica de busca de dados e exibição de resultados."""
     status = gee_handler.inicializar_gee()
 
     if status == "local":
@@ -85,6 +91,7 @@ def run_full_analysis():
                 final_vis_params["max"] = 3000
 
             st.subheader("🗺️ Resultado da Análise")
+
             if st.session_state.map_type == "Estático":
                 mapa_final = map_visualizer.create_static_map(
                     ee_image, feature, final_vis_params, variable_config["unit"]
@@ -96,6 +103,7 @@ def run_full_analysis():
                         width=700,
                         output_format="PNG",
                     )
+
             elif st.session_state.map_type == "Interativo":
                 map_visualizer.create_interactive_map(
                     ee_image, feature, final_vis_params, variable_config["unit"]
@@ -108,6 +116,7 @@ def run_full_analysis():
             df_series = gee_handler.get_time_series_data(
                 st.session_state.variavel, start_date, end_date, geometry
             )
+
             st.subheader("📈 Resultado da Análise")
 
             charts_visualizer.display_time_series_chart(
@@ -119,7 +128,6 @@ def run_full_analysis():
 # --------------------------------------------------------------------------
 def main():
     """Organiza e executa o fluxo principal do app."""
-
     ui.configurar_pagina()
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
@@ -130,7 +138,7 @@ def main():
         if st.session_state.get("analysis_triggered", False):
             st.session_state.analysis_triggered = False
             st.session_state.area_validada = True
-            st.experimental_rerun()
+            st.rerun()  # ✅ versão compatível e estável
 
         if st.session_state.get("area_validada", False):
             ui.renderizar_pagina_principal(opcao_menu)
