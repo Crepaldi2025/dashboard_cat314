@@ -17,9 +17,9 @@ from matplotlib.colors import LinearSegmentedColormap
 import io
 from streamlit_folium import st_folium
 import numpy as np
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-from matplotlib import patheffects
+#import cartopy.crs as ccrs
+#import cartopy.feature as cfeature
+#from matplotlib import patheffects
 
 # ------------------------------------------------------------------------------
 # FUNÇÕES CACHEADAS — Criação e reuso de objetos pesados
@@ -178,3 +178,4 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
     mapa.add_colorbar(vis_params, label=unit_label, layer_name='Dados Climáticos')
     mapa.to_streamlit(height=500)
+
