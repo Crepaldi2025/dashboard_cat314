@@ -3,28 +3,26 @@
 # ==================================================================================
 import streamlit as st
 
-# ⚠️ ESTE COMANDO DEVE VIR ANTES DE QUALQUER OUTRA COISA DO STREAMLIT
-st.set_page_config(page_title="Clima-Cast-Crepaldi", page_icon="🌤️", layout="wide")
+# ⚠️ ESTE COMANDO DEVE SER O PRIMEIRO DO APP
+st.set_page_config(
+    page_title="Clima-Cast-Crepaldi",
+    page_icon="🌤️",
+    layout="wide"
+)
 
-# Somente depois disso, os demais imports
-import ee
+# ==================================================================================
+# IMPORTS — Somente após o set_page_config
+# ==================================================================================
 import locale
 import pandas as pd
+import ee
 
-# Agora os módulos que usam Streamlit internamente
-import ui
-import gee_handler
-import map_visualizer
-import charts_visualizer
+# Importação dos módulos internos (usam Streamlit dentro de funções)
 import utils
 import ui
 import gee_handler
 import map_visualizer
 import charts_visualizer
-import ee
-import utils
-import pandas as pd
-import locale
 
 # ==================================================================================
 # Configuração de Locale (português com fallback)
@@ -104,10 +102,10 @@ def run_map_analysis():
         st.success("✅ Mapas gerados com sucesso!")
 
 # ==================================================================================
-# Função: Página de Séries Temporais
+# Função: Análise de Séries Temporais
 # ==================================================================================
 def run_time_series_analysis():
-    """Executa a análise de séries temporais usando os parâmetros selecionados."""
+    """Executa a análise de séries temporais e exibe gráficos e tabelas."""
     with st.spinner("📈 Gerando séries temporais..."):
         ee.Initialize()
 
@@ -117,17 +115,16 @@ def run_time_series_analysis():
 
         start_date, end_date = utils.get_date_range(periodo_series, st.session_state)
         variable_config = utils.get_variable_config(tipo_variavel)
-
         dataset_id = variable_config["dataset"]
         unit = variable_config["unit"]
 
         ee_image = gee_handler.get_aggregated_image(dataset_id, tipo_variavel, start_date, end_date)
         feature = gee_handler.get_selected_feature(tipo_area, st.session_state)
 
-        # Estatísticas extraídas por período
-        df_stats = gee_handler.extract_statistics(ee_image, feature, tipo_variavel, start_date, end_date)
+        df_stats = gee_handler.extract_statistics(
+            ee_image, feature, tipo_variavel, start_date, end_date
+        )
 
-        # Exibe gráficos e estatísticas
         charts_visualizer.display_charts(df_stats, tipo_variavel, unit)
 
         st.markdown("---")
@@ -149,27 +146,15 @@ def main():
 
     page = st.session_state.get("page", "Mapas")
 
-    # ------------------------------------------------------------
-    # 1. Aba — Mapas
-    # ------------------------------------------------------------
     if page == "Mapas":
         run_map_analysis()
 
-    # ------------------------------------------------------------
-    # 2. Aba — Séries Temporais
-    # ------------------------------------------------------------
     elif page == "Séries Temporais":
         run_time_series_analysis()
 
-    # ------------------------------------------------------------
-    # 3. Aba — Sobre
-    # ------------------------------------------------------------
     elif page == "Sobre":
         ui.render_about_page()
 
-    # ------------------------------------------------------------
-    # Fallback
-    # ------------------------------------------------------------
     else:
         st.warning("Página não reconhecida. Verifique o menu lateral.")
 
@@ -178,4 +163,3 @@ def main():
 # ==================================================================================
 if __name__ == "__main__":
     main()
-
