@@ -229,44 +229,28 @@ def get_sampled_data_as_dataframe(img, geom, variable):
 # ------------------------------------------------------------------------------
 @st.cache_data
 def get_time_series_data(variable, start_date, end_date, geometry):
-    """Extrai série temporal de média diária."""
+    """Versão original simples — apenas média diária."""
     if variable not in ERA5_VARS:
         return pd.DataFrame()
-
     config = ERA5_VARS[variable]
-    bands = config.get("bands", config.get("band"))
-    ic = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR") \
-        .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")) \
-        .select(bands)
-
-    if variable == "Velocidade do Vento (10m)":
-        def calc_ws(img):
-            ws = img.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config["result_band"])
-            return img.addBands(ws)
-        ic = ic.map(calc_ws)
-
-    def extract_value(img):
-        mean_value = img.select(config["result_band"]).reduceRegion(
-            reducer=ee.Reducer.mean(),
-            geometry=geometry,
-            scale=10000
-        ).get(config["result_band"])
-
-        val = ee.Number(mean_value)
-        if config["unit"] == "°C":
-            val = val.subtract(273.15)
-        elif config["unit"] == "mm":
-            val = val.multiply(1000)
-
-        return img.set("date", img.date().format("YYYY-MM-dd")).set("value", val)
-
-    ts = ic.map(extract_value)
-    data = ts.reduceColumns(ee.Reducer.toList(2), ["date", "value"]).get("list").getInfo()
-
-    if not data:
-        return pd.DataFrame()
-
-    df = pd.DataFrame(data, columns=["date", "value"])
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.sort_values("date")
-    return df
+    bands = config.get('bands', config.get('band'))
+    ic = ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR').filterDate(
+        start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+    ).select(bands)
+    if variable == 'Velocidade do Vento (10m)':
+        def ws(img):
+            return img.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
+        ic = ic.map(lambda i: i.addBands(ws(i)))
+    def extract(img):
+        val = img.select(config['result_band']).reduceRegion(
+            reducer=ee.Reducer.mean(), geometry=geometry, scale=10000
+        ).get(config['result_band'])
+        v = ee.Number(val)
+        if config['unit'] == '°C': v = v.subtract(273.15)
+        elif config['unit'] == 'mm': v = v.multiply(1000)
+        return img.set('date', img.date().format('YYYY-MM-dd')).set('value', v)
+    ts = ic.map(extract)
+    lst = ts.reduceColumns(ee.Reducer.toList(2), ['date', 'value']).get('list').getInfo()
+    df = pd.DataFrame(lst, columns=['date', 'value'])
+    df['date'] = pd.to_datetime(df['date'])
+    return df.sort_values('date')
