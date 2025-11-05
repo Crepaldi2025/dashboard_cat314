@@ -175,23 +175,31 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
 # MAPA INTERATIVO (ERA5-LAND)
 # ------------------------------------------------------------------------------
 def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
+    """
+    Gera e exibe um mapa interativo leve e compatível com Streamlit Cloud,
+    garantindo que a camada GEE fique visível sobre o basemap.
+    """
     if ee_image is None or feature is None:
         st.error("❌ Imagem ou geometria ausente.")
         return
 
+    # 🔹 Calcula o centroide da geometria
     centroid = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
     centroid.reverse()
 
-    # ✅ cria mapa base SEM basemap fixo
-    mapa = geemap.Map(center=centroid, zoom=7)
-    
-    # 🔹 adiciona camada ERA5-Land primeiro
-    mapa.addLayer(ee_image, vis_params, 'Dados Climáticos')
-    mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
-
-    # 🔹 só depois adiciona o basemap (fica no fundo)
+    # 🔹 Cria o mapa base (sem camada inicial)
+    mapa = geemap.Map(center=centroid, zoom=6)
     mapa.add_basemap('SATELLITE')
-    mapa.add_colorbar(vis_params, label=unit_label, layer_name='Dados Climáticos')
-    mapa.to_streamlit(height=500)
+
+    # 🔹 Cria explicitamente o tile layer do GEE (garante renderização)
+    try:
+        layer = geemap.ee_tile_layer(ee_image, vis_params, name="Dados Climáticos")
+        mapa.add_layer(layer)
+        mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
+        mapa.add_colorbar(vis_params, label=unit_label, layer_name='Dados Climáticos')
+        mapa.to_streamlit(height=550)
+    except Exception as e:
+        st.error(f"⚠️ Falha ao adicionar camada do GEE: {e}")
+
 
 
