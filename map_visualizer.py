@@ -201,7 +201,7 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 
         # Adiciona contorno e legenda
         mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
-        mapa.add_colorbar(vis_params, label=unit_label, layer_name='Dados Climáticos')
+        add_colorbar_with_background(mapa, vis_params, unit_label)
 
         # Exibe o mapa no Streamlit
         mapa.to_streamlit(height=550)
@@ -209,7 +209,26 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     except Exception as e:
         st.error(f"⚠️ Falha ao adicionar camada do GEE: {e}")
 
+def add_colorbar_with_background(mapa, vis_params, unit_label=""):
+    """Adiciona uma colorbar legível com fundo branco semitransparente."""
+    try:
+        colorbar = geemap.colorbar(
+            vis_params=vis_params,
+            label=unit_label,
+            position="bottomcenter"
+        )
 
+        # Aplica estilo CSS manualmente para fundo branco translúcido
+        colorbar_html = colorbar.to_html().replace(
+            "<div",
+            "<div style='background-color: rgba(255,255,255,0.85);"
+            "padding: 4px 10px;border-radius: 6px;"
+            "box-shadow: 0px 0px 6px rgba(0,0,0,0.3);'"
+        )
 
+        from branca.element import Element
+        mapa.get_root().html.add_child(Element(colorbar_html))
+    except Exception as e:
+        st.warning(f"⚠️ Falha ao adicionar colorbar estilizada: {e}")
 
 
