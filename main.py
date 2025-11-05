@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (versão otimizada 2025-11)
+# main.py — Clima-Cast-Crepaldi (versão final otimizada 2025-11)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -78,9 +78,10 @@ def run_full_analysis():
 
             # ---------- mapa estático ----------
             if st.session_state.map_type == "Estático":
-                mapa_final, _, _ = map_visualizer.create_static_map(
+                mapa_final = map_visualizer.create_static_map(
                     ee_image, feature, final_vis_params, variable_config["unit"]
                 )
+
                 if mapa_final:
                     st.image(
                         mapa_final,
