@@ -45,10 +45,12 @@ def get_date_range(tipo_periodo, session_state):
     elif tipo_periodo == "Mensal":
         ano = session_state.ano_mensal
         mes_nome = session_state.mes_mensal
-        mes_num = MESES_PARA_NUMEROS[mes_nome.capitalize()]
+        mes_num = MESES_PARA_NUMEROS.get(mes_nome.capitalize(), MESES_PARA_NUMEROS.get(mes_nome, 1))
+
         ultimo_dia = calendar.monthrange(ano, mes_num)[1]
         return date(ano, mes_num, 1), date(ano, mes_num, ultimo_dia)
     
 # Caso o tipo de período não seja reconhecido, retorna None (tratado posteriormente em main.py)
     
+
     return None, None
