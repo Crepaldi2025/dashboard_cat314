@@ -44,18 +44,45 @@ def _create_base_map(center, zoom, basemap='SATELLITE'):
 
 @st.cache_data(show_spinner=False)
 def create_colorbar(vis_params, unit_label=""):
-    """Cria e cacheia a imagem de colorbar horizontal com gradiente contínuo."""
-    fig, ax = plt.subplots(figsize=(6, 0.5))
-    cmap = LinearSegmentedColormap.from_list("custom_gradient", vis_params['palette'])
-    norm = matplotlib.colors.Normalize(vmin=vis_params['min'], vmax=vis_params['max'])
-    cb = matplotlib.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
-    cb.set_label(unit_label, rotation=0, labelpad=5)
+    """
+    Gera uma colorbar estilizada (semelhante à do mapa interativo),
+    com fundo branco translúcido, ticks regulares e gradiente horizontal.
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import io
+    import numpy as np
 
+    vmin = vis_params["min"]
+    vmax = vis_params["max"]
+    colors = vis_params["palette"]
+
+    # Cria colormap contínuo
+    cmap = mpl.colors.LinearSegmentedColormap.from_list("custom", colors)
+
+    # Define ticks regulares (ex.: 10 em 10)
+    step = max(1, round((vmax - vmin) / 6))
+    ticks = np.arange(vmin, vmax + step, step)
+
+    # Figura compacta
+    fig, ax = plt.subplots(figsize=(5, 0.35))
+    norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+    cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal', ticks=ticks)
+
+    # Ajusta aparência
+    cb.outline.set_visible(False)
+    cb.set_label(f"{unit_label}", fontsize=9, labelpad=2)
+    cb.ax.tick_params(labelsize=8)
+    ax.set_facecolor((1, 1, 1, 0.8))  # fundo branco translúcido
+    fig.patch.set_alpha(0.0)
+
+    # Renderiza imagem em memória
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.05, transparent=True)
     plt.close(fig)
     buf.seek(0)
     return buf.getvalue()
+
 
 # ------------------------------------------------------------------------------
 # MAPA: CÍRCULO
@@ -250,5 +277,6 @@ def add_colorbar_with_background(mapa, vis_params, unit_label=""):
 
     except Exception as e:
         st.warning(f"⚠️ Falha ao adicionar colorbar estilizada: {e}")
+
 
 
