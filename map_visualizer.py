@@ -134,14 +134,14 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 # ------------------------------------------------------------------------------
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """
-    Gera mapa estático de alta qualidade (sem perda, sem fundo preto)
-    e adiciona colorbar com o mesmo estilo do mapa interativo.
-    Exporta uma única imagem (mapa + colorbar) com resolução original.
+    Gera mapa estático nítido, com interpolação bilinear e colorbar incorporada.
+    Elimina fundo preto e mantém cores originais do GEE.
+    Exporta um único arquivo PNG de alta qualidade.
     """
     import io
     import requests
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
     from PIL import Image
 
     if ee_image is None or feature is None:
@@ -149,70 +149,60 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         return None, None, None
 
     try:
-        # ================================================================
-        # 1️⃣ Criação do mapa no GEE — com fundo branco e contorno nítido
-        # ================================================================
+        # --- 1️⃣ Renderização GEE com resample bilinear e fundo branco ---
         region = feature.geometry().bounds()
+        ee_smooth = ee_image.resample("bilinear")
 
-        background = ee.Image.constant(1).visualize(palette=["ffffff"], min=0, max=1)
+        base = ee.Image.constant(1).visualize(palette=["ffffff"], min=0, max=1)
         outline = ee.Image().byte().paint(featureCollection=feature, color=1, width=2)
-        final_image = (
-            background
-            .blend(ee_image.visualize(**vis_params))
-            .blend(outline.visualize(palette=["000000"]))
+        composite = (
+            base.blend(ee_smooth.visualize(**vis_params))
+                .blend(outline.visualize(palette=["000000"]))
         )
 
-        url = final_image.getThumbURL({
+        url = composite.getThumbURL({
             "region": region.getInfo()["coordinates"],
-            "dimensions": 3072,
+            "dimensions": 2048,
             "format": "png",
             "crs": "EPSG:4326"
         })
 
+        # --- 2️⃣ Carrega imagem mantendo transparência e suavização ---
         response = requests.get(url, timeout=60)
         mapa_img = Image.open(io.BytesIO(response.content)).convert("RGBA")
+        mapa_img = mapa_img.resize((mapa_img.width, mapa_img.height), Image.Resampling.LANCZOS)
 
-        # Remove fundo preto substituindo transparência
-        data = np.array(mapa_img)
-        r, g, b, a = data.T
-        white_areas = (a == 0)
-        data[..., :-1][white_areas.T] = (255, 255, 255)
-        mapa_rgb = Image.fromarray(data[..., :-1])
-
+        # --- 3️⃣ Substitui transparência por branco sem perder gradiente ---
+        background = Image.new("RGBA", mapa_img.size, (255, 255, 255, 255))
+        mapa_rgb = Image.alpha_composite(background, mapa_img).convert("RGB")
         mapa_w, mapa_h = mapa_rgb.size
 
-        # ================================================================
-        # 2️⃣ Criação da colorbar (alta definição, estilo interativo)
-        # ================================================================
-        fig, ax = plt.subplots(figsize=(6, 0.5))
+        # --- 4️⃣ Cria colorbar com o mesmo colormap e escala ---
+        fig, ax = plt.subplots(figsize=(6, 0.4))
         cmap = plt.get_cmap("jet")
         norm = plt.Normalize(vmin=vis_params["min"], vmax=vis_params["max"])
         cb = plt.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap),
                           cax=ax, orientation="horizontal")
-        cb.set_label(unit_label, fontsize=10)
+        cb.set_label(unit_label, fontsize=9)
+        cb.ax.tick_params(labelsize=8)
         fig.tight_layout()
 
         buf_cb = io.BytesIO()
-        plt.savefig(buf_cb, format="png", dpi=300, bbox_inches="tight", pad_inches=0.2)
+        plt.savefig(buf_cb, format="png", dpi=200, bbox_inches="tight", pad_inches=0.05)
         plt.close(fig)
         buf_cb.seek(0)
         cb_img = Image.open(buf_cb).convert("RGB")
 
-        # ================================================================
-        # 3️⃣ Combinação mapa + colorbar (sem reamostrar o mapa)
-        # ================================================================
+        # --- 5️⃣ Junta mapa + colorbar (sem reamostrar o mapa) ---
         cb_w, cb_h = cb_img.size
         combined_w = mapa_w
         combined_h = mapa_h + cb_h + 30
-
         combined = Image.new("RGB", (combined_w, combined_h), (255, 255, 255))
         combined.paste(mapa_rgb, (0, 0))
         offset_x = (mapa_w - cb_w) // 2
         combined.paste(cb_img, (offset_x, mapa_h + 10))
 
-        # ================================================================
-        # 4️⃣ Exporta imagem final
-        # ================================================================
+        # --- 6️⃣ Exporta imagem final ---
         buf = io.BytesIO()
         combined.save(buf, format="PNG", quality=98)
         buf.seek(0)
@@ -221,7 +211,7 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         return final_bytes, final_bytes, final_bytes
 
     except Exception as e:
-        st.error(f"⚠️ Falha ao gerar mapa estático de alta qualidade: {e}")
+        st.error(f"⚠️ Falha ao gerar mapa estático refinado: {e}")
         return None, None, None
 
 def export_interactive_snapshot(ee_image, feature, vis_params, unit_label=""):
@@ -298,6 +288,7 @@ def export_interactive_snapshot(ee_image, feature, vis_params, unit_label=""):
     except Exception as e:
         st.error(f"⚠️ Falha ao gerar mapa de alta qualidade: {e}")
         return None
+
 
 
 
