@@ -78,10 +78,11 @@ def run_full_analysis():
 
             # ---------- mapa estático ----------
             if st.session_state.map_type == "Estático":
-                mapa_final = map_visualizer.export_interactive_snapshot(
+                mapa_final, _, _ = map_visualizer.create_static_map(
                     ee_image, feature, final_vis_params, variable_config["unit"]
                 )
 
+            
                 if mapa_final:
                     # preview reduzido (sem perder resolução original)
                     st.image(
@@ -235,4 +236,5 @@ def main():
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
+
 
