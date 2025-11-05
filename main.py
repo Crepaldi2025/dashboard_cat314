@@ -2,6 +2,10 @@
 # main.py — Aplicativo principal Clima-Cast-Crepaldi
 # ==================================================================================
 import streamlit as st
+
+# ✅ Este comando deve ser o primeiro Streamlit do arquivo
+st.set_page_config(page_title="Clima-Cast-Crepaldi", page_icon="🌤️", layout="wide")
+
 import ui
 import gee_handler
 import map_visualizer
@@ -12,7 +16,7 @@ import pandas as pd
 import locale
 
 # ==================================================================================
-# Configuração de Locale (compatível com diferentes sistemas)
+# Configuração de Locale (português com fallback)
 # ==================================================================================
 try:
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
@@ -23,40 +27,40 @@ except locale.Error:
         st.warning("Locale 'pt_BR.UTF-8' não encontrado. Meses podem aparecer em inglês.")
 
 # ==================================================================================
-# Função principal: Análise de Mapas
+# Função: Análise de Mapas
 # ==================================================================================
 def run_map_analysis():
-    """Executa a busca de dados e geração de mapas no GEE."""
+    """Executa a busca de dados e geração dos mapas no Google Earth Engine."""
     with st.spinner("🔄 Processando dados no Google Earth Engine..."):
         ee.Initialize()
 
         # ------------------------------------------------------------
-        # 1. Coleta das seleções feitas pelo usuário
+        # 1. Coleta das opções do usuário
         # ------------------------------------------------------------
         tipo_area = st.session_state.get("tipo_area", "Município")
         tipo_variavel = st.session_state.get("tipo_variavel", "Precipitação")
         tipo_periodo = st.session_state.get("tipo_periodo", "Mensal")
 
         # ------------------------------------------------------------
-        # 2. Datas de início e fim
+        # 2. Intervalo de datas
         # ------------------------------------------------------------
         start_date, end_date = utils.get_date_range(tipo_periodo, st.session_state)
 
         # ------------------------------------------------------------
-        # 3. Configuração da variável (dataset e visualização)
+        # 3. Dataset e parâmetros de visualização
         # ------------------------------------------------------------
         variable_config = utils.get_variable_config(tipo_variavel)
         dataset_id = variable_config["dataset"]
         vis_params = variable_config["vis_params"]
 
         # ------------------------------------------------------------
-        # 4. Busca de imagem agregada e área selecionada
+        # 4. Imagem agregada e região selecionada
         # ------------------------------------------------------------
         ee_image = gee_handler.get_aggregated_image(dataset_id, tipo_variavel, start_date, end_date)
         feature = gee_handler.get_selected_feature(tipo_area, st.session_state)
 
         # ------------------------------------------------------------
-        # 5. Parâmetros visuais finais
+        # 5. Configurações visuais finais
         # ------------------------------------------------------------
         final_vis_params = {
             "min": vis_params["min"],
@@ -65,7 +69,7 @@ def run_map_analysis():
         }
 
         # ------------------------------------------------------------
-        # 6. Exibição dos Mapas
+        # 6. Exibição dos mapas
         # ------------------------------------------------------------
         st.markdown("### 🗺️ Mapas de Visualização")
 
@@ -89,37 +93,71 @@ def run_map_analysis():
         st.success("✅ Mapas gerados com sucesso!")
 
 # ==================================================================================
+# Função: Página de Séries Temporais
+# ==================================================================================
+def run_time_series_analysis():
+    """Executa a análise de séries temporais usando os parâmetros selecionados."""
+    with st.spinner("📈 Gerando séries temporais..."):
+        ee.Initialize()
+
+        tipo_area = st.session_state.get("tipo_area", "Município")
+        tipo_variavel = st.session_state.get("tipo_variavel", "Precipitação")
+        periodo_series = st.session_state.get("periodo_series", "Mensal")
+
+        start_date, end_date = utils.get_date_range(periodo_series, st.session_state)
+        variable_config = utils.get_variable_config(tipo_variavel)
+
+        dataset_id = variable_config["dataset"]
+        unit = variable_config["unit"]
+
+        ee_image = gee_handler.get_aggregated_image(dataset_id, tipo_variavel, start_date, end_date)
+        feature = gee_handler.get_selected_feature(tipo_area, st.session_state)
+
+        # Estatísticas extraídas por período
+        df_stats = gee_handler.extract_statistics(ee_image, feature, tipo_variavel, start_date, end_date)
+
+        # Exibe gráficos e estatísticas
+        charts_visualizer.display_charts(df_stats, tipo_variavel, unit)
+
+        st.markdown("---")
+        st.download_button(
+            label="📥 Baixar dados em CSV",
+            data=df_stats.to_csv(index=False).encode("utf-8"),
+            file_name=f"serie_{tipo_variavel}.csv",
+            mime="text/csv"
+        )
+
+        st.success("✅ Séries temporais geradas com sucesso!")
+
+# ==================================================================================
 # Função principal do aplicativo
 # ==================================================================================
 def main():
     """Função principal do Clima-Cast-Crepaldi."""
-    st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide")
-
-    # Renderiza o menu lateral
     ui.render_sidebar()
 
     page = st.session_state.get("page", "Mapas")
 
     # ------------------------------------------------------------
-    # Seção 1 — Mapas
+    # 1. Aba — Mapas
     # ------------------------------------------------------------
     if page == "Mapas":
         run_map_analysis()
 
     # ------------------------------------------------------------
-    # Seção 2 — Séries Temporais
+    # 2. Aba — Séries Temporais
     # ------------------------------------------------------------
     elif page == "Séries Temporais":
-        charts_visualizer.display_time_series_page()
+        run_time_series_analysis()
 
     # ------------------------------------------------------------
-    # Seção 3 — Sobre o Aplicativo
+    # 3. Aba — Sobre
     # ------------------------------------------------------------
     elif page == "Sobre":
         ui.render_about_page()
 
     # ------------------------------------------------------------
-    # Página desconhecida (fallback)
+    # Fallback
     # ------------------------------------------------------------
     else:
         st.warning("Página não reconhecida. Verifique o menu lateral.")
