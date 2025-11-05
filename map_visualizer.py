@@ -212,41 +212,40 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 from branca.colormap import LinearColormap
 from branca.element import Element
 
+from branca.colormap import LinearColormap
+from branca.element import Element
+
 def add_colorbar_with_background(mapa, vis_params, unit_label=""):
     """
-    Adiciona uma colorbar compatível com geemap.foliumap, 
-    com fundo branco translúcido e texto legível.
+    Adiciona uma colorbar compacta e elegante no canto inferior esquerdo,
+    com fundo branco translúcido e sombra suave.
     """
     try:
-        # 🔹 Cria colormap linear com base na paleta e faixa
         cmap = LinearColormap(
             colors=vis_params["palette"],
             vmin=vis_params["min"],
             vmax=vis_params["max"]
         )
 
-        # 🔹 Define rótulo (unidade)
         label_html = f"<b>{unit_label}</b>" if unit_label else ""
 
-        # 🔹 Gera HTML com estilo customizado
         colorbar_html = f"""
         <div style="
             position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(255, 255, 255, 0.85);
-            padding: 6px 12px;
-            border-radius: 8px;
-            box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+            bottom: 18px;
+            left: 18px;
+            background-color: rgba(255, 255, 255, 0.75);
+            padding: 5px 8px;
+            border-radius: 6px;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
             text-align: center;
-            z-index: 9999;">
-            {cmap._repr_html_()}
-            <div style="font-size: 12px; font-weight: 500; margin-top: 2px;">{label_html}</div>
+            z-index: 9999;
+            font-size: 11px;">
+            {cmap._repr_html_().replace('width="100%"', 'width="200px"')}
+            <div style="font-size: 11px; font-weight: 600; margin-top: 2px;">{label_html}</div>
         </div>
         """
 
-        # 🔹 Insere HTML no mapa
         mapa.get_root().html.add_child(Element(colorbar_html))
 
     except Exception as e:
