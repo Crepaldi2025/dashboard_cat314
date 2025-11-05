@@ -209,26 +209,45 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     except Exception as e:
         st.error(f"⚠️ Falha ao adicionar camada do GEE: {e}")
 
+from branca.colormap import LinearColormap
+from branca.element import Element
+
 def add_colorbar_with_background(mapa, vis_params, unit_label=""):
-    """Adiciona uma colorbar legível com fundo branco semitransparente."""
+    """
+    Adiciona uma colorbar compatível com geemap.foliumap, 
+    com fundo branco translúcido e texto legível.
+    """
     try:
-        colorbar = geemap.colorbar(
-            vis_params=vis_params,
-            label=unit_label,
-            position="bottomcenter"
+        # 🔹 Cria colormap linear com base na paleta e faixa
+        cmap = LinearColormap(
+            colors=vis_params["palette"],
+            vmin=vis_params["min"],
+            vmax=vis_params["max"]
         )
 
-        # Aplica estilo CSS manualmente para fundo branco translúcido
-        colorbar_html = colorbar.to_html().replace(
-            "<div",
-            "<div style='background-color: rgba(255,255,255,0.85);"
-            "padding: 4px 10px;border-radius: 6px;"
-            "box-shadow: 0px 0px 6px rgba(0,0,0,0.3);'"
-        )
+        # 🔹 Define rótulo (unidade)
+        label_html = f"<b>{unit_label}</b>" if unit_label else ""
 
-        from branca.element import Element
+        # 🔹 Gera HTML com estilo customizado
+        colorbar_html = f"""
+        <div style="
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.85);
+            padding: 6px 12px;
+            border-radius: 8px;
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            z-index: 9999;">
+            {cmap._repr_html_()}
+            <div style="font-size: 12px; font-weight: 500; margin-top: 2px;">{label_html}</div>
+        </div>
+        """
+
+        # 🔹 Insere HTML no mapa
         mapa.get_root().html.add_child(Element(colorbar_html))
+
     except Exception as e:
         st.warning(f"⚠️ Falha ao adicionar colorbar estilizada: {e}")
-
-
