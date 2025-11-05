@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (versão otimizada final — novembro/2025)
+# main.py — Clima-Cast-Crepaldi (versão leve e estável)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -25,15 +25,23 @@ except locale.Error:
         pass
 
 # --------------------------------------------------------------------------
+# Botão de limpeza de cache e reset de estado
+# --------------------------------------------------------------------------
+st.sidebar.markdown("### ⚙️ Diagnóstico rápido")
+if st.sidebar.button("🧹 Limpar cache e estado"):
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    for k in list(st.session_state.keys()):
+        del st.session_state[k]
+    st.success("Cache e estado limpos. Recarregue o app.")
+    st.stop()
+
+# --------------------------------------------------------------------------
 # Função principal de análise
 # --------------------------------------------------------------------------
 def run_full_analysis():
-    """Executa toda a lógica de busca de dados e exibição de resultados."""
-
-    # A inicialização será feita apenas quando o usuário clicar em "Gerar Análise"
-    # Isso evita inicializações duplicadas e lentidão
-    pass
-
+    """Executa a lógica de análise com inicialização única do GEE."""
+    status = gee_handler.inicializar_gee()
 
     if status == "local":
         st.toast("✅ Conectado ao Earth Engine (modo local).")
@@ -77,74 +85,17 @@ def run_full_analysis():
                 final_vis_params["max"] = 3000
 
             st.subheader("🗺️ Resultado da Análise")
-
-            # ---------- mapa estático ----------
             if st.session_state.map_type == "Estático":
-                mapa_final, _, _ = map_visualizer.create_static_map(
+                mapa_final = map_visualizer.create_static_map(
                     ee_image, feature, final_vis_params, variable_config["unit"]
                 )
-
-            
                 if mapa_final:
-                    # preview reduzido (sem perder resolução original)
                     st.image(
                         mapa_final,
-                        caption="Mapa Estático com Legenda",
-                        width=700,       # ✅ preview controlado
+                        caption="Mapa Estático",
+                        width=700,
                         output_format="PNG",
                     )
-
-                    with st.expander("💾 Opções de Exportação de Mapa"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.download_button(
-                                label="Exportar (PNG)",
-                                data=mapa_final,
-                                file_name="mapa_com_legenda.png",
-                                mime="image/png",
-                                use_container_width=True,
-                            )
-                        with col2:
-                            st.download_button(
-                                label="Exportar (JPEG)",
-                                data=mapa_final,
-                                file_name="mapa_com_legenda.jpeg",
-                                mime="image/jpeg",
-                                use_container_width=True,
-                            )
-
-                    with st.expander("📋 Tabela de Dados Amostrados"):
-                        df_table = gee_handler.get_sampled_data_as_dataframe(
-                            ee_image, geometry, st.session_state.variavel
-                        )
-                        if not df_table.empty:
-                            st.dataframe(df_table)
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.download_button(
-                                    "Exportar (CSV)",
-                                    data=df_table.to_csv(index=False).encode("utf-8"),
-                                    file_name="dados_mapa.csv",
-                                    mime="text/csv",
-                                    use_container_width=True,
-                                )
-                            with c2:
-                                output = io.BytesIO()
-                                with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                                    df_table.to_excel(
-                                        writer, index=False, sheet_name="Dados"
-                                    )
-                                st.download_button(
-                                    "Exportar (XLSX)",
-                                    data=output.getvalue(),
-                                    file_name="dados_mapa.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    use_container_width=True,
-                                )
-                        else:
-                            st.warning("Não foi possível amostrar dados para a tabela.")
-
-            # ---------- mapa interativo ----------
             elif st.session_state.map_type == "Interativo":
                 map_visualizer.create_interactive_map(
                     ee_image, feature, final_vis_params, variable_config["unit"]
@@ -163,38 +114,11 @@ def run_full_analysis():
                 df_series, st.session_state.variavel, variable_config["unit"]
             )
 
-            if not df_series.empty:
-                with st.expander("💾 Exportar Dados da Série Temporal"):
-                    st.dataframe(df_series)
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        st.download_button(
-                            "Exportar (CSV)",
-                            data=df_series.to_csv(index=False).encode("utf-8"),
-                            file_name="dados_serie_temporal.csv",
-                            mime="text/csv",
-                            use_container_width=True,
-                        )
-                    with c2:
-                        output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                            df_series.to_excel(writer, index=False, sheet_name="Dados")
-                        st.download_button(
-                            "Exportar (XLSX)",
-                            data=output.getvalue(),
-                            file_name="dados_serie_temporal.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True,
-                        )
-
 # --------------------------------------------------------------------------
 # Função principal da aplicação
 # --------------------------------------------------------------------------
 def main():
-    """Organiza e executa a aplicação Streamlit."""
-
-    from gee_handler import inicializar_gee
-    inicializar_gee()  # Inicialização silenciosa e cacheada
+    """Organiza e executa o fluxo principal do app."""
 
     ui.configurar_pagina()
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
@@ -203,41 +127,18 @@ def main():
     if opcao_menu == "Sobre o Aplicativo":
         ui.renderizar_pagina_sobre()
     else:
+        if st.session_state.get("analysis_triggered", False):
+            st.session_state.analysis_triggered = False
+            st.session_state.area_validada = True
+            st.experimental_rerun()
+
         if st.session_state.get("area_validada", False):
             ui.renderizar_pagina_principal(opcao_menu)
             ui.renderizar_resumo_selecao()
             run_full_analysis()
-
-        elif st.session_state.get("show_confirmation_map", False):
-            ui.renderizar_pagina_principal(opcao_menu)
-            ui.renderizar_resumo_selecao()
-            tipo_loc = st.session_state.get("tipo_localizacao")
-            if tipo_loc == "Círculo (Lat/Lon/Raio)":
-                map_visualizer.display_circle_map(
-                    st.session_state.latitude,
-                    st.session_state.longitude,
-                    st.session_state.raio,
-                )
-                ui.renderizar_validacao_mapa()
-            elif tipo_loc == "Polígono":
-                map_visualizer.display_polygon_draw_map()
-                ui.renderizar_validacao_mapa()
-
-        elif st.session_state.get("analysis_triggered", False):
-            st.session_state.analysis_triggered = False
-            tipo_loc = st.session_state.get("tipo_localizacao")
-            if tipo_loc in ["Estado", "Município"]:
-                st.session_state.area_validada = True
-            else:
-                st.session_state.show_confirmation_map = True
-            st.rerun()
-
         else:
             ui.renderizar_pagina_principal(opcao_menu)
 
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
-
-
-
