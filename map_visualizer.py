@@ -86,3 +86,32 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
     cmap.position = "bottomleft"
 
     st_folium(mapa, width=900, height=500)
+def create_interactive_map(ee_image, feature, vis_params, unidade):
+    """Função compatível com chamadas antigas (mantém fluxo original)."""
+    variavel = unidade  # só para compatibilidade, pode usar nome real se desejar
+    mapa = geemap.Map(center=[-15, -55], zoom=5)
+    mapa.add_basemap("SATELLITE")
+    mapa.add_layer(ee_image, vis_params, variavel)
+
+    # Colorbar discreto e coerente com unidade
+    from branca.colormap import linear
+    if "°" in unidade or "temp" in unidade.lower():
+        cmap = linear.RdYlBu_11.scale(0, 40)
+        label = "Temperatura (°C)"
+    elif "mm" in unidade.lower():
+        cmap = linear.Blues_09.scale(0, 500)
+        label = "Precipitação (mm)"
+    elif "m/s" in unidade.lower():
+        cmap = linear.Viridis_09.scale(0, 30)
+        label = "Vento (m/s)"
+    else:
+        cmap = linear.Greys_09.scale(0, 1)
+        label = unidade
+
+    cmap.caption = label
+    cmap.add_to(mapa)
+    cmap.position = "bottomleft"
+
+    st_folium(mapa, width=900, height=500)
+
+
