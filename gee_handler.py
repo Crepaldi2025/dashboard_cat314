@@ -19,7 +19,7 @@ def inicializar_gee():
             # Cria credenciais usando a conta de serviço
             credentials = ee.ServiceAccountCredentials(service_account, key_data=private_key)
             ee.Initialize(credentials)
-            st.success("✅ Conectado ao Google Earth Engine via Service Account.")
+            
         else:
             # Executa localmente com credenciais já autenticadas
             ee.Initialize()
@@ -245,4 +245,5 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values(by='date').dropna()
     
+
     return df
