@@ -35,7 +35,8 @@ def render_sidebar():
 
         st.session_state.tipo_variavel = st.sidebar.selectbox(
             "Variável meteorológica:",
-            ["Precipitação", "Temperatura Média", "Temperatura Máxima", "Temperatura Mínima", "Umidade do Solo"]
+            ["Precipitação", "Temperatura Média", "Temperatura Máxima",
+             "Temperatura Mínima", "Umidade do Solo"]
         )
 
         st.session_state.tipo_periodo = st.sidebar.selectbox(
@@ -63,7 +64,8 @@ def render_sidebar():
 
         st.session_state.tipo_variavel = st.sidebar.selectbox(
             "Variável meteorológica:",
-            ["Precipitação", "Temperatura Média", "Temperatura Máxima", "Temperatura Mínima", "Umidade do Solo"]
+            ["Precipitação", "Temperatura Média", "Temperatura Máxima",
+             "Temperatura Mínima", "Umidade do Solo"]
         )
 
         st.session_state.periodo_series = st.sidebar.selectbox(
