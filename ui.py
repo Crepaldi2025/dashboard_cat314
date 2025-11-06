@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — Interface do usuário do sistema Clima-Cast-Crepaldi (Corrigido v7)
+# ui.py — (Corrigido v25)
 # ==================================================================================
 
 import streamlit as st
@@ -8,16 +8,20 @@ import calendar
 from dateutil.relativedelta import relativedelta
 import locale
 
+# --- INÍCIO DA CORREÇÃO (Carregar DOCX) ---
+import docx
+import os
+# --- FIM DA CORREÇÃO ---
+
+
 # ==================================================================================
 # CONFIGURAÇÃO INICIAL (Idêntica)
 # ==================================================================================
-
 st.set_page_config(
     page_title="Clima-Cast-Crepaldi",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
 try:
     locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
 except locale.Error:
@@ -27,14 +31,60 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES PRINCIPAIS (Apenas 'renderizar_sidebar' foi alterada)
+# FUNÇÕES AUXILIARES (Novas)
 # ==================================================================================
 
+# --- INÍCIO DA CORREÇÃO (Carregar DOCX) ---
+@st.cache_data
+def _carregar_texto_docx(file_path):
+    """
+    Função auxiliar para ler um arquivo .docx e retornar seu texto.
+    Usa cache para não ler o arquivo em cada recarregamento da página.
+    """
+    if not os.path.exists(file_path):
+        return None # Retorna None se o arquivo não existir
+
+    try:
+        doc = docx.Document(file_path)
+        full_text = []
+        for para in doc.paragraphs:
+            # Adiciona o texto do parágrafo. 
+            # Verifica se há "runs" (partes de texto) com estilos diferentes
+            if para.runs:
+                # Verifica se é um item de lista (detecta pelo estilo ou bullets)
+                is_list_item = "List Paragraph" in para.style.name or para.style.name.startswith("List") or para._p.pPr.numPr is not None
+                
+                # Adiciona o marcador de lista (Markdown)
+                prefix = "- " if is_list_item else ""
+                
+                run_texts = []
+                for run in para.runs:
+                    text = run.text
+                    if run.bold:
+                        text = f"**{text}**"
+                    if run.italic:
+                        text = f"*{text}*"
+                    run_texts.append(text)
+                
+                full_text.append(prefix + "".join(run_texts))
+            else:
+                full_text.append(para.text)
+                
+        # Junta os parágrafos com quebra de linha dupla (Markdown)
+        return "\n\n".join(full_text)
+    except Exception as e:
+        st.error(f"Erro ao ler o arquivo {file_path}: {e}")
+        return None
+# --- FIM DA CORREÇÃO ---
+
+
+# ==================================================================================
+# FUNÇÕES PRINCIPAIS (Restante idêntico ao v7, exceto renderizar_pagina_sobre)
+# ==================================================================================
 def configurar_pagina():
     st.markdown("---")
 
 def reset_analysis_state():
-    """Callback para limpar o estado dos resultados sempre que um filtro é alterado."""
     keys_to_clear = [
         'analysis_triggered',   
         'analysis_results',     
@@ -46,11 +96,9 @@ def reset_analysis_state():
     
 
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
-    """Cria a barra lateral com os filtros."""
     with st.sidebar:
         st.header("Painel de Controle")
 
-        # 1. NAVEGAÇÃO
         st.radio(
             "Navegação",
             ["Mapas", "Séries Temporais", "Sobre o Aplicativo"],
@@ -64,17 +112,14 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         if opcao_selecionada in ["Mapas", "Séries Temporais"]:
             st.markdown("<p style='text-align: center;'>Selecione os filtros abaixo para gerar os dados.</p>", unsafe_allow_html=True)
             
-            # 2. BASE DE DADOS
             st.subheader("1. Base de Dados")
             st.selectbox("Selecione a Base de Dados", ["ERA5-LAND"], key='base_de_dados', on_change=reset_analysis_state)
             st.divider()
 
-            # 3. VARIÁVEL
             st.subheader("2. Variável Meteorológica")
             st.selectbox("Selecione a Variável", ["Temperatura do Ar (2m)", "Precipitação Total", "Velocidade do Vento (10m)"], key='variavel', on_change=reset_analysis_state)
             st.divider()
 
-            # 4. LOCALIZAÇÃO
             st.subheader("3. Localização")
             st.selectbox("Selecione o tipo de área de interesse", 
                          ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], 
@@ -99,23 +144,15 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
             
-            # ----------------------------------------------------------------------
-            # CORREÇÃO v7: Lógica da "Mensagem Azul"
-            # ----------------------------------------------------------------------
             elif tipo_localizacao == "Polígono":
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
                 elif opcao_selecionada == "Mapas":
-                    # O usuário está na aba certa, mas não desenhou
                     st.info("Use as ferramentas no mapa principal para desenhar sua área.")
                 else: 
-                    # O usuário está na aba errada (ex: "Séries Temporais")
                     st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
-            # ----------------------------------------------------------------------
-
             st.divider()
 
-            # 5. PERÍODO
             st.subheader("4. Período de Análise")
             
             if opcao_selecionada == "Mapas":
@@ -150,13 +187,11 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
             st.divider()
 
-            # 6. TIPO DE MAPA
             if opcao_selecionada == "Mapas":
                 st.subheader("5. Tipo de Mapa")
                 st.radio("Selecione o formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_state)
                 st.divider()
 
-            # 7. BOTÃO DE ANÁLISE
             disable_button = st.session_state.get('date_error', False)
             tooltip_message = "Clique para gerar a análise"
 
@@ -165,7 +200,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     disable_button = True
                     tooltip_message = "Por favor, desenhe um polígono no mapa principal primeiro."
                 if opcao_selecionada != "Mapas":
-                     # Desabilita se tentar rodar polígono na aba "Séries Temporais"
                      disable_button = True
                      tooltip_message = "O desenho de polígono só funciona na aba 'Mapas'."
 
@@ -182,13 +216,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         return opcao_selecionada
 
-# ==================================================================================
-# O restante do ui.py (renderizar_pagina_principal, etc.)
-# permanece IDÊNTICO ao v5.
-# ==================================================================================
 
 def renderizar_pagina_principal(opcao_navegacao):
-    """Exibe o conteúdo da página principal com o logo."""
     agora = datetime.now()
     data_hora_formatada = agora.strftime("%d/%m/%Y, %H:%M:%S")
 
@@ -196,7 +225,7 @@ def renderizar_pagina_principal(opcao_navegacao):
     with col1:
         logo_col, title_col = st.columns([1, 5])
         with logo_col:
-            st.image("logo.png", width=70) # Assume que 'logo.png' está na pasta raiz
+            st.image("logo.png", width=70)
         with title_col:
             st.title(f"Clima-Cast-Crepaldi: {opcao_navegacao}")
 
@@ -209,7 +238,6 @@ def renderizar_pagina_principal(opcao_navegacao):
 
 
 def renderizar_resumo_selecao():
-    """Mostra um resumo dos filtros selecionados."""
     with st.expander("Resumo dos Filtros Utilizados", expanded=False):
         col_resumo1, col_resumo2 = st.columns(2)
         
@@ -247,66 +275,26 @@ def renderizar_resumo_selecao():
 
 
 def renderizar_pagina_sobre():
-    # Texto introdutório
-    st.markdown("""
-    O **Clima-Cast-Crepaldi** é um sistema interativo desenvolvido no âmbito da disciplina  
-    **CAT314 – Ferramentas de Previsão de Curtíssimo Prazo (Nowcasting)**, do curso de **Ciências Atmosféricas da Universidade Federal de Itajubá (UNIFEI)**.  
-    Seu propósito é **integrar dados meteorológicos de reanálises globais** e disponibilizá-los em uma plataforma visual, dinâmica e acessível, 
-    favorecendo tanto a **análise científica** quanto o **uso didático**.
-    """)
-
-    # Objetivo
-    st.markdown("<div class='subtitulo'> Objetivo</div>", unsafe_allow_html=True)
-    st.markdown("""
-    O sistema tem como principal objetivo **proporcionar uma interface intuitiva e interativa** para consulta, análise e visualização 
-    de dados meteorológicos históricos dos municípios brasileiros, utilizando a base **ERA5-Land**, disponibilizada pelo  
-    **European Centre for Medium-Range Weather Forecasts (ECMWF)** por meio da plataforma **Google Earth Engine (GEE)**.
-
-    Além disso, o aplicativo busca:
-    - Apoiar o aprendizado prático em técnicas de análise e visualização de dados meteorológicos;
-    - Facilitar a **análise espaço-temporal** de variáveis como temperatura, precipitação e vento;
-    - Demonstrar a **aplicabilidade de ferramentas computacionais ** na climatologia operacional.
-    """)
-
-    # Metodologia
-    st.markdown("<div class='subtitulo'> Metodologia e Funcionamento</div>", unsafe_allow_html=True)
-    st.markdown("""
-    O dashboard permite ao usuário selecionar:
-    - A **variável meteorológica** de interesse (*temperatura, precipitação ou vento*);
-    - O **tipo de área de estudo** (*Estado, Município, Círculo ou Polígono*);
-    - O **intervalo temporal** (*personalizado, mensal ou anual*).
-
-    Após a seleção, o sistema acessa os dados do **ERA5-Land via GEE**, aplica a **agregação estatística apropriada** (média ou soma) 
-    e exibe os resultados em diferentes formas:
-    - **Mapas interativos** com *geemap* e *folium*;
-    - **Mapas estáticos** com *matplotlib*;
-    - **Séries temporais interativas** com *plotly.express*.
-
-    Os resultados podem ser **exportados** em formatos **CSV**, **XLSX** e **PNG**, permitindo o reuso em relatórios e análises externas.
-    """)
-
-    # Tecnologias
-    st.markdown("<div class='subtitulo'> Tecnologias Utilizadas</div>", unsafe_allow_html=True)
-    st.markdown("""
-    | Categoria | Ferramenta / Tecnologia | Função |
-    |------------|-------------------------|---------|
-    | **Linguagem de Programação** | Python | Desenvolvimento principal e integração entre módulos |
-    | **Framework de Interface** | Streamlit | Criação da interface interativa (dashboard web) |
-    | **Plataforma Geoespacial** | Google Earth Engine (GEE) | Acesso e processamento de dados climáticos e geográficos |
-    | **Visualização** | Geemap, Folium, Streamlit-Folium, Matplotlib, Plotly | Criação de mapas e gráficos interativos |
-    | **Fonte de Dados Meteorológicos** | ERA5-Land (ECMWF) | Reanálise global de alta resolução (~9 km) |
-    | **Geometrias Territoriais** | Geobr | Fronteiras oficiais de estados e municípios brasileiros |
-    """, unsafe_allow_html=True)
-
-    # Fonte dos Dados
-    st.markdown("<div class='subtitulo'> Fonte dos Dados</div>", unsafe_allow_html=True)
-    st.markdown("""
-    Os dados utilizados provêm do produto **ERA5-Land Daily Aggregated**, mantido pelo **ECMWF (European Centre for Medium-Range Weather Forecasts)** e disponibilizado no **Google Earth Engine (GEE)**.  
-    Esse conjunto de dados fornece **estimativas diárias de variáveis meteorológicas de superfície** com resolução espacial de **0,1° (~9 km)**, 
-    cobrindo o período de **1950 até o presente**.  
-    A confiabilidade e consistência do ERA5-Land o tornam uma referência para **estudos climáticos e hidrometeorológicos**.
-    """)
-
-    # Rodapé
+    # --- INÍCIO DA CORREÇÃO (Carregar DOCX) ---
+    # Tenta carregar o texto do arquivo 'sobre.docx'
+    texto_sobre = _carregar_texto_docx("sobre.docx")
+    
+    if texto_sobre is None:
+        # Se o arquivo não for encontrado, exibe este texto padrão
+        st.warning("Arquivo `sobre.docx` não encontrado. Exibindo texto padrão.")
+        st.markdown("""
+        **Objetivo**
+        
+        O sistema tem como principal objetivo proporcionar uma interface intuitiva e interativa para consulta, análise e visualização 
+        de dados meteorológicos históricos dos municípios brasileiros...
+        
+        *(Por favor, crie um arquivo chamado 'sobre.docx' na mesma pasta do 'main.py' com o conteúdo desta página.)*
+        """)
+    else:
+        # Se o arquivo for encontrado, exibe o conteúdo
+        st.markdown(texto_sobre, unsafe_allow_html=True)
+    
+    # O rodapé pode continuar aqui
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
+    # --- FIM DA CORREÇÃO ---
