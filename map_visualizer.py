@@ -60,26 +60,35 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
 # MAPA INTERATIVO — COMPATÍVEL COM main.py
 # ==================================================================================
 def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
-    """Exibe o mapa interativo com colorbar discreta no canto inferior esquerdo."""
-    # (não repetir subheader aqui; o main.py já mostra)
+    """Exibe o mapa interativo com fundo de satélite e colorbar discreta."""
+    # O título já vem do main.py
 
     # Centraliza no AOI
     centroid = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
     centroid.reverse()  # (lon, lat) -> (lat, lon)
 
+    # Cria mapa com fundo satélite ESRI
     mapa = geemap.Map(center=centroid, zoom=7)
-    mapa.add_basemap("Esri.WorldImagery")
+    basemap = folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri &mdash; Source: Esri, Maxar, Earthstar Geographics",
+        name="Esri Satellite",
+        overlay=False,
+        control=False,
+    )
+    basemap.add_to(mapa)
 
-    # Camada do EE (sem gerar colorbar automática)
-    mapa.addLayer(ee_image, vis_params, 'Dados Climáticos')
-    # Contorno do AOI (opcional, como já estava)
-    mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
+    # Adiciona camada do EE (sem gerar colorbar automática)
+    mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
+    # Contorno do AOI (mantém o traço preto)
+    mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
 
     # Colorbar discreta (canto inferior esquerdo)
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
     # Render
     mapa.to_streamlit(height=500)
+
 
 
 # ==================================================================================
@@ -157,3 +166,4 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     macro = MacroElement()
     macro._template = template
     mapa.get_root().add_child(macro)
+
