@@ -6,34 +6,32 @@ import datetime
 import utils
 
 # ==================================================================================
-# SIDEBAR PRINCIPAL
+# Sidebar principal
 # ==================================================================================
-
 def render_sidebar():
-    """Renderiza a barra lateral com controles interativos."""
+    """Renderiza a barra lateral completa para controle da aplicação."""
     st.sidebar.title("🌦️ Clima-Cast-Crepaldi")
-    st.sidebar.markdown("Selecione as opções abaixo para gerar a análise.")
+    st.sidebar.markdown("Selecione os parâmetros abaixo para gerar a análise.")
     st.sidebar.markdown("---")
 
-    # === Tipo de localização ===
-    tipo_localizacao = st.sidebar.selectbox(
+    tipo_loc = st.sidebar.selectbox(
         "📍 Tipo de localização",
         ["Estado", "Município", "Círculo", "Polígono"]
     )
-    st.session_state.tipo_localizacao = tipo_localizacao
+    st.session_state.tipo_localizacao = tipo_loc
 
-    # ================================================================
-    # OPÇÃO 1 — ESTADO
-    # ================================================================
-    if tipo_localizacao == "Estado":
+    # -------------------------------------------------------
+    # Estado
+    # -------------------------------------------------------
+    if tipo_loc == "Estado":
         estados = utils.listar_estados_brasil()
         uf_sigla = st.sidebar.selectbox("UF", estados)
         st.session_state.uf_sigla = uf_sigla
 
-    # ================================================================
-    # OPÇÃO 2 — MUNICÍPIO
-    # ================================================================
-    elif tipo_localizacao == "Município":
+    # -------------------------------------------------------
+    # Município
+    # -------------------------------------------------------
+    elif tipo_loc == "Município":
         estados = utils.listar_estados_brasil()
         uf_sigla = st.sidebar.selectbox("UF", estados)
         municipios = utils.listar_municipios_por_estado(uf_sigla)
@@ -41,11 +39,11 @@ def render_sidebar():
         st.session_state.uf_sigla = uf_sigla
         st.session_state.municipio_nome = municipio_nome
 
-    # ================================================================
-    # OPÇÃO 3 — CÍRCULO
-    # ================================================================
-    elif tipo_localizacao == "Círculo":
-        st.sidebar.markdown("Defina o **centro** e o **raio** (em km):")
+    # -------------------------------------------------------
+    # Círculo
+    # -------------------------------------------------------
+    elif tipo_loc == "Círculo":
+        st.sidebar.markdown("Defina o **centro** e o **raio (km)**:")
         latitude = st.sidebar.number_input("Latitude (°)", value=-23.0, step=0.1)
         longitude = st.sidebar.number_input("Longitude (°)", value=-46.0, step=0.1)
         raio_km = st.sidebar.number_input("Raio (km)", value=50.0, step=1.0)
@@ -53,18 +51,17 @@ def render_sidebar():
         st.session_state.longitude = longitude
         st.session_state.raio_km = raio_km
 
-    # ================================================================
-    # OPÇÃO 4 — POLÍGONO
-    # ================================================================
-    elif tipo_localizacao == "Polígono":
+    # -------------------------------------------------------
+    # Polígono
+    # -------------------------------------------------------
+    elif tipo_loc == "Polígono":
         st.sidebar.info("🟦 O polígono deve ser desenhado no mapa principal.")
-        st.session_state.tipo_localizacao = "Polígono"
 
     st.sidebar.markdown("---")
 
-    # ================================================================
-    # VARIÁVEL METEOROLÓGICA
-    # ================================================================
+    # -------------------------------------------------------
+    # Variável meteorológica
+    # -------------------------------------------------------
     variavel = st.sidebar.selectbox(
         "🌡️ Variável meteorológica",
         [
@@ -76,42 +73,32 @@ def render_sidebar():
     )
     st.session_state.variavel = variavel
 
-    # ================================================================
-    # PERÍODO DE ANÁLISE
-    # ================================================================
     st.sidebar.markdown("---")
     st.sidebar.caption("🗓️ Período de análise")
 
-    start_date = st.sidebar.date_input(
-        "Data inicial", value=datetime.date(2024, 1, 1)
-    )
-    end_date = st.sidebar.date_input(
-        "Data final", value=datetime.date(2024, 12, 31)
-    )
+    start_date = st.sidebar.date_input("Data inicial", datetime.date(2024, 1, 1))
+    end_date = st.sidebar.date_input("Data final", datetime.date(2024, 12, 31))
 
     st.session_state.start_date = start_date
     st.session_state.end_date = end_date
 
     st.sidebar.markdown("---")
 
-    # ================================================================
-    # BOTÕES DE CONTROLE
-    # ================================================================
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        if st.button("🚀 Gerar Análise"):
-            st.session_state.analysis_triggered = True
-            st.rerun()
-    with col2:
-        if st.button("🧹 Limpar resultados"):
-            reset_analysis_state()
-            st.rerun()
+    # -------------------------------------------------------
+    # Botões
+    # -------------------------------------------------------
+    if st.sidebar.button("🚀 Gerar Análise"):
+        st.session_state.analysis_triggered = True
+        st.rerun()
+
+    if st.sidebar.button("🧹 Limpar resultados"):
+        reset_analysis_state()
+        st.rerun()
 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES
+# Funções auxiliares
 # ==================================================================================
-
 def obter_parametros_principais():
     """Retorna variável, datas de início e fim selecionadas."""
     return (
@@ -133,6 +120,7 @@ def reset_analysis_state():
         "latitude",
         "longitude",
         "raio_km",
+        "drawn_geometry",
     ]
     for k in keys_to_clear:
         if k in st.session_state:
