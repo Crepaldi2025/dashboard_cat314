@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v25)
+# ui.py — (Corrigido v26)
 # ==================================================================================
 
 import streamlit as st
@@ -7,12 +7,8 @@ from datetime import datetime
 import calendar
 from dateutil.relativedelta import relativedelta
 import locale
-
-# --- INÍCIO DA CORREÇÃO (Carregar DOCX) ---
 import docx
 import os
-# --- FIM DA CORREÇÃO ---
-
 
 # ==================================================================================
 # CONFIGURAÇÃO INICIAL (Idêntica)
@@ -31,30 +27,32 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES (Novas)
+# FUNÇÕES AUXILIARES (Modificada)
 # ==================================================================================
 
-# --- INÍCIO DA CORREÇÃO (Carregar DOCX) ---
+# --- INÍCIO DA CORREÇÃO v26 (Erro 'NoneType' object has no attribute 'numPr') ---
 @st.cache_data
 def _carregar_texto_docx(file_path):
     """
     Função auxiliar para ler um arquivo .docx e retornar seu texto.
-    Usa cache para não ler o arquivo em cada recarregamento da página.
+    (v26) - Corrigido para lidar com parágrafos sem propriedades.
     """
     if not os.path.exists(file_path):
-        return None # Retorna None se o arquivo não existir
+        return None 
 
     try:
         doc = docx.Document(file_path)
         full_text = []
         for para in doc.paragraphs:
-            # Adiciona o texto do parágrafo. 
-            # Verifica se há "runs" (partes de texto) com estilos diferentes
             if para.runs:
-                # Verifica se é um item de lista (detecta pelo estilo ou bullets)
-                is_list_item = "List Paragraph" in para.style.name or para.style.name.startswith("List") or para._p.pPr.numPr is not None
+                # Verificação de item de lista (segura)
+                is_list_item = "List Paragraph" in para.style.name or para.style.name.startswith("List")
                 
-                # Adiciona o marcador de lista (Markdown)
+                # Verificação de bullet (segura)
+                if not is_list_item and para._p.pPr is not None: # <-- VERIFICA SE pPr NÃO É NONE
+                    if para._p.pPr.numPr is not None:             # <-- SÓ ENTÃO ACESSA numPr
+                        is_list_item = True
+                
                 prefix = "- " if is_list_item else ""
                 
                 run_texts = []
@@ -70,16 +68,15 @@ def _carregar_texto_docx(file_path):
             else:
                 full_text.append(para.text)
                 
-        # Junta os parágrafos com quebra de linha dupla (Markdown)
         return "\n\n".join(full_text)
     except Exception as e:
         st.error(f"Erro ao ler o arquivo {file_path}: {e}")
         return None
-# --- FIM DA CORREÇÃO ---
+# --- FIM DA CORREÇÃO v26 ---
 
 
 # ==================================================================================
-# FUNÇÕES PRINCIPAIS (Restante idêntico ao v7, exceto renderizar_pagina_sobre)
+# FUNÇÕES PRINCIPAIS (Restante idêntico ao v7/v25)
 # ==================================================================================
 def configurar_pagina():
     st.markdown("---")
@@ -275,12 +272,9 @@ def renderizar_resumo_selecao():
 
 
 def renderizar_pagina_sobre():
-    # --- INÍCIO DA CORREÇÃO (Carregar DOCX) ---
-    # Tenta carregar o texto do arquivo 'sobre.docx'
     texto_sobre = _carregar_texto_docx("sobre.docx")
     
     if texto_sobre is None:
-        # Se o arquivo não for encontrado, exibe este texto padrão
         st.warning("Arquivo `sobre.docx` não encontrado. Exibindo texto padrão.")
         st.markdown("""
         **Objetivo**
@@ -291,10 +285,7 @@ def renderizar_pagina_sobre():
         *(Por favor, crie um arquivo chamado 'sobre.docx' na mesma pasta do 'main.py' com o conteúdo desta página.)*
         """)
     else:
-        # Se o arquivo for encontrado, exibe o conteúdo
         st.markdown(texto_sobre, unsafe_allow_html=True)
     
-    # O rodapé pode continuar aqui
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
-    # --- FIM DA CORREÇÃO ---
