@@ -234,49 +234,75 @@ def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
 
 @st.cache_data
 def get_time_series_data(variable, start_date, end_date, _geometry):
-    """Extrai a série temporal de uma variável para uma dada geometria."""
-    if variable not in ERA5_VARS: return pd.DataFrame()
-    config = ERA5_VARS[variable]
-    
-    bands_to_select = config.get('bands', config.get('band'))
-    image_collection = ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR').filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')).select(bands_to_select)
+    """Extrai a série temporal de uma variável do ERA5-Land para a geometria informada."""
+    if variable not in ERA5_VARS:
+        return pd.DataFrame()
 
-    if image_collection.size().getInfo() == 0:
+    config = ERA5_VARS[variable]
+    bands_to_select = config.get("bands", config.get("band"))
+
+    collection = (
+        ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
+        .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+        .select(bands_to_select)
+    )
+
+    if collection.size().getInfo() == 0:
         st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
         return pd.DataFrame()
 
+    # --- cálculo especial para o vento (mantido do seu código)
     if variable == "Velocidade do Vento (10m)":
         def calculate_wind_speed(image):
-            wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
+            wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config["result_band"])
             return image.addBands(wind_speed)
-        image_collection = image_collection.map(calculate_wind_speed)
+        collection = collection.map(calculate_wind_speed)
 
+    # --- média diária na área
     def extract_value(image):
-        mean_value = image.select(config['result_band']).reduceRegion(
+        val = image.select(config["result_band"]).reduceRegion(
             reducer=ee.Reducer.mean(),
             geometry=_geometry,
-            scale=10000
-        ).get(config['result_band'])
-        
-        final_value = ee.Number(mean_value)
-        if config['unit'] == "°C":
-            final_value = final_value.subtract(273.15)
-        elif config['unit'] == "mm":
-            final_value = final_value.multiply(1000)
-            
-        return image.set('date', image.date().format('YYYY-MM-dd')).set('value', final_value)
+            scale=10000,
+            bestEffort=True,
+            maxPixels=1e9
+        ).get(config["result_band"])
 
-    time_series = image_collection.map(extract_value)
-    
-    data = time_series.reduceColumns(ee.Reducer.toList(2), ['date', 'value']).getInfo()['list']
-    
-    if not data:
-        st.warning("Não foi possível extrair a série temporal.")
+        # --- conversões de unidade
+        final_val = ee.Number(val)
+        if config["unit"] == "°C":
+            final_val = final_val.subtract(273.15)
+        elif config["unit"] == "mm":
+            final_val = final_val.multiply(1000)
+
+        return image.set("date", image.date().format("YYYY-MM-dd")).set("value", final_val)
+
+    # --- aplica função
+    series = collection.map(extract_value)
+
+    # --- coleta resultados seguros
+    try:
+        data = series.aggregate_array("date").getInfo()
+        values = series.aggregate_array("value").getInfo()
+    except Exception as e:
+        st.error(f"Falha ao recuperar dados da série: {e}")
         return pd.DataFrame()
-        
-    df = pd.DataFrame(data, columns=['date', 'value'])
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values(by='date').dropna()
+
+    # --- cria DataFrame limpo
+    if not data or not values:
+        st.warning("Não foi possível extrair valores válidos do ERA5-Land para a área selecionada.")
+        return pd.DataFrame()
+
+    df = pd.DataFrame({"date": data, "value": values})
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    df = df.dropna(subset=["date", "value"]).sort_values("date")
+
+    return df
+
+
+
+
 # ==========================================================
 # Compatibilidade com o main.py antigo
 # ==========================================================
@@ -300,6 +326,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     
 
     return df
+
 
 
 
