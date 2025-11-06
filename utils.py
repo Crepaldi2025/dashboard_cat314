@@ -54,3 +54,28 @@ def get_date_range(tipo_periodo, session_state):
     
 
     return None, None
+
+import gee_handler
+
+def get_variable_config(variavel):
+    """Retorna as configurações da variável selecionada (dataset, banda, paleta, unidade, etc.)."""
+    ERA5_VARS = gee_handler.ERA5_VARS
+
+    if variavel not in ERA5_VARS:
+        raise ValueError(f"Variável '{variavel}' não encontrada no ERA5_VARS.")
+
+    config = ERA5_VARS[variavel]
+    
+    # Padroniza estrutura conforme main.py espera
+    return {
+        "dataset": "ECMWF/ERA5_LAND/DAILY_AGGR",
+        "band": config.get("band", None),
+        "bands": config.get("bands", None),
+        "result_band": config.get("result_band"),
+        "unit": config.get("unit"),
+        "aggregation": config.get("aggregation"),
+        "palette": config["vis_params"]["palette"],
+        "min": config["vis_params"]["min"],
+        "max": config["vis_params"]["max"],
+        "label": variavel
+    }
