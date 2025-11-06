@@ -234,37 +234,51 @@ def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
 
 @st.cache_data
 def get_time_series_data(variable, start_date, end_date, _geometry):
-       
     """Extrai a série temporal de uma variável do ERA5-Land para a geometria informada."""
+
     if variable not in ERA5_VARS:
+        st.warning("Variável não reconhecida.")
         return pd.DataFrame()
 
     config = ERA5_VARS[variable]
     bands_to_select = config.get("bands", config.get("band"))
 
+    # ======================================================
+    # 1. Carrega coleção ERA5-LAND e recorta para a geometria
+    # ======================================================
     collection = (
         ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
         .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
         .select(bands_to_select)
+        .map(lambda img: img.clip(_geometry))
     )
-    collection = collection.map(lambda img: img.clip(_geometry))
-    st.write("✅ Aplicado clip à geometria:", _geometry.getInfo().get('type', 'N/A'))
-
 
     if collection.size().getInfo() == 0:
         st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
         return pd.DataFrame()
 
-    # --- cálculo especial para o vento (mantido do seu código)
+    # ======================================================
+    # 2. Cálculo especial para o vento (u/v -> módulo)
+    # ======================================================
     if variable == "Velocidade do Vento (10m)":
         def calculate_wind_speed(image):
-            wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config["result_band"])
+            wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename("wind_speed")
             return image.addBands(wind_speed)
         collection = collection.map(calculate_wind_speed)
 
-    # --- média diária na área
+    # ======================================================
+    # 3. Renomeia banda única para result_band
+    # ======================================================
+    elif isinstance(bands_to_select, str):
+        collection = collection.map(
+            lambda img: img.rename(config["result_band"])
+        )
+
+    # ======================================================
+    # 4. Função de extração diária
+    # ======================================================
     def extract_value(image):
-        # Força média por região (funciona melhor para estados grandes)
+        # Força cálculo da média apenas sobre a geometria
         reduced = image.select(config["result_band"]).reduceRegions(
             collection=ee.FeatureCollection([ee.Feature(_geometry)]),
             reducer=ee.Reducer.mean(),
@@ -272,11 +286,11 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
             bestEffort=True,
             maxPixels=1e9
         )
-        # Pega o primeiro valor da lista retornada
-        val = ee.Feature(reduced.first()).get(config["result_band"])
 
-        # --- conversões de unidade
+        val = ee.Feature(reduced.first()).get(config["result_band"])
         final_val = ee.Number(val)
+
+        # Conversão de unidades
         if config["unit"] == "°C":
             final_val = final_val.subtract(273.15)
         elif config["unit"] == "mm":
@@ -284,18 +298,21 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
 
         return image.set("date", image.date().format("YYYY-MM-dd")).set("value", final_val)
 
-    # --- aplica função
+    # ======================================================
+    # 5. Aplica função e agrega dados
+    # ======================================================
     series = collection.map(extract_value)
 
-    # --- coleta resultados seguros
     try:
         data = series.aggregate_array("date").getInfo()
         values = series.aggregate_array("value").getInfo()
     except Exception as e:
-        st.error(f"Falha ao recuperar dados da série: {e}")
+        st.error(f"Falha ao recuperar dados da série temporal: {e}")
         return pd.DataFrame()
 
-    # --- cria DataFrame limpo
+    # ======================================================
+    # 6. Cria DataFrame limpo e ordenado
+    # ======================================================
     if not data or not values:
         st.warning("Não foi possível extrair valores válidos do ERA5-Land para a área selecionada.")
         return pd.DataFrame()
@@ -306,9 +323,6 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     df = df.dropna(subset=["date", "value"]).sort_values("date")
 
     return df
-
-
-
 
 # ==========================================================
 # Compatibilidade com o main.py antigo
@@ -333,6 +347,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     
 
     return df
+
 
 
 
