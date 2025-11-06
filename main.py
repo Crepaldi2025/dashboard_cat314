@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v2)
+# main.py — Clima-Cast-Crepaldi (Corrigido v3)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -11,13 +11,10 @@ import copy
 import locale
 import base64
 
-# --- CORREÇÃO DE TYPEERROR ---
-import folium                             # Necessário para o mapa de desenho
-from folium.plugins import Draw           # Necessário para as ferramentas de desenho
-import geemap.foliumap as geemap          # Mantido para o mapa de resultados
-from streamlit_folium import st_folium    # Necessário para renderizar o mapa de desenho
-# -----------------------------
-
+# --- CORREÇÃO DE TYPEERROR (v3) ---
+# Removemos 'folium' e 'st_folium' e usaremos apenas 'geemap'
+import geemap.foliumap as geemap
+# ----------------------------------
 
 # ==================================================================================
 # FUNÇÕES DE CACHE
@@ -35,34 +32,25 @@ def get_geo_caching_key(session_state):
     elif loc_type == "Círculo (Lat/Lon/Raio)":
         key += f"|lat:{session_state.get('latitude')}|lon:{session_state.get('longitude')}|raio:{session_state.get('raio')}"
     elif loc_type == "Polígono":
-        # O hash da geometria desenhada é o bastante
         key += f"|geojson:{hash(str(session_state.get('drawn_geometry')))}"
     return key
 
-@st.cache_data(ttl=3600) # Cache de 1 hora
+@st.cache_data(ttl=3600)
 def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
     """
     Função cacheada que busca os dados do GEE.
     Executa a parte "lenta" da análise.
     """
-    
-    # 1. Recriar a geometria (rápido, não precisa de cache)
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
-    if not geometry:
-        return None 
-
-    # 2. Obter configurações da variável
+    if not geometry: return None 
     var_cfg = gee_handler.ERA5_VARS.get(variavel)
-    if not var_cfg:
-        return None
-
-    # 3. Executar a análise de GEE (lento)
+    if not var_cfg: return None
+    
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
     if aba == "Mapas":
         ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry)
-        if ee_image is None:
-            return None
+        if ee_image is None: return None
         results["ee_image"] = ee_image
         
         if st.session_state.get("map_type", "Interativo") == "Estático":
@@ -73,19 +61,14 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
 
     elif aba == "Séries Temporais":
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
-        if df is None or df.empty:
-            return None
+        if df is None or df.empty: return None
         results["time_series_df"] = df
 
     return results
 
-
 # ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE ----------------------
 def run_full_analysis():
-    """
-    Orquestra a análise e armazena os resultados no st.session_state.
-    (CORREÇÃO P2)
-    """
+    """ Orquestra a análise e armazena os resultados no st.session_state. """
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
 
@@ -114,10 +97,7 @@ def run_full_analysis():
 
 
 def render_analysis_results():
-    """
-    Renderiza os resultados que estão salvos em st.session_state.analysis_results.
-    (CORREÇÃO P2)
-    """
+    """ Renderiza os resultados que estão salvos em st.session_state.analysis_results. """
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
         return
 
@@ -141,7 +121,7 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
-            # Esta função será corrigida no próximo passo
+            # Esta função será corrigida no próximo arquivo
             map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"])
 
         elif tipo_mapa == "Estático":
@@ -157,23 +137,10 @@ def render_analysis_results():
                 st.image(colorbar_img, caption="Legenda", use_container_width=True)
 
             st.markdown("### Exportar Mapas")
-            # ... (seção de download continua idêntica)
             if png_url:
-                st.download_button(
-                    "Exportar (PNG)",
-                    data=base6b64.b64decode(png_url.split(",")[1]),
-                    file_name="mapa.png",
-                    mime="image/png",
-                    use_container_width=True,
-                )
+                st.download_button("Exportar (PNG)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
             if jpg_url:
-                st.download_button(
-                    "Exportar (JPEG)",
-                    data=base64.b64decode(jpg_url.split(",")[1]),
-                    file_name="mapa.jpeg",
-                    mime="image/jpeg",
-                    use_container_width=True,
-                )
+                st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
     elif aba == "Séries Temporais":
         if "time_series_df" not in results:
@@ -186,59 +153,42 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO DE TYPEERROR: Esta função foi reescrita para usar folium.Map
+# CORREÇÃO DE TYPEERROR (v3): Esta função foi reescrita para usar
+# o método .to_streamlit() do geemap, que é a forma correta.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
     Renderiza um mapa para o usuário desenhar um polígono.
-    Usa folium.Map nativo para ser compatível com st_folium.
+    Usa geemap.Map e seu drawing tools nativo.
     """
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
-    # 1. Criar um mapa folium.Map (em vez de geemap.Map)
-    mapa_desenho = folium.Map(location=[-15.78, -47.93], zoom_start=4)
-
-    # 2. Adicionar o basemap de satélite (forma do folium)
-    folium.TileLayer(
-        tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        attr="Google",
-        name="Google Satellite",
-        overlay=True,
-        control=True,
-    ).add_to(mapa_desenho)
-
-    # 3. Adicionar as ferramentas de desenho
-    Draw(
-        export=False,
-        filename="meu_poligono.geojson",
-        position="topleft",
-        draw_options={
-            "polygon": {"allowIntersection": False, "showArea": True},
-            "rectangle": False,
-            "circle": False,
-            "marker": False,
-            "circlemarker": False,
-            "polyline": False,
-        },
-        edit_options={"edit": True, "remove": True}
-    ).add_to(mapa_desenho)
+    # 1. Criar um geemap.Map
+    mapa_desenho = geemap.Map(center=[-15.78, -47.93], zoom=4)
+    mapa_desenho.add_basemap("SATELLITE") # Adiciona o basemap de satélite
     
-    # 4. Chamar st_folium com o mapa folium.Map (agora correto)
-    map_data = st_folium(
-        mapa_desenho, 
+    # 2. Usar o .to_streamlit() do geemap, que renderiza o mapa e
+    #    pode retornar os desenhos.
+    map_data = mapa_desenho.to_streamlit(
         width=None, 
         height=500, 
         use_container_width=True,
-        feature_group_name="Polígono Desenhado", # Este nome é arbitrário
-        returned_objects=["last_active_drawing"]
+        # Pede para o 'to_streamlit' retornar a última geometria desenhada
+        return_last_drawn=True 
     )
 
-    # 5. Lógica de captura (idêntica)
-    if map_data and map_data.get("last_active_drawing"):
-        drawing = map_data["last_active_drawing"]
-        st.session_state.drawn_geometry = drawing["geometry"]
-        st.success("✅ Polígono capturado! Você já pode clicar em 'Gerar Análise'.")
+    # 3. Verifica se o geemap retornou um desenho
+    if map_data and map_data.get("last_drawn"):
+        drawing = map_data["last_drawn"]
+        # Verifica se é uma geometria válida (não apenas um ponto)
+        if drawing and drawing.get("geometry") and drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
+            st.session_state.drawn_geometry = drawing["geometry"]
+            st.success("✅ Polígono capturado! Você já pode clicar em 'Gerar Análise'.")
+        else:
+            # Limpa se for um desenho inválido (ex: um marcador)
+            if 'drawn_geometry' in st.session_state:
+                del st.session_state['drawn_geometry']
 
 
 # ---------------------- FUNÇÃO MAIN ----------------------
@@ -256,13 +206,16 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
+    # Lógica de renderização do mapa de desenho
     if opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono":
         render_polygon_drawer()
 
+    # Lógica de execução da análise
     if st.session_state.get("analysis_triggered", False):
         st.session_state.analysis_triggered = False 
         run_full_analysis() 
 
+    # Lógica de renderização dos resultados
     render_analysis_results()
 
 if __name__ == "__main__":
