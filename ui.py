@@ -130,7 +130,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.divider()
 
             if st.button("Gerar Análise", type="primary", use_container_width=True, disabled=st.session_state.get('date_error', False)):
-                st.session_state['analysis_triggered'] = True
+                st.session_state['analisar'] = True
                 st.rerun()
         
         return opcao_selecionada
@@ -272,4 +272,5 @@ def renderizar_pagina_sobre():
 
     # Rodapé
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
+
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
