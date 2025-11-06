@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v6)
+# main.py — Clima-Cast-Crepaldi (Corrigido v7)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -107,7 +107,7 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
-            # Esta função já está correta (v5)
+            # Esta função já está correta (v5) e usa "HYBRID"
             map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"]) 
 
         elif tipo_mapa == "Estático":
@@ -137,11 +137,10 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v6:
-# Corrigindo os dois problemas da imagem:
-# 1. Botões de Desenho: Adicionado `draw_control=True` ao construtor.
-# 2. Mapa Satélite: Removido `basemap="SATELLITE"` e adicionado
-#    `mapa_desenho.add_tile_layer(...)` manualmente.
+# CORREÇÃO v7:
+# Corrigindo o problema do Basemap (não era satélite).
+# 1. `basemap="SATELLITE"` (v5) e `add_tile_layer` (v6) falharam.
+# 2. Usando `basemap="HYBRID"` (v7) que é o satélite + rótulos.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -151,22 +150,16 @@ def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
-    # --- INÍCIO DA CORREÇÃO v6 ---
+    # --- INÍCIO DA CORREÇÃO v7 ---
     mapa_desenho = geemap.Map(
         center=[-15.78, -47.93], 
         zoom=4,
-        draw_control=True,      # <-- SOLUÇÃO 1: Adiciona os botões de desenho
-        draw_export=False,      # (Opcional) Oculta o botão de exportar
-        edit_control=True       # (Opcional) Permite editar/deletar o polígono
+        basemap="HYBRID",       # <-- SOLUÇÃO 1: Usando "HYBRID"
+        draw_control=True,      # <-- (Mantido da v6)
+        draw_export=False,      
+        edit_control=True       
     )
-
-    # SOLUÇÃO 2: Adiciona manualmente o basemap de satélite
-    mapa_desenho.add_tile_layer(
-        url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        name="Google Satellite",
-        attribution="Google",
-    )
-    # --- FIM DA CORREÇÃO v6 ---
+    # --- FIM DA CORREÇÃO v7 ---
     
     map_data = mapa_desenho.to_streamlit(
         width=None, 
