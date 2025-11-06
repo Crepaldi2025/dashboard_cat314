@@ -1,115 +1,127 @@
-# utils.py
-
-"""
-utils.py — Funções auxiliares do sistema Clima-Cast-Crepaldi
-------------------------------------------------------------
-Este módulo contém funções utilitárias usadas em diferentes partes do dashboard,
-principalmente para manipulação de datas e períodos selecionados pelo usuário.
-"""
-
-from datetime import date
-import calendar
-
-"""
-Mapeamento entre nomes de meses (em português) e seus respectivos números (1 a 12).
-Esse dicionário é usado para converter a escolha do usuário (ex: "Março") em valores numéricos
-reconhecidos pelo módulo `calendar`.
-"""
-
-MESES_PARA_NUMEROS = {
-    "Janeiro": 1, "Fevereiro": 2, "Março": 3, "Abril": 4, "Maio": 5, "Junho": 6,
-    "Julho": 7, "Agosto": 8, "Setembro": 9, "Outubro": 10, "Novembro": 11, "Dezembro": 12
-}
-
-def get_date_range(tipo_periodo, session_state):
-    """
-    Retorna as datas de início e fim de análise com base no tipo de período selecionado.
-    Parâmetros
-    ----------
-    tipo_periodo : str
-    Pode ser "Personalizado", "Mensal" ou "Anual".
-    session_state : streamlit.runtime.state.session_state
-    Contém os valores selecionados pelo usuário na interface (datas, mês, ano etc.).
-    Retorna
-    -------
-    tuple (date, date)
-    Datas de início e fim do período correspondente.
-    """
-    if tipo_periodo == "Personalizado":
-        return session_state.data_inicio, session_state.data_fim
-
-    elif tipo_periodo == "Anual":
-        ano = session_state.ano_anual
-        return date(ano, 1, 1), date(ano, 12, 31)
-
-    elif tipo_periodo == "Mensal":
-        ano = session_state.ano_mensal
-        mes_nome = session_state.mes_mensal
-        mes_num = MESES_PARA_NUMEROS.get(mes_nome.capitalize(), MESES_PARA_NUMEROS.get(mes_nome, 1))
-
-        ultimo_dia = calendar.monthrange(ano, mes_num)[1]
-        return date(ano, mes_num, 1), date(ano, mes_num, ultimo_dia)
-    
-# Caso o tipo de período não seja reconhecido, retorna None (tratado posteriormente em main.py)
-    
-
-    return None, None
-
-import gee_handler
-
-def get_variable_config(variavel):
-    """Retorna as configurações da variável selecionada (dataset, banda, paleta, unidade, etc.)."""
-    ERA5_VARS = gee_handler.ERA5_VARS
-
-    if variavel not in ERA5_VARS:
-        raise ValueError(f"Variável '{variavel}' não encontrada no ERA5_VARS.")
-
-    config = ERA5_VARS[variavel]
-    
-    # Padroniza estrutura conforme main.py espera
-    return {
-        "dataset": "ECMWF/ERA5_LAND/DAILY_AGGR",
-        "band": config.get("band", None),
-        "bands": config.get("bands", None),
-        "result_band": config.get("result_band"),
-        "unit": config.get("unit"),
-        "aggregation": config.get("aggregation"),
-        "palette": config["vis_params"]["palette"],
-        "min": config["vis_params"]["min"],
-        "max": config["vis_params"]["max"],
-        "label": variavel
-    }
 # ==================================================================================
-# utils.py — Funções auxiliares para interface e dados geográficos
+# ui.py — Interface do usuário para o Clima-Cast-Crepaldi
 # ==================================================================================
 import streamlit as st
-import geobr
+import datetime
+import utils
 
 # ==================================================================================
-# LISTAR ESTADOS
+# Sidebar principal
 # ==================================================================================
-@st.cache_data
-def listar_estados_brasil():
-    """Retorna lista de siglas dos estados brasileiros (ordenada)."""
-    try:
-        estados_gdf = geobr.read_state()
-        siglas = sorted(estados_gdf["abbrev_state"].unique().tolist())
-        return siglas
-    except Exception as e:
-        st.error(f"Erro ao carregar lista de estados: {e}")
-        return []
+def render_sidebar():
+    """Renderiza a barra lateral completa para controle da aplicação."""
+    st.sidebar.title("🌦️ Clima-Cast-Crepaldi")
+    st.sidebar.markdown("Selecione os parâmetros abaixo para gerar a análise.")
+    st.sidebar.markdown("---")
+
+    tipo_loc = st.sidebar.selectbox(
+        "📍 Tipo de localização",
+        ["Estado", "Município", "Círculo", "Polígono"]
+    )
+    st.session_state.tipo_localizacao = tipo_loc
+
+    # -------------------------------------------------------
+    # Estado
+    # -------------------------------------------------------
+    if tipo_loc == "Estado":
+        estados = utils.listar_estados_brasil()
+        uf_sigla = st.sidebar.selectbox("UF", estados)
+        st.session_state.uf_sigla = uf_sigla
+
+    # -------------------------------------------------------
+    # Município
+    # -------------------------------------------------------
+    elif tipo_loc == "Município":
+        estados = utils.listar_estados_brasil()
+        uf_sigla = st.sidebar.selectbox("UF", estados)
+        municipios = utils.listar_municipios_por_estado(uf_sigla)
+        municipio_nome = st.sidebar.selectbox("Município", municipios)
+        st.session_state.uf_sigla = uf_sigla
+        st.session_state.municipio_nome = municipio_nome
+
+    # -------------------------------------------------------
+    # Círculo
+    # -------------------------------------------------------
+    elif tipo_loc == "Círculo":
+        st.sidebar.markdown("Defina o **centro** e o **raio (km)**:")
+        latitude = st.sidebar.number_input("Latitude (°)", value=-23.0, step=0.1)
+        longitude = st.sidebar.number_input("Longitude (°)", value=-46.0, step=0.1)
+        raio_km = st.sidebar.number_input("Raio (km)", value=50.0, step=1.0)
+        st.session_state.latitude = latitude
+        st.session_state.longitude = longitude
+        st.session_state.raio_km = raio_km
+
+    # -------------------------------------------------------
+    # Polígono
+    # -------------------------------------------------------
+    elif tipo_loc == "Polígono":
+        st.sidebar.info("🟦 O polígono deve ser desenhado no mapa principal.")
+
+    st.sidebar.markdown("---")
+
+    # -------------------------------------------------------
+    # Variável meteorológica
+    # -------------------------------------------------------
+    variavel = st.sidebar.selectbox(
+        "🌡️ Variável meteorológica",
+        [
+            "Temperatura do ar (°C)",
+            "Precipitação (mm)",
+            "Umidade do solo (%)",
+            "Velocidade do vento (m/s)"
+        ]
+    )
+    st.session_state.variavel = variavel
+
+    st.sidebar.markdown("---")
+    st.sidebar.caption("🗓️ Período de análise")
+
+    start_date = st.sidebar.date_input("Data inicial", datetime.date(2024, 1, 1))
+    end_date = st.sidebar.date_input("Data final", datetime.date(2024, 12, 31))
+
+    st.session_state.start_date = start_date
+    st.session_state.end_date = end_date
+
+    st.sidebar.markdown("---")
+
+    # -------------------------------------------------------
+    # Botões
+    # -------------------------------------------------------
+    if st.sidebar.button("🚀 Gerar Análise"):
+        st.session_state.analysis_triggered = True
+        st.rerun()
+
+    if st.sidebar.button("🧹 Limpar resultados"):
+        reset_analysis_state()
+        st.rerun()
+
 
 # ==================================================================================
-# LISTAR MUNICÍPIOS POR UF
+# Funções auxiliares
 # ==================================================================================
-@st.cache_data
-def listar_municipios_por_estado(uf_sigla):
-    """Retorna lista de municípios do estado informado."""
-    try:
-        municipios_gdf = geobr.read_municipality(code_muni=uf_sigla, year=2020)
-        nomes = sorted(municipios_gdf["name_muni"].unique().tolist())
-        return nomes
-    except Exception as e:
-        st.error(f"Erro ao carregar municípios de {uf_sigla}: {e}")
-        return []
+def obter_parametros_principais():
+    """Retorna variável, datas de início e fim selecionadas."""
+    return (
+        st.session_state.get("variavel"),
+        st.session_state.get("start_date"),
+        st.session_state.get("end_date"),
+    )
 
+
+def reset_analysis_state():
+    """Limpa variáveis do session_state de forma segura."""
+    keys_to_clear = [
+        "analysis_triggered",
+        "ee_image_result",
+        "df_timeseries_result",
+        "static_map_urls",
+        "uf_sigla",
+        "municipio_nome",
+        "latitude",
+        "longitude",
+        "raio_km",
+        "drawn_geometry",
+    ]
+    for k in keys_to_clear:
+        if k in st.session_state:
+            del st.session_state[k]
