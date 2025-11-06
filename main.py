@@ -14,21 +14,8 @@ import pandas as pd
 import copy
 import locale
 
-
-
 # ==================================================================================
-# Configuração de idioma e locale
-# ==================================================================================
-try:
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
-except locale.Error:
-    try:
-        locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
-    except locale.Error:
-        st.warning("Locale 'pt_BR.UTF-8' não encontrado. Nomes de meses podem aparecer em inglês.")
-
-# ==================================================================================
-# Função principal — execução e renderização
+# Funções principais de execução e renderização
 # ==================================================================================
 
 def run_full_analysis():
@@ -40,16 +27,13 @@ def run_full_analysis():
         df_timeseries = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
         url_mapa_estatico = map_visualizer.create_static_map(ee_image, variavel, geometry, nome_local)
 
-    # === Atualização: persistência dos resultados ===
+    # === Atualização: persistência dos resultados no session_state ===
     st.session_state.ee_image_result = ee_image
     st.session_state.df_timeseries_result = df_timeseries
     st.session_state.static_map_urls = {"principal": url_mapa_estatico}
 
     st.success("✅ Análise concluída com sucesso!")
 
-# ==================================================================================
-# Função para renderizar resultados persistidos
-# ==================================================================================
 
 def render_analysis_results_from_state():
     """Renderiza na tela os resultados armazenados no session_state."""
@@ -65,31 +49,40 @@ def render_analysis_results_from_state():
         st.subheader("📈 Série temporal")
         charts_visualizer.exibir_grafico_series_temporais(df)
 
+
 # ==================================================================================
 # Função principal da aplicação
 # ==================================================================================
-
 def main():
+    # === Correção: set_page_config é o primeiro comando Streamlit da função ===
     st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide")
 
-    # === Atualização: inicializa chaves do estado ===
+    # --- Configuração de idioma e locale ---
+    try:
+        locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
+        except locale.Error:
+            st.warning("Locale 'pt_BR.UTF-8' não encontrado. Nomes de meses podem aparecer em inglês.")
+
+    # --- Inicializa variáveis de estado ---
     if "analysis_triggered" not in st.session_state:
         st.session_state.analysis_triggered = False
 
-    # Renderiza interface lateral
+    # --- Interface lateral ---
     ui.render_sidebar()
 
-    # === Atualização: controle seguro de execução ===
+    # --- Execução principal da análise ---
     if st.session_state.get("analysis_triggered", False):
         run_full_analysis()
 
-    # Sempre tenta renderizar os resultados armazenados
+    # --- Renderização dos resultados armazenados ---
     render_analysis_results_from_state()
+
 
 # ==================================================================================
 # Execução
 # ==================================================================================
 if __name__ == "__main__":
     main()
-
-
