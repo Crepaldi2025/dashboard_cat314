@@ -14,7 +14,6 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
 from matplotlib import cm
 
-
 # ==================================================================================
 # MAPA INTERATIVO — ESTADO
 # ==================================================================================
@@ -25,16 +24,14 @@ def display_state_map(geometry, variavel, vis_params, titulo="Mapa Interativo"):
     mapa = geemap.Map(center=[-15.78, -47.93], zoom=5)
     mapa.add_basemap("SATELLITE")
 
-    # === Atualização: desenha apenas o contorno, sem cobrir o fundo ===
+    # ✅ Correção: desenha apenas o contorno da área, sem cobrir o fundo
     layer = geemap.ee_tile_layer(ee.Image().paint(geometry, 0, 2), vis_params, variavel)
     mapa.add_layer(layer)
 
-    # Adiciona colorbar discreta
     _add_colorbar_discreto(mapa, vis_params, variavel)
 
     st_folium(mapa, width=900, height=500)
     st.success("Mapa interativo exibido com sucesso.")
-
 
 # ==================================================================================
 # MAPA INTERATIVO — CÍRCULO
@@ -62,7 +59,6 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
     _add_colorbar_discreto(mapa, vis_params, variavel)
     st_folium(mapa, width=900, height=500)
 
-
 # ==================================================================================
 # MAPA INTERATIVO — COMPATÍVEL COM main.py
 # ==================================================================================
@@ -74,12 +70,16 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     mapa = geemap.Map(center=centroid, zoom=7)
     mapa.add_basemap("SATELLITE")
 
+    # Camada principal (dados GEE)
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
+
+    # Contorno da área analisada
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
 
+    # Colorbar discreta no canto inferior esquerdo
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
-    mapa.to_streamlit(height=500)
 
+    mapa.to_streamlit(height=500)
 
 # ==================================================================================
 # COLORBAR PARA MAPAS INTERATIVOS
@@ -87,9 +87,11 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 def _add_colorbar_discreto(mapa, vis_params, unidade):
     """Colorbar discreto padrão."""
     from branca.colormap import LinearColormap
+
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
+
     if not palette:
         return
 
@@ -106,11 +108,11 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
     colormap.caption = label
     mapa.add_child(colormap)
 
-
 def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     """Colorbar no canto inferior esquerdo do mapa interativo."""
     from branca.colormap import LinearColormap
     from branca.element import Template, MacroElement
+
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
@@ -146,7 +148,6 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     macro._template = template
     mapa.get_root().add_child(macro)
 
-
 # ==================================================================================
 # COLORBAR COMPACTA (MAPA ESTÁTICO)
 # ==================================================================================
@@ -169,7 +170,6 @@ def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
     buf.seek(0)
     b64 = base64.b64encode(buf.read()).decode("ascii")
     return f"data:image/png;base64,{b64}"
-
 
 # ==================================================================================
 # MAPA ESTÁTICO — GERAÇÃO DE IMAGENS
