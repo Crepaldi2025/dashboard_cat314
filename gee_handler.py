@@ -73,9 +73,13 @@ ERA5_VARS = {
 def get_area_of_interest_geometry(session_state):
     """
     Obtém a geometria da área de interesse (Estado, Município, Círculo ou Polígono).
-    Compatível com o ui.py atualizado.
+    Compatível com o ui.py atualizado e com verificações seguras.
     """
-    tipo_loc = session_state.tipo_localizacao
+    tipo_loc = session_state.get("tipo_localizacao", None)
+
+    if not tipo_loc:
+        st.warning("⚠️ Tipo de localização não definido na barra lateral.")
+        return None, None
 
     # ==============================================================
     # ESTADO
@@ -83,12 +87,13 @@ def get_area_of_interest_geometry(session_state):
     if tipo_loc == "Estado":
         uf_sigla = session_state.get("uf_sigla", None)
         if not uf_sigla:
-            st.warning("Selecione um estado válido.")
+            st.warning("⚠️ Nenhum estado selecionado.")
             return None, None
         try:
             todos_estados_gdf = geobr.read_state()
             estado_gdf = todos_estados_gdf[todos_estados_gdf["abbrev_state"] == uf_sigla]
             if estado_gdf.empty:
+                st.warning(f"⚠️ Estado '{uf_sigla}' não encontrado nos dados do geobr.")
                 return None, None
             estado_geojson = json.loads(estado_gdf.to_json())["features"][0]["geometry"]
             ee_geometry = ee.Geometry(estado_geojson, proj="EPSG:4326", geodesic=False)
@@ -105,13 +110,14 @@ def get_area_of_interest_geometry(session_state):
         uf_sigla = session_state.get("uf_sigla", None)
         municipio_nome = session_state.get("municipio_nome", None)
         if not uf_sigla or not municipio_nome:
-            st.warning("Selecione um estado e um município válidos.")
+            st.warning("⚠️ Selecione um estado e um município válidos.")
             return None, None
         try:
             with st.spinner(f"Buscando geometria para {municipio_nome}, {uf_sigla}..."):
                 municipios_do_estado_gdf = geobr.read_municipality(code_muni=uf_sigla, year=2020)
             municipio_gdf = municipios_do_estado_gdf[municipios_do_estado_gdf["name_muni"] == municipio_nome]
             if municipio_gdf.empty:
+                st.warning(f"⚠️ Município '{municipio_nome}' não encontrado em {uf_sigla}.")
                 return None, None
             municipio_geojson = json.loads(municipio_gdf.to_json())["features"][0]["geometry"]
             ee_geometry = ee.Geometry(municipio_geojson, proj="EPSG:4326", geodesic=False)
@@ -125,10 +131,13 @@ def get_area_of_interest_geometry(session_state):
     # CÍRCULO
     # ==============================================================
     elif tipo_loc == "Círculo":
+        latitude = session_state.get("latitude", None)
+        longitude = session_state.get("longitude", None)
+        raio_km = session_state.get("raio_km", None)
+        if None in [latitude, longitude, raio_km]:
+            st.warning("⚠️ Informe latitude, longitude e raio válidos.")
+            return None, None
         try:
-            latitude = session_state.latitude
-            longitude = session_state.longitude
-            raio_km = session_state.raio_km
             ponto_central = ee.Geometry.Point([longitude, latitude])
             ee_geometry = ponto_central.buffer(raio_km * 1000)
             ee_feature = ee.Feature(ee_geometry, {"latitude": latitude, "longitude": longitude, "raio_km": raio_km})
@@ -142,7 +151,7 @@ def get_area_of_interest_geometry(session_state):
     # ==============================================================
     elif tipo_loc == "Polígono":
         if "drawn_geometry" not in session_state:
-            st.warning("Nenhum polígono foi desenhado no mapa.")
+            st.warning("⚠️ Nenhum polígono foi desenhado no mapa.")
             return None, None
         try:
             polygon_geojson = session_state.drawn_geometry
@@ -153,7 +162,9 @@ def get_area_of_interest_geometry(session_state):
             st.error(f"Erro ao processar geometria do polígono: {e}")
             return None, None
 
+    st.warning("⚠️ Tipo de localização desconhecido ou não configurado.")
     return None, None
+
 
 # ==================================================================================
 # DADOS ERA5 — IMAGEM
@@ -262,3 +273,4 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     df = df.dropna(subset=["date", "value"]).sort_values("date")
 
     return df
+
