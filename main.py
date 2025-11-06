@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v16)
+# main.py — Clima-Cast-Crepaldi (Corrigido v19)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -96,13 +96,9 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v16:
-# Ajustado o tamanho da exibição do mapa estático e da colorbar.
+# (Função idêntica à v16)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
-    """
-    Renderiza os resultados que estão salvos em st.session_state.analysis_results.
-    """
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
         return
 
@@ -134,17 +130,13 @@ def render_analysis_results():
                 return
             png_url, jpg_url, colorbar_img = results["static_maps"]
 
-            # --- INÍCIO DA CORREÇÃO v16 ---
-            # Define uma largura máxima para o mapa e a colorbar.
-            # Você pode ajustar esses valores (ex: 600, 400)
-            map_width = 400 
-            colorbar_width = 400 # A colorbar geralmente acompanha a largura do mapa para ser consistente
+            map_width = 800 
+            colorbar_width = 800
 
             if png_url:
-                st.image(png_url, caption="Mapa Estático", width=map_width) # Removido use_container_width
+                st.image(png_url, caption="Mapa Estático", width=map_width) 
             if colorbar_img:
-                st.image(colorbar_img, caption="Legenda", width=colorbar_width) # Removido use_container_width
-            # --- FIM DA CORREÇÃO v16 ---
+                st.image(colorbar_img, caption="Legenda", width=colorbar_width) 
 
             st.markdown("### Exportar Mapas")
             if png_url:
@@ -188,9 +180,16 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# LÓGICA DE DESENHO (Idêntica, mantida da v13)
+# CORREÇÃO v19:
+# Mudando de `returned_objects=["last_active_drawing"]` 
+# para `returned_objects=["all_drawings"]`.
+# Esta é uma forma mais robusta de capturar os desenhos.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
+    """
+    Renderiza um mapa para o usuário desenhar um polígono.
+    Usa folium.Map + st_folium para captura estável.
+    """
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
@@ -216,22 +215,32 @@ def render_polygon_drawer():
         edit_options={"edit": True, "remove": True}
     ).add_to(mapa_desenho)
     
+    # --- INÍCIO DA CORREÇÃO v19 ---
     map_data = st_folium(
         mapa_desenho, 
         width=None, 
         height=500, 
         use_container_width=True,
-        returned_objects=["last_active_drawing"]
+        returned_objects=["all_drawings"] # <-- MUDANÇA AQUI
     )
     
     geometry = None
     
-    if map_data and map_data.get("last_active_drawing"):
-        drawing = map_data["last_active_drawing"]
-        if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
-            if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
-                geometry = drawing["geometry"]
+    # Lógica de captura agora usa 'all_drawings'
+    if map_data and map_data.get("all_drawings"):
+        all_drawings = map_data["all_drawings"]
+        
+        # Se o usuário desenhou algo
+        if all_drawings and len(all_drawings) > 0:
+            # Pega o último desenho da lista
+            drawing = all_drawings[-1] 
+            
+            if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
+                if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
+                    geometry = drawing["geometry"]
+    # --- FIM DA CORREÇÃO v19 ---
 
+    # Lógica de validação (mantida)
     if geometry:
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
