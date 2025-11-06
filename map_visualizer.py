@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py — Funções de visualização (Corrigido v3)
+# map_visualizer.py — Funções de visualização (Corrigido v4)
 # ==================================================================================
 import streamlit as st
 import geemap.foliumap as geemap
@@ -27,18 +27,12 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
         centroid = [-15.78, -47.93] # Centro do Brasil
         zoom = 4
 
-    mapa = geemap.Map(center=centroid, zoom=zoom)
-
     # -----------------------------------------------------------------
-    # CORREÇÃO: "Satelite não aparece"
-    # Adiciona manualmente a camada de satélite do Google em vez de 
-    # usar o alias "SATELLITE" do geemap.
+    # CORREÇÃO: "mapa precisa ser satelite"
+    # Adicionado basemap="SATELLITE" ao construtor do geemap.
+    # Removida a camada de tile manual da v3.
     # -----------------------------------------------------------------
-    mapa.add_tile_layer(
-        url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        name="Google Satellite",
-        attribution="Google",
-    )
+    mapa = geemap.Map(center=centroid, zoom=zoom, basemap="SATELLITE")
     # -----------------------------------------------------------------
 
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
@@ -46,17 +40,13 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
-    # Mantém o .to_streamlit() que é o método correto para geemap.Map
     return mapa.to_streamlit(height=500, use_container_width=True)
 
 
 # ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS
+# COLORBAR PARA MAPAS INTERATIVOS (Idêntico)
 # ==================================================================================
-# (O restante deste arquivo permanece IDÊNTICO à v2)
-
 def _add_colorbar_discreto(mapa, vis_params, unidade):
-    """(Função auxiliar) Colorbar discreto padrão."""
     from branca.colormap import LinearColormap
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
@@ -77,7 +67,6 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
 
 
 def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
-    """(Função auxiliar) Colorbar no canto inferior esquerdo do mapa interativo."""
     from branca.colormap import LinearColormap
     from branca.element import Template, MacroElement
     palette = vis_params.get("palette", None)
@@ -115,10 +104,9 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
 
 
 # ==================================================================================
-# COLORBAR COMPACTA (MAPA ESTÁTICO)
+# COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico)
 # ==================================================================================
 def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
-    """(Função auxiliar) Gera uma colorbar compacta (horizontal) como data URL PNG."""
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
     
@@ -131,10 +119,8 @@ def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
         return None
 
     cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
-    
     if ticks is not None:
         cb.set_ticks(ticks)
-        
     cb.set_label(label, fontsize=7)
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     
@@ -147,10 +133,9 @@ def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
 
 
 # ==================================================================================
-# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS
+# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico)
 # ==================================================================================
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
-    """Gera o mapa estático (PNG/JPG) e colorbar compacta."""
     try:
         region_geometry = feature.geometry()
 
