@@ -22,7 +22,7 @@ def display_state_map(geometry, variavel, vis_params, titulo="Mapa Interativo"):
     layer = geemap.ee_tile_layer(geometry, vis_params, variavel)
     mapa.add_layer(layer)
 
-    # Adiciona colorbar discreto e coerente
+    # Adiciona colorbar discreto
     _add_colorbar_discreto(mapa, vis_params, variavel)
 
     st_folium(mapa, width=900, height=500)
@@ -81,6 +81,8 @@ def create_interactive_map(ee_image, feature, vis_params, unidade):
 # ==================================================================================
 def _add_colorbar_discreto(mapa, vis_params, unidade):
     """Adiciona colorbar discreto e contrastante no canto inferior esquerdo."""
+    import geemap.foliumap as geemap
+
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
@@ -95,9 +97,10 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
     else:
         label = str(unidade) if unidade else ""
 
-    # Adiciona colorbar usando o método nativo do geemap (mantém contraste e posição)
+    # Adiciona colorbar usando a função geemap.add_colorbar (evita TypeError)
     if palette:
-        mapa.add_colorbar(
+        geemap.add_colorbar(
+            map=mapa,
             colors=palette,
             vmin=vmin,
             vmax=vmax,
