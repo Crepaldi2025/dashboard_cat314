@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido)
+# main.py — Clima-Cast-Crepaldi (Corrigido v2)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -10,17 +10,19 @@ import utils
 import copy
 import locale
 import base64
-import geemap.foliumap as geemap # Para o mapa de desenho (P7)
-from streamlit_folium import st_folium # Para o mapa de desenho (P7)
 
-# ---------------------- CONFIGURAÇÃO DE LOCALE ----------------------
-# (Movido para ui.py, que é importado antes de tudo)
+# --- CORREÇÃO DE TYPEERROR ---
+import folium                             # Necessário para o mapa de desenho
+from folium.plugins import Draw           # Necessário para as ferramentas de desenho
+import geemap.foliumap as geemap          # Mantido para o mapa de resultados
+from streamlit_folium import st_folium    # Necessário para renderizar o mapa de desenho
+# -----------------------------
+
 
 # ==================================================================================
-# CORREÇÃO P1 e P2: FUNÇÕES DE CACHE
+# FUNÇÕES DE CACHE
 # ==================================================================================
-# O cache não pode lidar com objetos 'ee.Geometry'.
-# Criamos uma 'chave' de cache com base nas *seleções* do usuário.
+# (Esta seção permanece IDÊNTICA à versão anterior)
 
 def get_geo_caching_key(session_state):
     """Cria uma string 'hashable' única para os parâmetros de localização."""
@@ -45,11 +47,8 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
     """
     
     # 1. Recriar a geometria (rápido, não precisa de cache)
-    #    (Usamos st.session_state, o que é seguro em funções cacheadas
-    #     SE elas forem recriadas com base na chave de cache)
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     if not geometry:
-        # st.warning não funciona bem aqui, então retornamos None
         return None 
 
     # 2. Obter configurações da variável
@@ -66,7 +65,6 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
             return None
         results["ee_image"] = ee_image
         
-        # Gera mapas estáticos se necessário (lento)
         if st.session_state.get("map_type", "Interativo") == "Estático":
             png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
                 ee_image, feature, var_cfg["vis_params"], var_cfg["unit"]
@@ -91,31 +89,26 @@ def run_full_analysis():
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
 
-    # Período
     start_date, end_date = utils.get_date_range(st.session_state.tipo_periodo, st.session_state)
     if not (start_date and end_date):
         st.warning("Selecione um período válido.")
         return
 
-    # Chave de cache para os parâmetros
     geo_key = get_geo_caching_key(st.session_state)
     
     try:
         with st.spinner("Processando dados no Google Earth Engine... Isso pode levar um momento."):
-            # Chama a função CACHEADA
             analysis_data = cached_run_analysis(
                 variavel, start_date, end_date, geo_key, aba
             )
         
         if analysis_data is None:
             st.warning("Não foi possível obter dados para a seleção. Verifique os parâmetros.")
-            st.session_state.analysis_results = None # Limpa resultados antigos
+            st.session_state.analysis_results = None
         else:
-            # Sucesso! Salva os resultados no session_state para renderização.
             st.session_state.analysis_results = analysis_data
 
     except Exception as e:
-        # Se o cache falhar (ex: erro no GEE), exibe o erro
         st.error(f"Ocorreu um erro durante a análise: {e}")
         st.session_state.analysis_results = None
 
@@ -126,7 +119,6 @@ def render_analysis_results():
     (CORREÇÃO P2)
     """
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
-        # Nenhum resultado para mostrar
         return
 
     results = st.session_state.analysis_results
@@ -134,9 +126,8 @@ def render_analysis_results():
     
     st.markdown("---")
     st.subheader("Resultado da Análise")
-    ui.renderizar_resumo_selecao() # Mostra o resumo do que foi analisado
+    ui.renderizar_resumo_selecao() 
 
-    # -------------------- Aba MAPAS --------------------
     if aba == "Mapas":
         tipo_mapa = st.session_state.get("map_type", "Interativo")
         
@@ -150,6 +141,7 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
+            # Esta função será corrigida no próximo passo
             map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"])
 
         elif tipo_mapa == "Estático":
@@ -165,10 +157,11 @@ def render_analysis_results():
                 st.image(colorbar_img, caption="Legenda", use_container_width=True)
 
             st.markdown("### Exportar Mapas")
+            # ... (seção de download continua idêntica)
             if png_url:
                 st.download_button(
                     "Exportar (PNG)",
-                    data=base64.b64decode(png_url.split(",")[1]),
+                    data=base6b64.b64decode(png_url.split(",")[1]),
                     file_name="mapa.png",
                     mime="image/png",
                     use_container_width=True,
@@ -182,7 +175,6 @@ def render_analysis_results():
                     use_container_width=True,
                 )
 
-    # -------------------- Aba SÉRIES TEMPORAIS --------------------
     elif aba == "Séries Temporais":
         if "time_series_df" not in results:
             st.warning("Não foi possível extrair a série temporal.")
@@ -193,79 +185,85 @@ def render_analysis_results():
         charts_visualizer.display_time_series_chart(df, st.session_state.variavel, var_cfg["unit"])
 
 
+# ----------------------------------------------------------------------------------
+# CORREÇÃO DE TYPEERROR: Esta função foi reescrita para usar folium.Map
+# ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
     Renderiza um mapa para o usuário desenhar um polígono.
-    (CORREÇÃO P7)
+    Usa folium.Map nativo para ser compatível com st_folium.
     """
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
-    mapa_desenho = geemap.Map(center=[-15.78, -47.93], zoom=4)
-    mapa_desenho.add_basemap("SATELLITE")
+    # 1. Criar um mapa folium.Map (em vez de geemap.Map)
+    mapa_desenho = folium.Map(location=[-15.78, -47.93], zoom_start=4)
+
+    # 2. Adicionar o basemap de satélite (forma do folium)
+    folium.TileLayer(
+        tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        attr="Google",
+        name="Google Satellite",
+        overlay=True,
+        control=True,
+    ).add_to(mapa_desenho)
+
+    # 3. Adicionar as ferramentas de desenho
+    Draw(
+        export=False,
+        filename="meu_poligono.geojson",
+        position="topleft",
+        draw_options={
+            "polygon": {"allowIntersection": False, "showArea": True},
+            "rectangle": False,
+            "circle": False,
+            "marker": False,
+            "circlemarker": False,
+            "polyline": False,
+        },
+        edit_options={"edit": True, "remove": True}
+    ).add_to(mapa_desenho)
     
-    # Usa st_folium para capturar os desenhos
+    # 4. Chamar st_folium com o mapa folium.Map (agora correto)
     map_data = st_folium(
         mapa_desenho, 
         width=None, 
         height=500, 
         use_container_width=True,
-        # Especifica que queremos os desenhos de volta
-        feature_group_name="Polígono Desenhado", 
+        feature_group_name="Polígono Desenhado", # Este nome é arbitrário
         returned_objects=["last_active_drawing"]
     )
 
-    # Verifica se o usuário desenhou algo
+    # 5. Lógica de captura (idêntica)
     if map_data and map_data.get("last_active_drawing"):
         drawing = map_data["last_active_drawing"]
-        # Salva a geometria no estado
         st.session_state.drawn_geometry = drawing["geometry"]
         st.success("✅ Polígono capturado! Você já pode clicar em 'Gerar Análise'.")
 
 
 # ---------------------- FUNÇÃO MAIN ----------------------
 def main():
-    # Inicializa GEE (só roda uma vez)
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
         st.session_state.gee_initialized = True
 
-    # Layout base
-    # (st.set_page_config() foi movido para ui.py)
-    # ui.configurar_pagina() # (Chamada em ui.py)
-
-    # Sidebar e seleção
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
 
-    # -------------------- SOBRE --------------------
     if opcao_menu == "Sobre o Aplicativo":
         ui.renderizar_pagina_sobre()
         return
 
-    # -------------------- PRINCIPAL --------------------
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # -------------------- CORREÇÃO P7: Mapa de Desenho --------------------
-    # Se a aba for "Mapas" e o tipo "Polígono", mostra o mapa de desenho
     if opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono":
         render_polygon_drawer()
 
-    # -------------------- CORREÇÃO P2: Lógica de Estado --------------------
-    
-    # 1. Se o botão "Gerar Análise" foi clicado:
     if st.session_state.get("analysis_triggered", False):
-        # Zera o gatilho para evitar re-análise em cada rerun
         st.session_state.analysis_triggered = False 
-        
-        # Chama a função que executa a análise e salva os resultados no estado
         run_full_analysis() 
 
-    # 2. Sempre tenta renderizar os resultados que estão no estado:
-    #    (Isso garante que os resultados permaneçam na tela)
     render_analysis_results()
 
-
-# ---------------------- EXECUÇÃO DIRETA ----------------------
 if __name__ == "__main__":
     main()
