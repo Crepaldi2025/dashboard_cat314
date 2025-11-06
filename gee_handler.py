@@ -277,9 +277,30 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     df = pd.DataFrame(data, columns=['date', 'value'])
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values(by='date').dropna()
+# ==========================================================
+# Compatibilidade com o main.py antigo
+# ==========================================================
+def get_gee_data(dataset, band, start_date, end_date, feature):
+    """Mantém compatibilidade com versões antigas do main.py."""
+    try:
+        geometry = feature.geometry()
+        # Determina a variável automaticamente (com base no nome da banda)
+        if band == "temperature_2m":
+            variable = "Temperatura do Ar (2m)"
+        elif band == "total_precipitation_sum":
+            variable = "Precipitação Total"
+        elif band in ["u_component_of_wind_10m", "v_component_of_wind_10m"]:
+            variable = "Velocidade do Vento (10m)"
+        else:
+            variable = "Temperatura do Ar (2m)"  # padrão de segurança
+        return get_era5_image(variable, start_date, end_date, geometry)
+    except Exception as e:
+        st.error(f"⚠️ Falha ao processar dados do GEE: {e}")
+        return None
     
 
     return df
+
 
 
 
