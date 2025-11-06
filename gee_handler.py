@@ -234,9 +234,7 @@ def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
 
 @st.cache_data
 def get_time_series_data(variable, start_date, end_date, _geometry):
-    st.write("📍 Tipo da geometria:", type(_geometry), _geometry.getInfo().get('type', 'desconhecido'))
-
-    
+       
     """Extrai a série temporal de uma variável do ERA5-Land para a geometria informada."""
     if variable not in ERA5_VARS:
         return pd.DataFrame()
@@ -266,13 +264,16 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
 
     # --- média diária na área
     def extract_value(image):
-        val = image.select(config["result_band"]).reduceRegion(
+        # Força média por região (funciona melhor para estados grandes)
+        reduced = image.select(config["result_band"]).reduceRegions(
+            collection=ee.FeatureCollection([ee.Feature(_geometry)]),
             reducer=ee.Reducer.mean(),
-            geometry=_geometry,
             scale=10000,
             bestEffort=True,
             maxPixels=1e9
-        ).get(config["result_band"])
+        )
+        # Pega o primeiro valor da lista retornada
+        val = ee.Feature(reduced.first()).get(config["result_band"])
 
         # --- conversões de unidade
         final_val = ee.Number(val)
@@ -332,6 +333,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     
 
     return df
+
 
 
 
