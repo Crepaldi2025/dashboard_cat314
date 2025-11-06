@@ -1,136 +1,113 @@
 # ==================================================================================
-# utils.py — Funções utilitárias do sistema Clima-Cast-Crepaldi
+# utils.py — Funções utilitárias para o sistema Clima-Cast-Crepaldi
 # ==================================================================================
 import streamlit as st
-import geobr
-import datetime
-import pandas as pd
-import ee
+import json
+import os
+from functools import lru_cache
 
 # ==================================================================================
 # FUNÇÕES DE LOCALIZAÇÃO GEOGRÁFICA
 # ==================================================================================
-
 @st.cache_data
+def carregar_dados_geograficos():
+    """Carrega o arquivo JSON com os estados e municípios (IBGE local)."""
+    arquivo = "municipios_ibge.json"
+    if not os.path.exists(arquivo):
+        st.error("Arquivo 'municipios_ibge.json' não encontrado.")
+        return {}, {}
+    try:
+        with open(arquivo, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("municipios_por_uf", {}), data.get("nomes_estados", {})
+    except Exception as e:
+        st.error(f"Erro ao ler o arquivo de municípios: {e}")
+        return {}, {}
+
 def listar_estados_brasil():
-    """Retorna lista de siglas de estados brasileiros (ordenada)."""
-    try:
-        estados_gdf = geobr.read_state()
-        siglas = sorted(estados_gdf["abbrev_state"].unique().tolist())
-        return siglas
-    except Exception as e:
-        st.error(f"Erro ao carregar lista de estados: {e}")
-        return []
+    """Retorna uma lista de estados brasileiros formatada como 'Nome - UF'."""
+    _, nomes_estados = carregar_dados_geograficos()
+    return [f"{nome} - {uf}" for uf, nome in sorted(nomes_estados.items())]
 
-@st.cache_data
 def listar_municipios_por_estado(uf_sigla):
-    """Retorna lista de municípios de um determinado estado."""
-    try:
-        municipios_gdf = geobr.read_municipality(code_muni=uf_sigla, year=2020)
-        nomes = sorted(municipios_gdf["name_muni"].unique().tolist())
-        return nomes
-    except Exception as e:
-        st.error(f"Erro ao carregar municípios de {uf_sigla}: {e}")
-        return []
+    """Retorna a lista de municípios de uma dada UF."""
+    municipios_por_uf, _ = carregar_dados_geograficos()
+    return sorted(municipios_por_uf.get(uf_sigla, []))
 
 # ==================================================================================
-# FUNÇÕES DE SUPORTE AO GOOGLE EARTH ENGINE
+# CONFIGURAÇÃO DAS VARIÁVEIS DO ERA5-LAND
 # ==================================================================================
+@lru_cache(maxsize=None)
+def get_variable_config(variable):
+    """Retorna o dicionário de configuração de visualização de cada variável."""
+    ERA5_VARS = {
+        "Temperatura do ar (°C)": {
+            "band": "temperature_2m",
+            "result_band": "temperature_2m",
+            "unit": "°C",
+            "aggregation": "mean",
+            "vis_params": {
+                "min": 0,
+                "max": 40,
+                "palette": [
+                    "#000080", "#0000FF", "#00FFFF", "#00FF00",
+                    "#FFFF00", "#FFA500", "#FF0000", "#800000"
+                ]
+            },
+        },
+        "Precipitação (mm)": {
+            "band": "total_precipitation_sum",
+            "result_band": "total_precipitation_sum",
+            "unit": "mm",
+            "aggregation": "sum",
+            "vis_params": {
+                "min": 0,
+                "max": 500,
+                "palette": [
+                    "#FFFFFF", "#00FFFF", "#0000FF",
+                    "#00FF00", "#FFFF00", "#FF0000"
+                ],
+            },
+        },
+        "Umidade do solo (%)": {
+            "band": "volumetric_soil_water_layer_1",
+            "result_band": "volumetric_soil_water_layer_1",
+            "unit": "%",
+            "aggregation": "mean",
+            "vis_params": {
+                "min": 0,
+                "max": 100,
+                "palette": [
+                    "#f7fcf0", "#ccebc5", "#7bccc4",
+                    "#2b8cbe", "#08589e"
+                ],
+            },
+        },
+    }
 
-def ee_initialize():
-    """Inicializa o Earth Engine, se ainda não estiver inicializado."""
-    try:
-        ee.Initialize()
-    except Exception:
-        try:
-            ee.Authenticate()
-            ee.Initialize()
-        except Exception as e:
-            st.error(f"Falha ao inicializar o Google Earth Engine: {e}")
-
-# ==================================================================================
-# CONVERSÕES E AJUSTES DE DADOS
-# ==================================================================================
-
-def converter_data_para_str(data):
-    """Converte datetime/date em string compatível com GEE (YYYY-MM-DD)."""
-    if isinstance(data, datetime.date):
-        return data.strftime("%Y-%m-%d")
-    return str(data)
-
-def filtrar_periodo(df, start_date, end_date, coluna="data"):
-    """Filtra um DataFrame entre duas datas."""
-    try:
-        df[coluna] = pd.to_datetime(df[coluna])
-        mask = (df[coluna] >= pd.to_datetime(start_date)) & (df[coluna] <= pd.to_datetime(end_date))
-        return df.loc[mask]
-    except Exception as e:
-        st.warning(f"Erro ao filtrar período: {e}")
-        return df
-
-# ==================================================================================
-# CONFIGURAÇÕES DE VARIÁVEIS METEOROLÓGICAS
-# ==================================================================================
-
-ERA5_VARS = {
-    "Temperatura do ar (°C)": {
-        "band": "temperature_2m",
-        "vis_params": {"min": 0, "max": 40, "palette": ["#313695", "#74add1", "#fed976", "#f46d43", "#a50026"]},
-        "unit": "°C",
-    },
-    "Precipitação (mm)": {
-        "band": "total_precipitation_sum",
-        "vis_params": {"min": 0, "max": 300, "palette": ["#FFFFFF", "#ADD8E6", "#0000FF", "#800080"]},
-        "unit": "mm",
-    },
-    "Umidade do solo (%)": {
-        "band": "volumetric_soil_water_layer_1",
-        "vis_params": {"min": 0, "max": 100, "palette": ["#f7fcf0", "#00441b"]},
-        "unit": "%",
-    },
-    "Velocidade do vento (m/s)": {
-        "band": "wind_speed",
-        "vis_params": {"min": 0, "max": 30, "palette": ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"]},
-        "unit": "m/s",
-    },
-}
-
-def get_variable_config(variavel):
-    """Retorna as configurações de uma variável meteorológica do ERA5-Land."""
-    return ERA5_VARS.get(variavel, None)
+    return ERA5_VARS.get(variable, {})
 
 # ==================================================================================
-# GEOMETRIA AUXILIAR
+# AUXILIARES GERAIS
 # ==================================================================================
+def validar_datas(start_date, end_date):
+    """Valida intervalo de datas e emite alerta se inválido."""
+    if start_date > end_date:
+        st.error("A data inicial deve ser anterior à data final.")
+        return False
+    return True
 
-def criar_circulo(lat, lon, raio_km):
-    """Cria uma geometria circular (buffer) em torno de um ponto."""
-    try:
-        ponto = ee.Geometry.Point([lon, lat])
-        circulo = ponto.buffer(raio_km * 1000)
-        return circulo
-    except Exception as e:
-        st.error(f"Erro ao criar círculo: {e}")
-        return None
-
-# ==================================================================================
-# FORMATAÇÃO E EXIBIÇÃO
-# ==================================================================================
-
-def formatar_titulo(variavel, nome_local, data_inicial, data_final):
-    """Gera título formatado para gráficos e mapas."""
-    try:
-        return f"{variavel} — {nome_local} ({data_inicial} a {data_final})"
-    except Exception:
-        return variavel
+def get_geo_params_from_state(session_state):
+    """Extrai parâmetros simples da área de interesse para cache."""
+    return {
+        "tipo": session_state.get("tipo_localizacao"),
+        "uf": session_state.get("uf_sigla"),
+        "municipio": session_state.get("municipio_nome"),
+        "latitude": session_state.get("latitude"),
+        "longitude": session_state.get("longitude"),
+        "raio_km": session_state.get("raio"),
+    }
 
 # ==================================================================================
-# VERIFICAÇÃO DE AMBIENTE
+# === FIM ===
 # ==================================================================================
-
-def verificar_ambiente():
-    """Exibe mensagem útil para depuração (local x Streamlit Cloud)."""
-    import platform
-    st.sidebar.info(
-        f"🖥️ Ambiente: {platform.system()} — Python {platform.python_version()}"
-    )
