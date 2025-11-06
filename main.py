@@ -132,8 +132,8 @@ def render_analysis_results():
 
             # --- INÍCIO DA CORREÇÃO v26 (Tamanho do Mapa Estático) ---
             # Diminuindo o tamanho de 800 para 600
-            map_width = 600 
-            colorbar_width = 600
+            map_width = 400 
+            colorbar_width = 400
             # --- FIM DA CORREÇÃO v26 ---
 
             if png_url:
@@ -264,3 +264,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
