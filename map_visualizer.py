@@ -82,6 +82,37 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 
     mapa.to_streamlit(height=500)
 
+# --- helper: gera uma colorbar compacta como PNG (data URL) ---
+def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
+    import io, base64
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.colors import LinearSegmentedColormap
+    from matplotlib.colorbar import ColorbarBase
+    from matplotlib import cm
+
+    # tamanho pequeno e horizontal (parecido com o interativo)
+    fig = plt.figure(figsize=(3.6, 0.35), dpi=220)  # ~ 792x77 px
+    ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])     # barra baixa e discreta
+
+    cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
+    norm = cm.colors.Normalize(vmin=vmin, vmax=vmax)
+
+    cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
+    if ticks is not None:
+        cb.set_ticks(ticks)
+    cb.set_label(label, fontsize=7)
+    cb.ax.tick_params(labelsize=6, length=2, pad=1)
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
+    plt.close(fig)
+    buf.seek(0)
+    b64 = base64.b64encode(buf.read()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
+
 
 # ==================================================================================
 # MAPA ESTÁTICO — VERSÃO FINAL COMPATÍVEL COM main.py
@@ -224,6 +255,7 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     macro = MacroElement()
     macro._template = template
     mapa.get_root().add_child(macro)
+
 
 
 
