@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py — Funções de visualização (Corrigido v4)
+# map_visualizer.py — Funções de visualização (Corrigido v5)
 # ==================================================================================
 import streamlit as st
 import geemap.foliumap as geemap
@@ -28,11 +28,11 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
         zoom = 4
 
     # -----------------------------------------------------------------
-    # CORREÇÃO: "mapa precisa ser satelite"
-    # Adicionado basemap="SATELLITE" ao construtor do geemap.
-    # Removida a camada de tile manual da v3.
+    # CORREÇÃO (v5): "mapa precisa ser satelite"
+    # Trocando 'SATELLITE' (v4) por 'HYBRID' (v5).
+    # Esta é a outra forma comum de chamar o mapa de satélite.
     # -----------------------------------------------------------------
-    mapa = geemap.Map(center=centroid, zoom=zoom, basemap="SATELLITE")
+    mapa = geemap.Map(center=centroid, zoom=zoom, basemap="HYBRID")
     # -----------------------------------------------------------------
 
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
@@ -46,6 +46,8 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 # ==================================================================================
 # COLORBAR PARA MAPAS INTERATIVOS (Idêntico)
 # ==================================================================================
+# (O restante deste arquivo permanece IDÊNTICO às versões anteriores)
+
 def _add_colorbar_discreto(mapa, vis_params, unidade):
     from branca.colormap import LinearColormap
     palette = vis_params.get("palette", None)
