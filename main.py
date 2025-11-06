@@ -209,4 +209,97 @@ def render_analysis_results():
         # --- FIM DA CORREÇÃO v14 ---
 
     elif aba == "Séries Temporais":
-        if "time_series_df" not
+        if "time_series_df" not in results:
+            st.warning("Não foi possível extrair a série temporal.")
+            return
+        df = results["time_series_df"]
+        charts_visualizer.display_time_series_chart(df, st.session_state.variavel, var_cfg["unit"])
+
+
+# ----------------------------------------------------------------------------------
+# CORREÇÃO v13 (Lógica de Desenho - mantida)
+# ----------------------------------------------------------------------------------
+def render_polygon_drawer():
+    """
+    Renderiza um mapa para o usuário desenhar um polígono.
+    Usa folium.Map + st_folium para captura estável.
+    """
+    st.subheader("Desenhe sua Área de Interesse")
+    st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
+
+    mapa_desenho = folium.Map(location=[-15.78, -47.93], zoom_start=4)
+    folium.TileLayer(
+        tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        attr="Google",
+        name="Google Satellite",
+        overlay=True,
+        control=True,
+    ).add_to(mapa_desenho)
+    Draw(
+        export=False,
+        position="topleft",
+        draw_options={
+            "polygon": {"allowIntersection": False, "showArea": True},
+            "rectangle": {"allowIntersection": False, "showArea": True},
+            "circle": False,
+            "marker": False,
+            "circlemarker": False,
+            "polyline": False,
+        },
+        edit_options={"edit": True, "remove": True}
+    ).add_to(mapa_desenho)
+    
+    map_data = st_folium(
+        mapa_desenho, 
+        width=None, 
+        height=500, 
+        use_container_width=True,
+        returned_objects=["last_active_drawing"]
+    )
+    
+    geometry = None
+    
+    if map_data and map_data.get("last_active_drawing"):
+        drawing = map_data["last_active_drawing"]
+        if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
+            if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
+                geometry = drawing["geometry"]
+
+    if geometry:
+        if st.session_state.get('drawn_geometry') != geometry:
+            st.session_state.drawn_geometry = geometry
+            st.success("✅ Polígono capturado!")
+            st.rerun() 
+    else:
+        if st.session_state.get('drawn_geometry') is not None:
+             del st.session_state['drawn_geometry']
+             st.warning("Polígono removido.")
+             st.rerun() 
+
+
+# ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
+def main():
+    if 'gee_initialized' not in st.session_state:
+        gee_handler.inicializar_gee()
+        st.session_state.gee_initialized = True
+
+    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
+    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
+
+    if opcao_menu == "Sobre o Aplicativo":
+        ui.renderizar_pagina_sobre()
+        return
+
+    ui.renderizar_pagina_principal(opcao_menu)
+    
+    if opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono":
+        render_polygon_drawer()
+
+    if st.session_state.get("analysis_triggered", False):
+        st.session_state.analysis_triggered = False 
+        run_full_analysis() 
+
+    render_analysis_results()
+
+if __name__ == "__main__":
+    main()
