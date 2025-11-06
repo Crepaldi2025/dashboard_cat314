@@ -1,17 +1,16 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v13)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
+import io # <-- ADICIONADO PARA EXPORTAÇÃO
 
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
     Cria a figura do gráfico de linha interativo de série temporal usando Plotly.
     (Função interna, indicada pelo underscore no início do nome)
     """
-    # Remove a unidade (ex: "Temperatura (2m)") para o título
     variable_name = variable.split(" (")[0]
 
     fig = px.line(
@@ -24,7 +23,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
             "value": f"{variable_name} ({unit})"
         },
         template="plotly_white",
-        markers=True # Adiciona marcadores para melhor visualização de pontos individuais
+        markers=True
     )
 
     fig.update_layout(
@@ -44,7 +43,6 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         height=420
     )
     
-    # Melhora a interatividade do 'hover'
     fig.update_traces(hovertemplate="<b>Data:</b> %{x|%d/%m/%Y}<br><b>Valor:</b> %{y:.2f} " + f"{unit}")
 
     return fig
@@ -55,28 +53,23 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
     """
     # ======================================================
-    # Pré-processamento seguro do DataFrame
+    # Pré-processamento seguro do DataFrame (Idêntico)
     # ======================================================
     if df is None or df.empty:
         st.warning("Não há dados disponíveis para gerar o gráfico para o período selecionado.")
         return
 
-    # Corrige possíveis problemas de colunas ou formatos
     df_clean = df.copy()
 
-    # Renomeia colunas inesperadas (caso venham de GEE como 'system:time_start')
     if 'date' not in df_clean.columns:
         if 'system:time_start' in df_clean.columns:
             df_clean.rename(columns={'system:time_start': 'date'}, inplace=True)
+        elif pd.api.types.is_datetime64_any_dtype(df_clean.iloc[:, 0]):
+            df_clean.rename(columns={df_clean.columns[0]: 'date'}, inplace=True)
         else:
-            # Tenta usar a primeira coluna se for do tipo datetime
-            if pd.api.types.is_datetime64_any_dtype(df_clean.iloc[:, 0]):
-                df_clean.rename(columns={df_clean.columns[0]: 'date'}, inplace=True)
-            else:
-                st.warning("Coluna de datas não encontrada nos dados retornados.")
-                return
+            st.warning("Coluna de datas não encontrada nos dados retornados.")
+            return
 
-    # Garante que a coluna 'value' exista
     if 'value' not in df_clean.columns:
          if len(df_clean.columns) > 1 and pd.api.types.is_numeric_dtype(df_clean.iloc[:, 1]):
              df_clean.rename(columns={df_clean.columns[1]: 'value'}, inplace=True)
@@ -84,21 +77,16 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             st.warning("Coluna 'value' não encontrada nos dados.")
             return
 
-    # Conversão de tipos
     df_clean['date'] = pd.to_datetime(df_clean['date'], errors='coerce')
     df_clean['value'] = pd.to_numeric(df_clean['value'], errors='coerce')
-
-    # Remove registros inválidos
     df_clean = df_clean.dropna(subset=['date', 'value'])
     if df_clean.empty:
         st.warning("Nenhum dado válido para exibir a série temporal.")
         return
-
-    # Ordena cronologicamente
     df_clean = df_clean.sort_values('date')
 
     # ======================================================
-    # Geração e exibição do gráfico
+    # Geração e exibição do gráfico (Idêntico)
     # ======================================================
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
@@ -107,16 +95,17 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         st.error(f"Erro ao gerar o gráfico Plotly: {e}")
         return
 
-    # =Amelhoria: Mostrar estatísticas básicas
+    # ======================================================
+    # Estatísticas (Idêntico)
+    # ======================================================
     st.markdown("#### Estatísticas do Período")
     col1, col2, col3 = st.columns(3)
     col1.metric("Média", f"{df_clean['value'].mean():.2f} {unit}")
     col2.metric("Máxima", f"{df_clean['value'].max():.2f} {unit}")
     col3.metric("Mínima", f"{df_clean['value'].min():.2f} {unit}")
 
-
     # ======================================================
-    # Caixa de instruções
+    # Caixa de instruções (Idêntico)
     # ======================================================
     st.info(
         """
@@ -126,3 +115,48 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         - **Passe o Mouse:** Veja a data e o valor exatos para cada ponto da série.
         """
     )
+    
+    # --- INÍCIO DA CORREÇÃO v13 (EXPORTAÇÃO) ---
+    st.markdown("---")
+    st.subheader("Exportar Dados da Série Temporal")
+    
+    # Prepara o DataFrame para exportação (nomeia a coluna 'value')
+    variable_name = variable.split(" (")[0]
+    df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
+    
+    # Remove colunas de timezone (se existirem) para compatibilidade com Excel
+    df_export['date'] = df_export['date'].dt.tz_localize(None)
+
+    # Cria nome do arquivo
+    file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
+    
+    # 1. Preparar dados CSV
+    csv_data = df_export.to_csv(index=False, encoding='utf-8-sig')
+    
+    # 2. Preparar dados Excel
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+        df_export.to_excel(writer, index=False, sheet_name='Dados')
+    excel_data = excel_buffer.getvalue()
+    
+    # 3. Exibir botões de download
+    col_btn_1, col_btn_2 = st.columns(2)
+    
+    with col_btn_1:
+        st.download_button(
+            label="Exportar para CSV",
+            data=csv_data,
+            file_name=f"serie_temporal_{file_name_safe}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+    with col_btn_2:
+        st.download_button(
+            label="Exportar para XLSX (Excel)",
+            data=excel_data,
+            file_name=f"serie_temporal_{file_name_safe}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+    # --- FIM DA CORREÇÃO v13 ---
