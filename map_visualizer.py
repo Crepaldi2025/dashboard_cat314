@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py — Funções de visualização (Corrigido v5)
+# map_visualizer.py — Funções de visualização (Corrigido v17)
 # ==================================================================================
 import streamlit as st
 import geemap.foliumap as geemap
@@ -15,7 +15,7 @@ import requests
 from PIL import Image
 
 # ==================================================================================
-# MAPA INTERATIVO — COMPATÍVEL COM main.py
+# MAPA INTERATIVO — COMPATÍVEL COM main.py (Idêntico)
 # ==================================================================================
 def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     """Exibe o mapa interativo com colorbar discreta no canto inferior esquerdo."""
@@ -27,13 +27,7 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
         centroid = [-15.78, -47.93] # Centro do Brasil
         zoom = 4
 
-    # -----------------------------------------------------------------
-    # CORREÇÃO (v5): "mapa precisa ser satelite"
-    # Trocando 'SATELLITE' (v4) por 'HYBRID' (v5).
-    # Esta é a outra forma comum de chamar o mapa de satélite.
-    # -----------------------------------------------------------------
     mapa = geemap.Map(center=centroid, zoom=zoom, basemap="HYBRID")
-    # -----------------------------------------------------------------
 
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
@@ -46,8 +40,6 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 # ==================================================================================
 # COLORBAR PARA MAPAS INTERATIVOS (Idêntico)
 # ==================================================================================
-# (O restante deste arquivo permanece IDÊNTICO às versões anteriores)
-
 def _add_colorbar_discreto(mapa, vis_params, unidade):
     from branca.colormap import LinearColormap
     palette = vis_params.get("palette", None)
@@ -135,45 +127,75 @@ def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
 
 
 # ==================================================================================
-# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico)
+# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Modificado)
 # ==================================================================================
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
+    """Gera o mapa estático (PNG/JPG) e colorbar compacta."""
     try:
-        region_geometry = feature.geometry()
+        # --- INÍCIO DA CORREÇÃO v17 ---
+        
+        # 1. Visualiza a imagem de dados principal (converte dados em cores)
+        visualized_data = ee_image.visualize(
+            min=vis_params["min"],
+            max=vis_params["max"],
+            palette=vis_params["palette"]
+        )
+        
+        # 2. Cria a imagem do contorno (preenchimento transparente, borda de 2px)
+        outline = ee.Image().paint(
+            featureCollection=feature, 
+            color=0, # Cor de preenchimento (0, mas irrelevante pois a paleta define)
+            width=2  # Largura da borda em pixels
+        )
+        
+        # 3. Visualiza o contorno em preto
+        visualized_outline = outline.visualize(palette='000000') # Preto
 
-        url = ee_image.getThumbURL({
-            "region": region_geometry,
+        # 4. Mescla o contorno sobre a imagem de dados
+        #    O 'blend' do GEE sobrepõe imagens.
+        final_image_with_outline = visualized_data.blend(visualized_outline)
+
+        # 5. Obtém a URL da imagem mesclada
+        #    Não passamos mais min/max/palette pois a imagem já é RGB
+        url = final_image_with_outline.getThumbURL({
+            "region": feature.geometry(),
             "dimensions": 800,
-            "format": "png",
-            "min": vis_params["min"],
-            "max": vis_params["max"],
-            "palette": vis_params["palette"]
+            "format": "png"
         })
+        # --- FIM DA CORREÇÃO v17 ---
 
+        import requests
         img_bytes = requests.get(url).content
         b64_png = base64.b64encode(img_bytes).decode("ascii")
         png_url = f"data:image/png;base64,{b64_png}"
 
+        # Versão JPEG
+        from PIL import Image
         img = Image.open(io.BytesIO(img_bytes))
         jpg_buffer = io.BytesIO()
         img.convert("RGB").save(jpg_buffer, format="JPEG")
         jpg_b64 = base64.b64encode(jpg_buffer.getvalue()).decode("ascii")
         jpg_url = f"data:image/jpeg;base64,{jpg_b64}"
 
+        # --- Geração da Colorbar (Idêntica) ---
         palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
         vmin = vis_params.get("min", 0)
         vmax = vis_params.get("max", 1)
         label = unit_label or ""
         ul = label.lower()
 
-        ticks = None 
-        if "mm" in ul and vmin == 0 and vmax == 500:
+        if "mm" in ul:
+            vmin, vmax = 0, 500
             ticks = [0, 100, 200, 300, 400, 500]
-        elif ("°" in ul or "c" in ul) and vmin == 0 and vmax == 40:
+        elif "°" in ul or "c" in ul:
+            vmin, vmax = 0, 40
             ticks = [0, 10, 20, 30, 40]
-        elif ("m/s" in ul or "vento" in ul) and vmin == 0 and vmax == 30:
+        elif "m/s" in ul or "vento" in ul:
+            vmin, vmax = 0, 30
             ticks = [0, 5, 10, 15, 20, 25, 30]
-        
+        else:
+            ticks = None
+
         colorbar_img = _make_compact_colorbar(palette, vmin, vmax, label, ticks)
 
         return png_url, jpg_url, colorbar_img
