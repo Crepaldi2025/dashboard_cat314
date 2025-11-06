@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v21)
+# main.py — Clima-Cast-Crepaldi (Corrigido v23)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -9,14 +9,12 @@ import charts_visualizer
 import utils
 import copy
 import locale
-import base64
+import base64 # <-- Importação correta (corrigindo NameError)
 import io
 import pandas as pd
 import folium
-# --- INÍCIO DA CORREÇÃO v21 ---
-# from folium.plugins import Draw  # <-- REMOVIDO! Este era o conflito.
+from folium.plugins import Draw # <-- Usando o plugin Draw
 from streamlit_folium import st_folium
-# --- FIM DA CORREÇÃO v21 ---
 
 # ==================================================================================
 # FUNÇÕES DE CACHE (Idênticas, sem alteração)
@@ -98,7 +96,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função idêntica à v16)
+# (Função idêntica à v16, exceto pela correção do NameError)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -142,7 +140,9 @@ def render_analysis_results():
 
             st.markdown("### Exportar Mapas")
             if png_url:
+                # --- INÍCIO DA CORREÇÃO v23 (NameError) ---
                 st.download_button("Exportar (PNG)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
+                # --- FIM DA CORREÇÃO v23 (NameError) ---
             if jpg_url:
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
@@ -182,44 +182,52 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v21:
-# Removido `folium.plugins.Draw`
-# Adicionado `feature_group_name="Desenho"` ao `st_folium`
-# Isso faz o PRÓPRIO st_folium criar a barra de desenho (única)
-# e preencher o `all_drawings` corretamente.
+# CORREÇÃO v23:
+# Corrigindo o `TypeError` de 'feature_group_name'.
+# A sua versão do st_folium é 0.22.0 e não suporta esse argumento.
+# Voltamos a usar `folium.plugins.Draw` (v22) e `returned_objects=["all_drawings"]` (v19).
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
     Renderiza um mapa para o usuário desenhar um polígono.
-    Usa folium.Map + st_folium (que adicionará os controles de desenho)
+    (v23)
     """
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
-    mapa_desenho = folium.Map(location=[-15.78, -47.93], zoom_start=4)
-    folium.TileLayer(
+    mapa_desenho = folium.Map(
+        location=[-15.78, -47.93], 
+        zoom_start=4,
         tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        attr="Google",
-        name="Google Satellite",
-        overlay=True,
-        control=True,
+        attr="Google"
+    )
+
+    Draw(
+        export=False,
+        position="topleft",
+        draw_options={
+            "polygon": {"allowIntersection": False, "showArea": True},
+            "rectangle": {"allowIntersection": False, "showArea": True},
+            "circle": False,
+            "marker": False,
+            "circlemarker": False,
+            "polyline": False,
+        },
+        edit_options={"edit": True, "remove": True}
     ).add_to(mapa_desenho)
     
-    # REMOVIDO o bloco Draw() daqui
-
     map_data = st_folium(
         mapa_desenho, 
         width=None, 
         height=500, 
         use_container_width=True,
-        # --- INÍCIO DA CORREÇÃO v21 ---
-        feature_group_name="Desenho", # <-- Isso habilita o desenho
-        returned_objects=["all_drawings"]
-        # --- FIM DA CORREÇÃO v21 ---
+        # A sua versão do st_folium (0.22.0) NÃO suporta 'feature_group_name'
+        # mas suporta 'returned_objects'.
+        returned_objects=["all_drawings"] 
     )
     
     # Caixa de depuração (mantida por segurança)
-    # with st.expander("Informações de Depuração"):
+    # with st.expander("Informações de Depuração (v23)"):
     #    st.json(map_data)
 
     geometry = None
@@ -228,9 +236,8 @@ def render_polygon_drawer():
     if map_data and map_data.get("all_drawings"):
         all_drawings = map_data["all_drawings"]
         
-        # Se o usuário desenhou algo
         if all_drawings and len(all_drawings) > 0:
-            drawing = all_drawings[-1] # Pega o último
+            drawing = all_drawings[-1] 
             
             if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
                 if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
@@ -243,8 +250,7 @@ def render_polygon_drawer():
             st.success("✅ Polígono capturado!")
             st.rerun() 
     else:
-        # Se o usuário deletou o polígono, limpa o estado
-        if st.session_state.get('drawn_geometry') is not None and map_data.get("all_drawings") == []:
+        if st.session_state.get('drawn_geometry') is not None:
              del st.session_state['drawn_geometry']
              st.warning("Polígono removido.")
              st.rerun() 
