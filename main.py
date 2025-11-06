@@ -67,7 +67,20 @@ def run_full_analysis():
                 with st.expander("Opções de Exportação de Mapa"):
                     map_btn1, map_btn2 = st.columns(2)
                     with map_btn1:
-                        st.download_button(label="Exportar (PNG)", data=requests.get(png_url).content, file_name="mapa.png", mime="image/png", use_container_width=True)
+                        import base64
+                        from io import BytesIO
+
+                        # Extrai conteúdo binário do base64
+                        png_bytes = base64.b64decode(png_url.split(",")[1])
+
+                        st.download_button(
+                        label="Exportar (PNG)",
+                        data=png_bytes,
+                        file_name="mapa.png",
+                        mime="image/png",
+                        use_container_width=True
+                        )
+
                     with map_btn2:
                         st.download_button(label="Exportar (JPEG)", data=requests.get(jpg_url).content, file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
             elif st.session_state.map_type == "Interativo":
@@ -157,3 +170,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
