@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v3)
+# main.py — Clima-Cast-Crepaldi (Corrigido v4)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -10,19 +10,12 @@ import utils
 import copy
 import locale
 import base64
-
-# --- CORREÇÃO DE TYPEERROR (v3) ---
-# Removemos 'folium' e 'st_folium' e usaremos apenas 'geemap'
 import geemap.foliumap as geemap
-# ----------------------------------
 
 # ==================================================================================
-# FUNÇÕES DE CACHE
+# FUNÇÕES DE CACHE (Idênticas, sem alteração)
 # ==================================================================================
-# (Esta seção permanece IDÊNTICA à versão anterior)
-
 def get_geo_caching_key(session_state):
-    """Cria uma string 'hashable' única para os parâmetros de localização."""
     loc_type = session_state.get('tipo_localizacao')
     key = f"loc_type:{loc_type}"
     if loc_type == "Estado":
@@ -37,10 +30,6 @@ def get_geo_caching_key(session_state):
 
 @st.cache_data(ttl=3600)
 def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
-    """
-    Função cacheada que busca os dados do GEE.
-    Executa a parte "lenta" da análise.
-    """
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     if not geometry: return None 
     var_cfg = gee_handler.ERA5_VARS.get(variavel)
@@ -66,9 +55,8 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
 
     return results
 
-# ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE ----------------------
+# ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE (Idêntica) ----------------------
 def run_full_analysis():
-    """ Orquestra a análise e armazena os resultados no st.session_state. """
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
 
@@ -97,7 +85,6 @@ def run_full_analysis():
 
 
 def render_analysis_results():
-    """ Renderiza os resultados que estão salvos em st.session_state.analysis_results. """
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
         return
 
@@ -110,7 +97,6 @@ def render_analysis_results():
 
     if aba == "Mapas":
         tipo_mapa = st.session_state.get("map_type", "Interativo")
-        
         if "ee_image" not in results:
             st.warning("Não há dados de imagem para exibir.")
             return
@@ -121,14 +107,12 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
-            # Esta função será corrigida no próximo arquivo
             map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"])
 
         elif tipo_mapa == "Estático":
             if "static_maps" not in results:
                 st.warning("Erro ao gerar mapas estáticos.")
                 return
-                
             png_url, jpg_url, colorbar_img = results["static_maps"]
 
             if png_url:
@@ -146,15 +130,16 @@ def render_analysis_results():
         if "time_series_df" not in results:
             st.warning("Não foi possível extrair a série temporal.")
             return
-            
         df = results["time_series_df"]
         var_cfg = results["var_cfg"]
         charts_visualizer.display_time_series_chart(df, st.session_state.variavel, var_cfg["unit"])
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO DE TYPEERROR (v3): Esta função foi reescrita para usar
-# o método .to_streamlit() do geemap, que é a forma correta.
+# CORREÇÃO DE TYPEERROR (v4):
+# O erro `map_data.get("last_drawn")` ocorre porque `map_data`
+# é o PRÓPRIO objeto de desenho, não um dicionário que o contém.
+# A lógica foi simplificada para `if map_data:`.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -164,34 +149,34 @@ def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
-    # 1. Criar um geemap.Map
-    mapa_desenho = geemap.Map(center=[-15.78, -47.93], zoom=4)
-    mapa_desenho.add_basemap("SATELLITE") # Adiciona o basemap de satélite
+    mapa_desenho = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="SATELLITE")
     
-    # 2. Usar o .to_streamlit() do geemap, que renderiza o mapa e
-    #    pode retornar os desenhos.
     map_data = mapa_desenho.to_streamlit(
         width=None, 
         height=500, 
         use_container_width=True,
-        # Pede para o 'to_streamlit' retornar a última geometria desenhada
         return_last_drawn=True 
     )
 
-    # 3. Verifica se o geemap retornou um desenho
-    if map_data and map_data.get("last_drawn"):
-        drawing = map_data["last_drawn"]
-        # Verifica se é uma geometria válida (não apenas um ponto)
+    # ----------------- CORREÇÃO ESTÁ AQUI -----------------
+    # 'map_data' não é um dicionário, é o objeto retornado (ou None)
+    if map_data:
+        # map_data É o objeto de desenho
+        drawing = map_data
+        
+        # Verifica se é uma geometria válida
         if drawing and drawing.get("geometry") and drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
             st.session_state.drawn_geometry = drawing["geometry"]
             st.success("✅ Polígono capturado! Você já pode clicar em 'Gerar Análise'.")
         else:
-            # Limpa se for um desenho inválido (ex: um marcador)
+            # Limpa se for um desenho inválido (ex: um marcador ou linha)
             if 'drawn_geometry' in st.session_state:
                 del st.session_state['drawn_geometry']
+            st.warning("Por favor, desenhe um POLÍGONO para a análise.")
+    # ----------------- FIM DA CORREÇÃO -----------------
 
 
-# ---------------------- FUNÇÃO MAIN ----------------------
+# ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
 def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
@@ -206,16 +191,13 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # Lógica de renderização do mapa de desenho
     if opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono":
         render_polygon_drawer()
 
-    # Lógica de execução da análise
     if st.session_state.get("analysis_triggered", False):
         st.session_state.analysis_triggered = False 
         run_full_analysis() 
 
-    # Lógica de renderização dos resultados
     render_analysis_results()
 
 if __name__ == "__main__":
