@@ -49,6 +49,10 @@ def run_full_analysis():
 
         # Obtém geometria conforme seleção
         feature = ui.get_selected_feature(tipo_localizacao)
+        if feature is None:
+            st.error("❌ Nenhuma área de interesse válida foi selecionada. Volte ao painel lateral e escolha um Estado, Município ou Círculo válido.")
+            st.stop()
+
 
         # Determina o período
         start_date, end_date = utils.get_date_range(st.session_state.tipo_periodo, st.session_state)
@@ -126,4 +130,5 @@ def main():
 # ==================================================================================
 if __name__ == "__main__":
     main()
+
 
