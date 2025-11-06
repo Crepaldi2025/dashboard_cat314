@@ -1,151 +1,172 @@
 # ==================================================================================
-# main.py — Aplicativo principal do Clima-Cast-Crepaldi (versão corrigida)
+# main.py — Aplicativo principal do Clima-Cast-Crepaldi (fluxo simples e estável)
 # ==================================================================================
 import streamlit as st
 import ui
 import gee_handler
 import map_visualizer
 import charts_visualizer
-import ee
 import utils
-import requests
-import io
-import pandas as pd
 import copy
 import locale
+import base64
+import requests
 
-# ==================================================================================
-# CONFIGURAÇÃO DE LOCALE
-# ==================================================================================
+# Locale (silencioso)
 try:
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+    locale.setlocale(locale.LC_ALL, "pt_BR.UTF-8")
 except locale.Error:
     try:
-        locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
+        locale.setlocale(locale.LC_ALL, "Portuguese_Brazil.1252")
     except locale.Error:
-        st.warning("Locale 'pt_BR.UTF-8' não encontrado. Nomes de meses podem aparecer em inglês.")
+        pass
 
 
-# ==================================================================================
-# EXECUÇÃO COMPLETA — MÓDULO DE ANÁLISE
-# ==================================================================================
+# ---------------------------------------------
+# Núcleo da análise (Mapas / Séries)
+# ---------------------------------------------
 def run_full_analysis():
-    """Executa a lógica principal de análise, conforme aba e tipo de mapa."""
+    aba = st.session_state.get("nav_option", "Mapas")
+    variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
 
-    tipo_aba = st.session_state.get("nav_option", "Mapas")
-    tipo_mapa = st.session_state.get("map_type", "Interativo")
-    variavel = st.session_state.variavel
-
+    # Geometria da AOI (Estado/Município/Círculo/Polígono)
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     if not geometry:
-        st.error("❌ Não foi possível definir a geometria da área de interesse.")
+        st.error("❌ Não foi possível definir a área de interesse. Confira o painel à esquerda.")
         return
 
+    # Período
     start_date, end_date = utils.get_date_range(st.session_state.tipo_periodo, st.session_state)
     if not (start_date and end_date):
-        st.error("⚠️ Período de análise inválido.")
+        st.error("⚠️ Período inválido.")
         return
 
-    variable_config = gee_handler.ERA5_VARS[variavel]
+    # Config da variável
+    var_cfg = gee_handler.ERA5_VARS.get(variavel)
+    if not var_cfg:
+        st.error("⚠️ Variável não reconhecida.")
+        return
 
-    # Apenas quando a aba é MAPAS
-    if tipo_aba == "Mapas":
+    # MAPAS
+    if aba == "Mapas":
+        # Busca imagem do ERA5-Land já processada/recortada
         ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry)
-        if not ee_image:
-            st.warning("Não há dados disponíveis para o período selecionado.")
+        if ee_image is None:
+            st.warning("Não há dados para o período selecionado.")
             return
 
         st.markdown("---")
         st.subheader("Resultado da Análise")
         ui.renderizar_resumo_selecao()
 
-        final_vis_params = copy.deepcopy(variable_config["vis_params"])
+        vis_params = copy.deepcopy(var_cfg["vis_params"])
+        tipo_mapa = st.session_state.get("map_type", "Interativo")
 
-        if tipo_mapa == "Estático":
-            png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
-                ee_image, feature, final_vis_params, variable_config["unit"]
+        if tipo_mapa == "Interativo":
+            # Apenas o mapa interativo. Sem exportação aqui.
+            map_visualizer.create_interactive_map(
+                ee_image, feature, vis_params, var_cfg["unit"]
             )
+
+        else:  # Estático
+            png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
+                ee_image, feature, vis_params, var_cfg["unit"]
+            )
+
             if png_url:
-                st.image(png_url, caption="Mapa Estático Gerado", use_container_width=True)
+                st.image(png_url, caption="Mapa Estático (PNG)", use_container_width=True)
             if colorbar_img:
-                st.image(colorbar_img, caption="Legenda", width=600)
+                st.image(colorbar_img, caption="Legenda", use_container_width=True)
 
             st.markdown("### Exportar Mapas")
             col1, col2 = st.columns(2)
             with col1:
-                st.download_button(
-                    label="Exportar (PNG)",
-                    data=requests.get(png_url).content,
-                    file_name="mapa.png",
-                    mime="image/png",
-                    use_container_width=True
-                )
+                if png_url:
+                    try:
+                        st.download_button(
+                            label="Exportar (PNG)",
+                            data=requests.get(png_url).content,
+                            file_name="mapa.png",
+                            mime="image/png",
+                            use_container_width=True,
+                        )
+                    except Exception:
+                        # fallback base64 (quando create_static_map retorna data URL)
+                        if png_url.startswith("data:image"):
+                            png_bytes = base64.b64decode(png_url.split(",")[1])
+                            st.download_button(
+                                label="Exportar (PNG)",
+                                data=png_bytes,
+                                file_name="mapa.png",
+                                mime="image/png",
+                                use_container_width=True,
+                            )
             with col2:
-                st.download_button(
-                    label="Exportar (JPEG)",
-                    data=requests.get(jpg_url).content,
-                    file_name="mapa.jpeg",
-                    mime="image/jpeg",
-                    use_container_width=True
-                )
+                if jpg_url:
+                    try:
+                        st.download_button(
+                            label="Exportar (JPEG)",
+                            data=requests.get(jpg_url).content,
+                            file_name="mapa.jpeg",
+                            mime="image/jpeg",
+                            use_container_width=True,
+                        )
+                    except Exception:
+                        if jpg_url.startswith("data:image"):
+                            jpg_bytes = base64.b64decode(jpg_url.split(",")[1])
+                            st.download_button(
+                                label="Exportar (JPEG)",
+                                data=jpg_bytes,
+                                file_name="mapa.jpeg",
+                                mime="image/jpeg",
+                                use_container_width=True,
+                            )
 
-        elif tipo_mapa == "Interativo":
-            map_visualizer.create_interactive_map(
-                ee_image, feature, final_vis_params, variable_config["unit"]
-            )
-
-    # Apenas quando a aba é SÉRIES TEMPORAIS
-    elif tipo_aba == "Séries Temporais":
+    # SÉRIES TEMPORAIS
+    elif aba == "Séries Temporais":
         st.markdown("---")
         st.subheader("Resultado da Análise")
         ui.renderizar_resumo_selecao()
 
-        df_series = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
-        charts_visualizer.display_time_series_chart(df_series, variavel, variable_config["unit"])
+        df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
+        if df is None or df.empty:
+            st.warning("Não foi possível extrair a série temporal.")
+            return
+        charts_visualizer.display_time_series_chart(df, variavel, var_cfg["unit"])
 
-    # Página SOBRE não executa análise
-    elif tipo_aba == "Sobre o Aplicativo":
-        ui.renderizar_pagina_sobre()
 
-
-# ==================================================================================
-# FUNÇÃO PRINCIPAL
-# ==================================================================================
+# ---------------------------------------------
+# Função principal
+# ---------------------------------------------
 def main():
-    """Organiza a execução geral do aplicativo."""
-    from gee_handler import inicializar_gee
-    inicializar_gee()
+    # Inicializa GEE (mantendo seu nome de função)
+    gee_handler.inicializar_gee()
 
+    # Cabeçalho/estrutura
     ui.configurar_pagina()
+
+    # Sidebar e opção de navegação
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
 
-    # Exibe conforme estado da sessão
-    if st.session_state.get('analysis_triggered', False):
+    # Página SOBRE: sempre mostra e encerra
+    if opcao_menu == "Sobre o Aplicativo":
+        ui.renderizar_pagina_sobre()
+        return
+
+    # Página principal (título/data)
+    ui.renderizar_pagina_principal(opcao_menu)
+
+    # Quando o usuário clicar em "Gerar Análise"
+    if st.session_state.get("analysis_triggered", False):
+        # zera o gatilho para evitar loop
         st.session_state.analysis_triggered = False
-        st.session_state.area_validada = True
-        st.rerun()
-
-    if st.session_state.get('area_validada', False):
-        ui.renderizar_pagina_principal(opcao_menu)
         run_full_analysis()
-
-    elif st.session_state.get('show_confirmation_map', False):
-        ui.renderizar_pagina_principal(opcao_menu)
-        tipo_loc = st.session_state.get('tipo_localizacao')
-        if tipo_loc == "Círculo (Lat/Lon/Raio)":
-            map_visualizer.display_circle_map(st.session_state.latitude, st.session_state.longitude, st.session_state.raio)
-            ui.renderizar_validacao_mapa()
-        elif tipo_loc == "Polígono":
-            map_visualizer.display_polygon_draw_map()
-            ui.renderizar_validacao_mapa()
-
     else:
-        ui.renderizar_pagina_principal(opcao_menu)
+        # Mensagem discreta enquanto nada foi rodado
+        st.info("Configure os filtros no painel à esquerda e clique em **Gerar Análise**.")
 
 
-# ==================================================================================
-# EXECUÇÃO DIRETA
-# ==================================================================================
+# Execução direta
 if __name__ == "__main__":
     main()
