@@ -84,10 +84,7 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 
 
 # ==================================================================================
-# MAPA ESTÁTICO — COMPATÍVEL COM main.py
-# ==================================================================================
-# ==================================================================================
-# MAPA ESTÁTICO — COMPATÍVEL COM main.py (versão corrigida)
+# MAPA ESTÁTICO — VERSÃO FINAL COMPATÍVEL COM main.py
 # ==================================================================================
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """Gera uma imagem estática (PNG e JPG) a partir dos dados do Earth Engine."""
@@ -114,26 +111,23 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         st.error("❌ Falha ao gerar o mapa estático a partir do Earth Engine.")
         return None, None, None
 
-    # Corrige fundo transparente → branco
+    # Corrige fundo transparente → branco sólido
     if image.mode == "RGBA":
         background = Image.new("RGB", image.size, (255, 255, 255))
-        background.paste(image, mask=image.split()[3])  # aplica máscara alfa
+        background.paste(image, mask=image.split()[3])
         image = background
 
-    # Cria versões em memória (PNG + JPG)
+    # Converte para PNG e JPG (em memória)
     png_buffer = io.BytesIO()
     jpg_buffer = io.BytesIO()
     image.save(png_buffer, format="PNG")
     image.save(jpg_buffer, format="JPEG")
 
-    # Codifica em Base64 (para exibir no Streamlit)
+    # Codifica em Base64 (para exibição e download)
     png_base64 = base64.b64encode(png_buffer.getvalue()).decode("utf-8")
     jpg_base64 = base64.b64encode(jpg_buffer.getvalue()).decode("utf-8")
 
-    # Exibe no Streamlit
-    st.image(image, caption=f"Mapa Estático — {unit_label}", use_container_width=True)
-
-    # Gera colorbar simples
+    # --- Colorbar ---
     fig, ax = plt.subplots(figsize=(5, 0.4))
     cmap = plt.cm.get_cmap("RdYlBu_r")
     if "mm" in unit_label.lower():
@@ -143,7 +137,11 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
     elif "m/s" in unit_label.lower():
         cmap = plt.cm.get_cmap("viridis")
 
-    cb = plt.colorbar(plt.cm.ScalarMappable(cmap=cmap), cax=ax, orientation="horizontal")
+    cb = plt.colorbar(
+        plt.cm.ScalarMappable(cmap=cmap),
+        cax=ax,
+        orientation="horizontal",
+    )
     cb.set_label(unit_label)
     plt.tight_layout()
 
@@ -151,12 +149,13 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
     plt.savefig(colorbar_buf, format="png", bbox_inches="tight", dpi=150)
     plt.close(fig)
 
-    # Retorna strings Base64 (compatíveis com main.py)
+    # Retorna as strings Base64 (sem exibir imagem)
     return (
         f"data:image/png;base64,{png_base64}",
         f"data:image/jpeg;base64,{jpg_base64}",
         colorbar_buf,
     )
+
 
 # ==================================================================================
 # FUNÇÃO INTERNA — COLORBAR DISCRETO
@@ -225,5 +224,6 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     macro = MacroElement()
     macro._template = template
     mapa.get_root().add_child(macro)
+
 
 
