@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — Interface do usuário do sistema Clima-Cast-Crepaldi (Corrigido)
+# ui.py — Interface do usuário do sistema Clima-Cast-Crepaldi (Corrigido v7)
 # ==================================================================================
 
 import streamlit as st
@@ -9,51 +9,40 @@ from dateutil.relativedelta import relativedelta
 import locale
 
 # ==================================================================================
-# CONFIGURAÇÃO INICIAL (DEVE VIR ANTES DE QUALQUER OUTRA CHAMADA STREAMLIT)
+# CONFIGURAÇÃO INICIAL (Idêntica)
 # ==================================================================================
 
 st.set_page_config(
     page_title="Clima-Cast-Crepaldi",
-    #page_icon="🛰️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Protege contra erro de locale no Streamlit Cloud
 try:
     locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
 except locale.Error:
     try:
         locale.setlocale(locale.LC_TIME, "C") # Fallback
     except Exception:
-        pass # Se tudo falhar, usa o padrão
+        pass 
 
 # ==================================================================================
-# FUNÇÕES PRINCIPAIS
+# FUNÇÕES PRINCIPAIS (Apenas 'renderizar_sidebar' foi alterada)
 # ==================================================================================
 
 def configurar_pagina():
-#   """Configura o título e separador inicial."""
-#   st.title("Clima-Cast-Crepaldi") # Descomentado em main.py
     st.markdown("---")
 
-# ----------------------------------------------------------------------------------
-# CORREÇÃO P2: Lógica de Estado
-# Esta função é a chave para o P2. Ela limpa o 'gatilho' e os 'resultados'.
-# Quando um filtro é alterado, a análise anterior é invalidada.
-# ----------------------------------------------------------------------------------
 def reset_analysis_state():
     """Callback para limpar o estado dos resultados sempre que um filtro é alterado."""
     keys_to_clear = [
-        'analysis_triggered',   # O gatilho para rodar a análise
-        'analysis_results',     # Onde os resultados (mapas, dfs) são guardados
-        'drawn_geometry'        # Limpa o polígono desenhado
+        'analysis_triggered',   
+        'analysis_results',     
+        'drawn_geometry'        
     ]
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
-    
-    # st.rerun() # Opcional, mas pode ser bom para limpar a UI
     
 
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
@@ -67,7 +56,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             ["Mapas", "Séries Temporais", "Sobre o Aplicativo"],
             label_visibility="collapsed",
             key='nav_option',
-            on_change=reset_analysis_state # Limpa a análise ao trocar de aba
+            on_change=reset_analysis_state
         )
         st.markdown("---")
         opcao_selecionada = st.session_state.get('nav_option', 'Mapas')
@@ -103,18 +92,27 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 lista_municipios = ["Selecione um estado primeiro"]
                 if estado_selecionado_str and estado_selecionado_str != "Selecione...":
                     uf_selecionada = estado_selecionado_str.split(' - ')[-1]
-                    # Garante que dados_geo[uf_selecionada] existe
                     lista_municipios = ["Selecione..."] + dados_geo.get(uf_selecionada, [])
                 st.selectbox("Selecione o Município", lista_municipios, key='municipio', on_change=reset_analysis_state)
             elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
                 st.number_input("Latitude", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
+            
+            # ----------------------------------------------------------------------
+            # CORREÇÃO v7: Lógica da "Mensagem Azul"
+            # ----------------------------------------------------------------------
             elif tipo_localizacao == "Polígono":
-                # A lógica de desenho agora fica em main.py
-                st.info("Acesse a aba 'Mapas' para desenhar seu polígono de interesse.")
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
+                elif opcao_selecionada == "Mapas":
+                    # O usuário está na aba certa, mas não desenhou
+                    st.info("Use as ferramentas no mapa principal para desenhar sua área.")
+                else: 
+                    # O usuário está na aba errada (ex: "Séries Temporais")
+                    st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
+            # ----------------------------------------------------------------------
+
             st.divider()
 
             # 5. PERÍODO
@@ -123,17 +121,15 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if opcao_selecionada == "Mapas":
                 st.selectbox("Selecione o tipo de período", ["Personalizado", "Mensal", "Anual"], key='tipo_periodo', on_change=reset_analysis_state)
             else:
-                # Séries temporais são sempre personalizadas
                 st.session_state.tipo_periodo = "Personalizado"
             
             tipo_periodo = st.session_state.get('tipo_periodo', 'Personalizado')
             ano_atual = datetime.now().year
-            lista_anos = list(range(ano_atual, 1979, -1)) # ERA5 começa em 1981, mas 1979 é seguro
+            lista_anos = list(range(ano_atual, 1979, -1)) 
 
             st.session_state.date_error = False
             if tipo_periodo == "Personalizado":
                 hoje = datetime.now()
-                # Datas padrão mais sensatas (ex: último mês)
                 data_padrao_fim = hoje.replace(day=1) - relativedelta(days=1)
                 data_padrao_inicio = data_padrao_fim.replace(day=1)
                 
@@ -154,15 +150,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
             st.divider()
 
-            # 6. TIPO DE MAPA (Se aplicável)
+            # 6. TIPO DE MAPA
             if opcao_selecionada == "Mapas":
                 st.subheader("5. Tipo de Mapa")
                 st.radio("Selecione o formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_state)
                 st.divider()
 
-            # ----------------------------------------------------------------------
-            # CORREÇÃO P7: Botão de Análise (Lógica de "disabled")
-            # ----------------------------------------------------------------------
+            # 7. BOTÃO DE ANÁLISE
             disable_button = st.session_state.get('date_error', False)
             tooltip_message = "Clique para gerar a análise"
 
@@ -171,8 +165,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     disable_button = True
                     tooltip_message = "Por favor, desenhe um polígono no mapa principal primeiro."
                 if opcao_selecionada != "Mapas":
-                     st.warning("O desenho de polígono só está disponível na aba 'Mapas'.")
+                     # Desabilita se tentar rodar polígono na aba "Séries Temporais"
                      disable_button = True
+                     tooltip_message = "O desenho de polígono só funciona na aba 'Mapas'."
+
 
             if st.button("Gerar Análise", 
                           type="primary", 
@@ -186,6 +182,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         return opcao_selecionada
 
+# ==================================================================================
+# O restante do ui.py (renderizar_pagina_principal, etc.)
+# permanece IDÊNTICO ao v5.
+# ==================================================================================
 
 def renderizar_pagina_principal(opcao_navegacao):
     """Exibe o conteúdo da página principal com o logo."""
@@ -210,11 +210,9 @@ def renderizar_pagina_principal(opcao_navegacao):
 
 def renderizar_resumo_selecao():
     """Mostra um resumo dos filtros selecionados."""
-    # Envolve em um expander para não poluir a tela
     with st.expander("Resumo dos Filtros Utilizados", expanded=False):
         col_resumo1, col_resumo2 = st.columns(2)
         
-        # Bloco de try...except para evitar falhas se o estado for limpo
         try:
             with col_resumo1:
                 st.markdown(f"**Base de Dados:** `{st.session_state.base_de_dados}`")
@@ -245,23 +243,10 @@ def renderizar_resumo_selecao():
                     st.markdown(f"**Tipo de Mapa:** `{st.session_state.map_type}`")
             st.info("Por favor, confira suas seleções. A busca pelos dados será iniciada com base nestes parâmetros.")
         except AttributeError:
-            # Ocorre se o estado for limpo (ex: reset_analysis_state)
             st.warning("Filtros foram redefinidos. Por favor, selecione novamente.")
 
 
-# ----------------------------------------------------------------------------------
-# CORREÇÃO P6 (Código Morto):
-# A função 'renderizar_validacao_mapa' foi removida.
-# Ela não era chamada e seu fluxo foi substituído pelo novo P2/P7.
-# ----------------------------------------------------------------------------------
-
-
 def renderizar_pagina_sobre():
-    # ------------------------------------------------------------------------------
-    # CORREÇÃO P6/Bug: O código solto (imports, funções) foi removido daqui
-    # e movido/deletado corretamente.
-    # ------------------------------------------------------------------------------
-
     # Texto introdutório
     st.markdown("""
     O **Clima-Cast-Crepaldi** é um sistema interativo desenvolvido no âmbito da disciplina  
