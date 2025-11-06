@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v5)
+# main.py — Clima-Cast-Crepaldi (Corrigido v6)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -107,10 +107,10 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
-            map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"])
+            # Esta função já está correta (v5)
+            map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"]) 
 
         elif tipo_mapa == "Estático":
-            # ... (código idêntico)
             if "static_maps" not in results:
                 st.warning("Erro ao gerar mapas estáticos.")
                 return
@@ -128,7 +128,6 @@ def render_analysis_results():
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
     elif aba == "Séries Temporais":
-        # ... (código idêntico)
         if "time_series_df" not in results:
             st.warning("Não foi possível extrair a série temporal.")
             return
@@ -138,10 +137,11 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO DE TYPEERROR (v5):
-# O erro `drawing.get("geometry")` (v4) acontecia porque `drawing` era
-# uma LISTA, não um dicionário.
-# A correção é verificar se a lista não está vazia e pegar o último item.
+# CORREÇÃO v6:
+# Corrigindo os dois problemas da imagem:
+# 1. Botões de Desenho: Adicionado `draw_control=True` ao construtor.
+# 2. Mapa Satélite: Removido `basemap="SATELLITE"` e adicionado
+#    `mapa_desenho.add_tile_layer(...)` manualmente.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -151,7 +151,22 @@ def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
-    mapa_desenho = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="SATELLITE")
+    # --- INÍCIO DA CORREÇÃO v6 ---
+    mapa_desenho = geemap.Map(
+        center=[-15.78, -47.93], 
+        zoom=4,
+        draw_control=True,      # <-- SOLUÇÃO 1: Adiciona os botões de desenho
+        draw_export=False,      # (Opcional) Oculta o botão de exportar
+        edit_control=True       # (Opcional) Permite editar/deletar o polígono
+    )
+
+    # SOLUÇÃO 2: Adiciona manualmente o basemap de satélite
+    mapa_desenho.add_tile_layer(
+        url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        name="Google Satellite",
+        attribution="Google",
+    )
+    # --- FIM DA CORREÇÃO v6 ---
     
     map_data = mapa_desenho.to_streamlit(
         width=None, 
@@ -160,13 +175,10 @@ def render_polygon_drawer():
         return_last_drawn=True 
     )
 
-    # ----------------- CORREÇÃO ESTÁ AQUI (v5) -----------------
-    # 'map_data' é uma LISTA de desenhos (ou None)
+    # Lógica de captura (v5, que estava correta)
     if map_data and isinstance(map_data, list) and len(map_data) > 0:
-        # Pega o último desenho da lista
         drawing = map_data[-1] 
         
-        # Agora 'drawing' é o dicionário que esperamos
         if drawing and drawing.get("geometry") and drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
             st.session_state.drawn_geometry = drawing["geometry"]
             st.success("✅ Polígono capturado! Você já pode clicar em 'Gerar Análise'.")
@@ -174,7 +186,6 @@ def render_polygon_drawer():
             if 'drawn_geometry' in st.session_state:
                 del st.session_state['drawn_geometry']
             st.warning("Por favor, desenhe um POLÍGONO para a análise.")
-    # ----------------- FIM DA CORREÇÃO -----------------
 
 
 # ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
