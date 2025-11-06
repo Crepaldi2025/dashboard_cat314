@@ -14,6 +14,8 @@ import pandas as pd
 import copy
 import locale
 
+st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide")
+
 # ==================================================================================
 # Configuração de idioma e locale
 # ==================================================================================
@@ -68,7 +70,7 @@ def render_analysis_results_from_state():
 # ==================================================================================
 
 def main():
-    st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide")
+    
 
     # === Atualização: inicializa chaves do estado ===
     if "analysis_triggered" not in st.session_state:
@@ -89,3 +91,4 @@ def main():
 # ==================================================================================
 if __name__ == "__main__":
     main()
+
