@@ -167,3 +167,69 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     macro._template = template
     mapa.get_root().add_child(macro)
 
+# ==================================================================================
+# MAPA ESTÁTICO — COMPATÍVEL COM main.py
+# ==================================================================================
+def create_static_map(ee_image, feature, vis_params, unit_label=""):
+    """Gera uma imagem estática (PNG e JPG) a partir dos dados do Earth Engine."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import io
+    import base64
+    from PIL import Image
+
+    # Obtém o thumbnail da imagem EE
+    url = ee_image.getThumbURL({
+        'region': feature.geometry(),
+        'min': vis_params.get('min', 0),
+        'max': vis_params.get('max', 1),
+        'palette': vis_params.get('palette', ['blue', 'green', 'red']),
+        'dimensions': 600
+    })
+
+    # Lê a imagem a partir da URL (modo simples, sem dependências extras)
+    try:
+        import requests
+        response = requests.get(url)
+        image = Image.open(io.BytesIO(response.content))
+    except Exception:
+        st.error("Falha ao gerar mapa estático.")
+        return None, None, None
+
+    # Cria buffer PNG e JPG
+    png_buffer = io.BytesIO()
+    jpg_buffer = io.BytesIO()
+    image.save(png_buffer, format="PNG")
+    image.save(jpg_buffer, format="JPEG")
+
+    # Codifica em base64 para exibição direta
+    png_base64 = base64.b64encode(png_buffer.getvalue()).decode("utf-8")
+    jpg_base64 = base64.b64encode(jpg_buffer.getvalue()).decode("utf-8")
+
+    # Exibe o mapa no Streamlit
+    st.image(image, caption=f"Mapa Estático — {unit_label}", use_column_width=True)
+
+    # Gera mini colorbar simples
+    fig, ax = plt.subplots(figsize=(5, 0.4))
+    cmap = plt.cm.get_cmap('RdYlBu_r')  # neutro se não houver paleta
+    if 'mm' in unit_label.lower():
+        cmap = plt.cm.get_cmap('turbo')
+    elif '°' in unit_label or 'temp' in unit_label.lower():
+        cmap = plt.cm.get_cmap('RdYlBu_r')
+    elif 'm/s' in unit_label.lower():
+        cmap = plt.cm.get_cmap('viridis')
+    cb = plt.colorbar(
+        plt.cm.ScalarMappable(cmap=cmap),
+        cax=ax,
+        orientation='horizontal'
+    )
+    cb.set_label(unit_label)
+    plt.tight_layout()
+
+    colorbar_buf = io.BytesIO()
+    plt.savefig(colorbar_buf, format='png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+
+    # Retorna URLs simuladas (para manter compatibilidade com main.py)
+    return png_base64, jpg_base64, colorbar_buf
+
