@@ -29,8 +29,7 @@ def get_brazilian_geopolitical_data_local():
     return dados_geo, mapa_nomes_uf
 
 def inicializar_gee():
-    return inicializar_gee()
-    
+        
     """
     Inicializa o Google Earth Engine.
     - Local: usa credenciais do 'earthengine authenticate'
@@ -52,6 +51,14 @@ def inicializar_gee():
             st.info("✅ Conectado ao Google Earth Engine com credenciais locais.")
     except Exception as e:
         st.error(f"⚠️ Falha ao conectar com o Google Earth Engine: {e}")
+
+# ==========================================================
+# Alias para compatibilidade com main.py
+# ==========================================================
+def initialize_gee():
+    """Compatibilidade: redireciona para inicializar_gee()"""
+    return inicializar_gee()
+
 import geobr
 import pandas as pd
 
@@ -273,5 +280,6 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     
 
     return df
+
 
 
