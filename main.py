@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v25)
+# main.py — Clima-Cast-Crepaldi (Corrigido v26)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -96,7 +96,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função idêntica à v24)
+# (Função idêntica à v25)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -130,8 +130,11 @@ def render_analysis_results():
                 return
             png_url, jpg_url, colorbar_img = results["static_maps"]
 
-            map_width = 800 
-            colorbar_width = 800
+            # --- INÍCIO DA CORREÇÃO v26 (Tamanho do Mapa Estático) ---
+            # Diminuindo o tamanho de 800 para 600
+            map_width = 600 
+            colorbar_width = 600
+            # --- FIM DA CORREÇÃO v26 ---
 
             if png_url:
                 st.image(png_url, caption="Mapa Estático", width=map_width) 
@@ -180,9 +183,7 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v25:
-# A lógica de captura do polígono foi alterada para
-# não apagar o estado (`drawn_geometry`) quando o mapa recarrega.
+# LÓGICA DE DESENHO (Idêntica, mantida da v25)
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
@@ -216,43 +217,27 @@ def render_polygon_drawer():
     
     geometry = None
     
-    # --- INÍCIO DA CORREÇÃO v25 ---
-    
-    # Verificamos a saída do mapa.
-    if map_data and map_data.get("all_drawings") is not None:
-        all_drawings = map_data["all_drawings"]
-        
-        # CASO 1: O usuário desenhou algo (a lista não está vazia)
+    if map_data:
+        all_drawings = map_data.get("all_drawings")
+
         if all_drawings and len(all_drawings) > 0:
             drawing = all_drawings[-1] 
             if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
                 if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
                     geometry = drawing["geometry"]
-
-        # CASO 2: O usuário apagou o desenho (a lista está vazia: [])
         elif all_drawings == []: 
             if 'drawn_geometry' in st.session_state:
                  del st.session_state['drawn_geometry']
                  st.warning("Polígono removido.")
                  st.rerun()
-        
-        # CASO 3: O mapa apenas recarregou (all_drawings é None/NULL)
-        # Neste caso, não fazemos nada, 'geometry' continua None.
 
-    # Lógica de validação (executada fora do bloco 'if map_data...')
     if geometry:
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
             st.success("✅ Polígono capturado!")
             st.rerun() 
     
-    # A lógica 'else' que apagava o estado foi removida.
-    # O estado só é apagado se o usuário *explicitamente* apagar (CASO 2).
-    
-    # --- FIM DA CORREÇÃO v25 ---
-
-
-# ---------------------- FUNÇÃO MAIN (Modificada) ----------------------
+# ---------------------- FUNÇÃO MAIN (Idêntica à v25) ----------------------
 def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
@@ -267,14 +252,9 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # --- INÍCIO DA CORREÇÃO v25 ---
-    # SÓ renderize o mapa de desenho se a análise NÃO estiver
-    # prestes a ser executada. Isso impede que o mapa
-    # recarregue e apague o `drawn_geometry` no meio do processo.
     if opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono":
         if not st.session_state.get("analysis_triggered", False):
             render_polygon_drawer()
-    # --- FIM DA CORREÇÃO v25 ---
 
     if st.session_state.get("analysis_triggered", False):
         st.session_state.analysis_triggered = False 
