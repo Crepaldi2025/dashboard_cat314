@@ -1,10 +1,10 @@
 # ==================================================================================
-# map_visualizer.py — Funções de visualização do Clima-Cast-Crepaldi
+# map_visualizer.py — Funções de visualização (Corrigido v2)
 # ==================================================================================
 import streamlit as st
 import geemap.foliumap as geemap
 import ee
-from streamlit_folium import st_folium
+# 'st_folium' não é mais usado neste arquivo
 import io
 import base64
 import matplotlib.pyplot as plt
@@ -12,14 +12,8 @@ import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
 from matplotlib import cm
-import requests # Adicionado para P5
-from PIL import Image # Adicionado para P5
-
-# ----------------------------------------------------------------------------------
-# CORREÇÃO P6 (Código Morto):
-# As funções 'display_state_map' e 'display_circle_map' foram removidas.
-# Elas não eram chamadas em 'main.py' e 'display_circle_map' continha um bug.
-# ----------------------------------------------------------------------------------
+import requests
+from PIL import Image
 
 # ==================================================================================
 # MAPA INTERATIVO — COMPATÍVEL COM main.py
@@ -31,7 +25,6 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
         centroid.reverse()  # (lon, lat) → (lat, lon)
         zoom = 7
     except Exception:
-        # Fallback se o centroide falhar (ex: geometria muito complexa)
         centroid = [-15.78, -47.93] # Centro do Brasil
         zoom = 4
 
@@ -42,9 +35,11 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
-    # Substitui o .to_streamlit() por st_folium para ser mais estável
-    # e permitir a captura de desenhos no futuro.
-    return st_folium(mapa, height=500, use_container_width=True, returned_objects=[])
+    # ----------------------------------------------------------------------------------
+    # CORREÇÃO DE TYPEERROR: Revertido de st_folium() para mapa.to_streamlit()
+    # geemap.Map deve ser renderizado com seu próprio método .to_streamlit()
+    # ----------------------------------------------------------------------------------
+    return mapa.to_streamlit(height=500, use_container_width=True)
 
 
 # ==================================================================================
@@ -95,7 +90,6 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     colormap.caption = label
     html = colormap._repr_html_()
     
-    # Template para posicionar o colorbar
     template = Template(f"""
     {{% macro html(this, kwargs) %}}
     <div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999;
@@ -128,7 +122,6 @@ def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
 
     cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
     
-    # Se 'ticks' não for fornecido, o Matplotlib decide os melhores
     if ticks is not None:
         cb.set_ticks(ticks)
         
@@ -149,7 +142,6 @@ def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
 def create_static_map(ee_image, feature, vis_params, unit_label=""):
     """Gera o mapa estático (PNG/JPG) e colorbar compacta."""
     try:
-        # Objeto de geometria para a região
         region_geometry = feature.geometry()
 
         url = ee_image.getThumbURL({
@@ -165,26 +157,20 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         b64_png = base64.b64encode(img_bytes).decode("ascii")
         png_url = f"data:image/png;base64,{b64_png}"
 
-        # Versão JPEG (convertendo de PNG)
         img = Image.open(io.BytesIO(img_bytes))
         jpg_buffer = io.BytesIO()
         img.convert("RGB").save(jpg_buffer, format="JPEG")
         jpg_b64 = base64.b64encode(jpg_buffer.getvalue()).decode("ascii")
         jpg_url = f"data:image/jpeg;base64,{jpg_b64}"
 
-        # --- Geração da Colorbar ---
-        
-        # CORREÇÃO P5: vmin e vmax são lidos DIRETAMENTE dos vis_params.
-        # Os valores fixos (ex: 0, 40) foram removidos.
+        # --- Geração da Colorbar (Corrigida na v1) ---
         palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
         vmin = vis_params.get("min", 0)
         vmax = vis_params.get("max", 1)
         label = unit_label or ""
         ul = label.lower()
 
-        # A lógica de 'ticks' pode ser mantida para melhor visualização,
-        # mas agora ela é opcional.
-        ticks = None # Deixa o matplotlib decidir por padrão
+        ticks = None 
         if "mm" in ul and vmin == 0 and vmax == 500:
             ticks = [0, 100, 200, 300, 400, 500]
         elif ("°" in ul or "c" in ul) and vmin == 0 and vmax == 40:
@@ -192,7 +178,6 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         elif ("m/s" in ul or "vento" in ul) and vmin == 0 and vmax == 30:
             ticks = [0, 5, 10, 15, 20, 25, 30]
         
-        # Gera a imagem da colorbar usando os vmin/vmax corretos
         colorbar_img = _make_compact_colorbar(palette, vmin, vmax, label, ticks)
 
         return png_url, jpg_url, colorbar_img
