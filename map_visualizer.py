@@ -59,21 +59,28 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
 # ==================================================================================
 # MAPA INTERATIVO — COMPATÍVEL COM main.py
 # ==================================================================================
-def create_interactive_map(ee_image, feature, vis_params, unidade):
-    """Compatível com main.py — mapa interativo sem duplicação de colorbar."""
-    st.subheader("Resultado da Análise")
+def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
+    """Exibe o mapa interativo com colorbar discreta no canto inferior esquerdo."""
+    # (não repetir subheader aqui; o main.py já mostra)
 
-    mapa = geemap.Map(center=[-15, -55], zoom=5)
-    mapa.add_basemap("SATELLITE")
+    # Centraliza no AOI
+    centroid = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
+    centroid.reverse()  # (lon, lat) -> (lat, lon)
 
-    # Adiciona camada sem gerar colorbar automática
-    tile_layer = geemap.ee_tile_layer(ee_image, vis_params, "Resultado", shown=True, opacity=1.0)
-    mapa.add_child(tile_layer)
+    mapa = geemap.Map(center=centroid, zoom=7)
+    mapa.add_basemap('SATELLITE')
 
-    # Adiciona colorbar discreto (canto inferior esquerdo)
-    _add_colorbar_discreto(mapa, vis_params, unidade)
+    # Camada do EE (sem gerar colorbar automática)
+    mapa.addLayer(ee_image, vis_params, 'Dados Climáticos')
+    # Contorno do AOI (opcional, como já estava)
+    mapa.addLayer(ee.Image().paint(feature, 0, 2), {'palette': 'black'}, 'Contorno da Área')
 
-    st_folium(mapa, width=900, height=500)
+    # Colorbar discreta (canto inferior esquerdo)
+    _add_colorbar_bottomleft(mapa, vis_params, unit_label)
+
+    # Render
+    mapa.to_streamlit(height=500)
+
 
 
 # ==================================================================================
@@ -106,3 +113,44 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
 
     # Adiciona ao mapa (canto inferior esquerdo)
     mapa.add_child(colormap)
+def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
+    """Adiciona uma colorbar com branca, posicionada no canto inferior esquerdo (compatível em qualquer versão)."""
+    from branca.colormap import LinearColormap
+    from branca.element import Template, MacroElement
+
+    palette = vis_params.get("palette", None)
+    vmin = vis_params.get("min", 0)
+    vmax = vis_params.get("max", 1)
+    if not palette:
+        return
+
+    # Rótulo da legenda
+    label = ""
+    ul = (unit_label or "").lower()
+    if "°" in unit_label or "temp" in ul:
+        label = "Temperatura (°C)"
+    elif "mm" in ul:
+        label = "Precipitação (mm)"
+    elif "m/s" in ul or "vento" in ul:
+        label = "Vento (m/s)"
+    elif unit_label:
+        label = str(unit_label)
+
+    colormap = LinearColormap(colors=palette, vmin=vmin, vmax=vmax)
+    colormap.caption = label
+
+    # Posiciona a colorbar no canto inferior esquerdo com CSS fixo
+    html = colormap._repr_html_()
+    template = Template(f"""
+    {{% macro html(this, kwargs) %}}
+    <div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999; 
+                background: rgba(255,255,255,0.85); padding: 8px 10px; 
+                border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.3);">
+        {html}
+    </div>
+    {{% endmacro %}}
+    """)
+    macro = MacroElement()
+    macro._template = template
+    mapa.get_root().add_child(macro)
+
