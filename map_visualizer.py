@@ -16,7 +16,7 @@ def display_state_map(geometry, variavel, vis_params, titulo="Mapa Interativo"):
     st.subheader(titulo)
 
     mapa = geemap.Map(center=[-15.78, -47.93], zoom=5)
-    mapa.add_basemap("SATELLITE")
+    mapa.add_basemap("Esri.WorldImagery")
 
     # Adiciona camada do Earth Engine
     layer = geemap.ee_tile_layer(geometry, vis_params, variavel)
@@ -37,7 +37,7 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
     st.subheader("Mapa de Conferência (Círculo)")
 
     mapa = geemap.Map(center=[latitude, longitude], zoom=7)
-    mapa.add_basemap("SATELLITE")
+    mapa.add_basemap("Esri.WorldImagery")
 
     # Círculo de referência
     circle = folium.Circle(
@@ -68,7 +68,7 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     centroid.reverse()  # (lon, lat) -> (lat, lon)
 
     mapa = geemap.Map(center=centroid, zoom=7)
-    mapa.add_basemap('SATELLITE')
+    mapa.add_basemap("Esri.WorldImagery")
 
     # Camada do EE (sem gerar colorbar automática)
     mapa.addLayer(ee_image, vis_params, 'Dados Climáticos')
@@ -80,7 +80,6 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 
     # Render
     mapa.to_streamlit(height=500)
-
 
 
 # ==================================================================================
@@ -113,6 +112,11 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
 
     # Adiciona ao mapa (canto inferior esquerdo)
     mapa.add_child(colormap)
+
+
+# ==================================================================================
+# FUNÇÃO INTERNA — COLORBAR FIXA (CANTO INFERIOR ESQUERDO)
+# ==================================================================================
 def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     """Adiciona uma colorbar com branca, posicionada no canto inferior esquerdo (compatível em qualquer versão)."""
     from branca.colormap import LinearColormap
@@ -153,4 +157,3 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     macro = MacroElement()
     macro._template = template
     mapa.get_root().add_child(macro)
-
