@@ -21,11 +21,12 @@ from matplotlib import cm
 def display_state_map(geometry, variavel, vis_params, titulo="Mapa Interativo"):
     """Exibe o mapa interativo com fundo de satélite e colorbar discreto."""
     st.subheader(titulo)
+
     mapa = geemap.Map(center=[-15.78, -47.93], zoom=5)
     mapa.add_basemap("SATELLITE")
 
-    # Camada do Earth Engine
-    layer = geemap.ee_tile_layer(geometry, vis_params, variavel)
+    # === Atualização: desenha apenas o contorno, sem cobrir o fundo ===
+    layer = geemap.ee_tile_layer(ee.Image().paint(geometry, 0, 2), vis_params, variavel)
     mapa.add_layer(layer)
 
     # Adiciona colorbar discreta
@@ -72,8 +73,10 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
 
     mapa = geemap.Map(center=centroid, zoom=7)
     mapa.add_basemap("SATELLITE")
+
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
+
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     mapa.to_streamlit(height=500)
 
@@ -89,6 +92,7 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
     vmax = vis_params.get("max", 1)
     if not palette:
         return
+
     if "°" in unidade or "temp" in unidade.lower():
         label = "Temperatura (°C)"
     elif "mm" in unidade.lower():
@@ -97,6 +101,7 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
         label = "Vento (m/s)"
     else:
         label = str(unidade) if unidade else ""
+
     colormap = LinearColormap(colors=palette, vmin=vmin, vmax=vmax)
     colormap.caption = label
     mapa.add_child(colormap)
@@ -111,6 +116,7 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     vmax = vis_params.get("max", 1)
     if not palette:
         return
+
     ul = (unit_label or "").lower()
     if "°" in unit_label or "temp" in ul:
         label = "Temperatura (°C)"
@@ -122,9 +128,11 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
         label = str(unit_label)
     else:
         label = ""
+
     colormap = LinearColormap(colors=palette, vmin=vmin, vmax=vmax)
     colormap.caption = label
     html = colormap._repr_html_()
+
     template = Template(f"""
     {{% macro html(this, kwargs) %}}
     <div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999;
@@ -149,10 +157,12 @@ def _make_compact_colorbar(palette, vmin, vmax, label, ticks=None):
     cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
     norm = cm.colors.Normalize(vmin=vmin, vmax=vmax)
     cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
+
     if ticks is not None:
         cb.set_ticks(ticks)
     cb.set_label(label, fontsize=7)
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
+
     buf = io.BytesIO()
     plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
     plt.close(fig)
@@ -209,10 +219,8 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
             ticks = None
 
         colorbar_img = _make_compact_colorbar(palette, vmin, vmax, label, ticks)
-
         return png_url, jpg_url, colorbar_img
 
     except Exception as e:
         st.error(f"Erro ao gerar mapa estático: {e}")
         return None, None, None
-
