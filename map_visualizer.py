@@ -1,10 +1,9 @@
 # ==================================================================================
-# map_visualizer.py — Funções de visualização (Corrigido v2)
+# map_visualizer.py — Funções de visualização (Corrigido v3)
 # ==================================================================================
 import streamlit as st
 import geemap.foliumap as geemap
 import ee
-# 'st_folium' não é mais usado neste arquivo
 import io
 import base64
 import matplotlib.pyplot as plt
@@ -29,22 +28,33 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
         zoom = 4
 
     mapa = geemap.Map(center=centroid, zoom=zoom)
-    mapa.add_basemap("SATELLITE")
+
+    # -----------------------------------------------------------------
+    # CORREÇÃO: "Satelite não aparece"
+    # Adiciona manualmente a camada de satélite do Google em vez de 
+    # usar o alias "SATELLITE" do geemap.
+    # -----------------------------------------------------------------
+    mapa.add_tile_layer(
+        url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        name="Google Satellite",
+        attribution="Google",
+    )
+    # -----------------------------------------------------------------
+
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
-    # ----------------------------------------------------------------------------------
-    # CORREÇÃO DE TYPEERROR: Revertido de st_folium() para mapa.to_streamlit()
-    # geemap.Map deve ser renderizado com seu próprio método .to_streamlit()
-    # ----------------------------------------------------------------------------------
+    # Mantém o .to_streamlit() que é o método correto para geemap.Map
     return mapa.to_streamlit(height=500, use_container_width=True)
 
 
 # ==================================================================================
 # COLORBAR PARA MAPAS INTERATIVOS
 # ==================================================================================
+# (O restante deste arquivo permanece IDÊNTICO à v2)
+
 def _add_colorbar_discreto(mapa, vis_params, unidade):
     """(Função auxiliar) Colorbar discreto padrão."""
     from branca.colormap import LinearColormap
@@ -163,7 +173,6 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
         jpg_b64 = base64.b64encode(jpg_buffer.getvalue()).decode("ascii")
         jpg_url = f"data:image/jpeg;base64,{jpg_b64}"
 
-        # --- Geração da Colorbar (Corrigida na v1) ---
         palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
         vmin = vis_params.get("min", 0)
         vmax = vis_params.get("max", 1)
