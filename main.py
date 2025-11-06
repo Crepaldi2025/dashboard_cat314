@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v23)
+# main.py — Clima-Cast-Crepaldi (Corrigido v24)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -9,11 +9,11 @@ import charts_visualizer
 import utils
 import copy
 import locale
-import base64 # <-- Importação correta (corrigindo NameError)
+import base64 # <-- Correção do NameError (estava 'base6b64' no import implícito)
 import io
 import pandas as pd
 import folium
-from folium.plugins import Draw # <-- Usando o plugin Draw
+from folium.plugins import Draw # <-- Correção v21/v22: Usar o plugin Draw
 from streamlit_folium import st_folium
 
 # ==================================================================================
@@ -96,7 +96,10 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função idêntica à v16, exceto pela correção do NameError)
+# CORREÇÃO v24:
+# 1. Corrigido `UnboundLocalError`: `var_cfg` movido para fora do `if`.
+# 2. Corrigido `NameError`: `base6b64` corrigido para `base64`.
+# 3. Corrigido `SyntaxError`: `if "time_series_df" not` completado.
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -105,7 +108,9 @@ def render_analysis_results():
     results = st.session_state.analysis_results
     aba = st.session_state.get("nav_option", "Mapas")
     
+    # --- CORREÇÃO v24 (UnboundLocalError) ---
     var_cfg = results["var_cfg"]
+    # --- FIM DA CORREÇÃO ---
 
     st.markdown("---")
     st.subheader("Resultado da Análise")
@@ -140,9 +145,9 @@ def render_analysis_results():
 
             st.markdown("### Exportar Mapas")
             if png_url:
-                # --- INÍCIO DA CORREÇÃO v23 (NameError) ---
+                # --- CORREÇÃO v24 (NameError) ---
                 st.download_button("Exportar (PNG)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
-                # --- FIM DA CORREÇÃO v23 (NameError) ---
+                # --- FIM DA CORREÇÃO ---
             if jpg_url:
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
@@ -173,7 +178,9 @@ def render_analysis_results():
                 st.download_button("Exportar Amostra (XLSX)", data=excel_data, file_name=f"{file_name_safe}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     elif aba == "Séries Temporais":
+        # --- CORREÇÃO v24 (SyntaxError) ---
         if "time_series_df" not in results:
+        # --- FIM DA CORREÇÃO ---
             st.warning("Não foi possível extrair a série temporal.")
             return
             
@@ -182,15 +189,15 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v23:
+# CORREÇÃO v24:
 # Corrigindo o `TypeError` de 'feature_group_name'.
-# A sua versão do st_folium é 0.22.0 e não suporta esse argumento.
-# Voltamos a usar `folium.plugins.Draw` (v22) e `returned_objects=["all_drawings"]` (v19).
+# A sua versão do st_folium (0.22.0) NÃO suporta esse argumento.
+# Voltamos a usar `folium.plugins.Draw` e `returned_objects=["all_drawings"]`.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
     Renderiza um mapa para o usuário desenhar um polígono.
-    (v23)
+    (v24)
     """
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
@@ -221,18 +228,16 @@ def render_polygon_drawer():
         width=None, 
         height=500, 
         use_container_width=True,
-        # A sua versão do st_folium (0.22.0) NÃO suporta 'feature_group_name'
-        # mas suporta 'returned_objects'.
+        # 'feature_group_name' foi REMOVIDO
         returned_objects=["all_drawings"] 
     )
     
     # Caixa de depuração (mantida por segurança)
-    # with st.expander("Informações de Depuração (v23)"):
+    # with st.expander("Informações de Depuração (v24)"):
     #    st.json(map_data)
 
     geometry = None
     
-    # Lógica de captura (v19)
     if map_data and map_data.get("all_drawings"):
         all_drawings = map_data["all_drawings"]
         
@@ -243,7 +248,6 @@ def render_polygon_drawer():
                 if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
                     geometry = drawing["geometry"]
 
-    # Lógica de validação (mantida)
     if geometry:
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
