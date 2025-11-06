@@ -3,6 +3,30 @@ import streamlit as st
 import json
 from collections import defaultdict
 import ee
+import json
+import os
+import streamlit as st
+
+def get_brazilian_geopolitical_data_local():
+    """Carrega os dados locais de estados e municípios do Brasil.
+    Retorna dois dicionários: {UF: [municípios]} e {UF: nome_completo}.
+    """
+    dados_geo = {}
+    mapa_nomes_uf = {}
+    arquivo = "municipios_ibge.json"
+
+    try:
+        if os.path.exists(arquivo):
+            with open(arquivo, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                dados_geo = data.get("municipios_por_uf", {})
+                mapa_nomes_uf = data.get("nomes_estados", {})
+        else:
+            st.warning("Arquivo 'municipios_ibge.json' não encontrado. Sidebar limitada.")
+    except Exception as e:
+        st.error(f"Falha ao carregar dados geográficos: {e}")
+
+    return dados_geo, mapa_nomes_uf
 
 def inicializar_gee():
     """
@@ -247,3 +271,4 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     
 
     return df
+
