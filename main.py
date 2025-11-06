@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v11)
+# main.py — Clima-Cast-Crepaldi (Corrigido v13)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -10,7 +10,15 @@ import utils
 import copy
 import locale
 import base64
-import geemap.foliumap as geemap
+
+# --- INÍCIO DA CORREÇÃO v13 ---
+# Revertendo para a estratégia folium + streamlit-folium APENAS para o desenho
+import folium
+from folium.plugins import Draw
+from streamlit_folium import st_folium
+# geemap SÓ será usado para exibir os resultados (via map_visualizer)
+# --- FIM DA CORREÇÃO v13 ---
+
 
 # ==================================================================================
 # FUNÇÕES DE CACHE (Idênticas, sem alteração)
@@ -136,71 +144,82 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v11:
-# 1. Removido `edit_control=True` para corrigir a barra de ferramentas dupla.
-# 2. Adicionado um `st.expander` de depuração para vermos o que o 
-#    `map_data` realmente contém.
+# CORREÇÃO v13:
+# Revertendo para folium + streamlit-folium, que é a solução correta.
+# Isso resolve:
+# 1. Barras duplas (só o plugin Draw será usado).
+# 2. Mapa satélite (usando folium.TileLayer).
+# 3. Erro de JSON (st_folium retorna um dict estável).
+# 4. Botão desabilitado (o dict será lido corretamente).
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
     Renderiza um mapa para o usuário desenhar um polígono.
-    Usa geemap.Map e seu drawing tools nativo.
+    Usa folium.Map + st_folium para captura estável.
     """
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
-    # --- INÍCIO DA CORREÇÃO v11 ---
-    mapa_desenho = geemap.Map(
-        center=[-15.78, -47.93], 
-        zoom=4,
-        basemap="HYBRID",       # (Mantido da v7)
-        draw_control=True,      # (Mantido da v7)
-        draw_export=False
-        # Removido 'edit_control=True' (que causava a barra dupla)
-    )
-    # --- FIM DA CORREÇÃO v11 ---
+    # 1. Criar um mapa folium.Map
+    mapa_desenho = folium.Map(location=[-15.78, -47.93], zoom_start=4)
+
+    # 2. Adicionar o basemap de satélite (Google)
+    folium.TileLayer(
+        tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        attr="Google",
+        name="Google Satellite",
+        overlay=True,
+        control=True,
+    ).add_to(mapa_desenho)
+
+    # 3. Adicionar as ferramentas de desenho (UMA barra de ferramentas)
+    Draw(
+        export=False,
+        position="topleft",
+        draw_options={
+            "polygon": {"allowIntersection": False, "showArea": True},
+            "rectangle": {"allowIntersection": False, "showArea": True}, # Habilitado
+            "circle": False,
+            "marker": False,
+            "circlemarker": False,
+            "polyline": False,
+        },
+        edit_options={"edit": True, "remove": True}
+    ).add_to(mapa_desenho)
     
-    map_data = mapa_desenho.to_streamlit(
+    # 4. Chamar st_folium com o mapa folium.Map
+    map_data = st_folium(
+        mapa_desenho, 
         width=None, 
         height=500, 
         use_container_width=True,
-        return_last_drawn=True 
+        # Pedimos ao st_folium para retornar o ÚLTIMO desenho
+        returned_objects=["last_active_drawing"]
     )
-
-    # --- INÍCIO DA DEPURAÇÃO v11 ---
-    # Vamos imprimir o que o geemap está retornando.
-    with st.expander("Informações de Depuração (Pode ignorar)"):
-        st.write("Saída do `map_data`:")
-        st.json(map_data)
-    # --- FIM DA DEPURAÇÃO v11 ---
-
+    
+    # --- INÍCIO DA LÓGICA DE CAPTURA (v13) ---
     geometry = None
     
-    try:
-        # Lógica v10 (que pode estar falhando, mas não vai quebrar o app)
-        if map_data and isinstance(map_data, list) and len(map_data) > 0:
-            drawing_list = map_data[-1] 
-            if drawing_list and isinstance(drawing_list, list) and len(drawing_list) > 0:
-                drawing = drawing_list[-1] 
-                if drawing and isinstance(drawing, dict):
-                    if drawing.get("type") == "Feature":
-                        geometry = drawing.get("geometry")
-                    elif drawing.get("type") in ["Polygon", "MultiPolygon"]:
-                        geometry = drawing
-    except Exception as e:
-        st.error(f"Erro de parsing (v11): {e}")
+    if map_data and map_data.get("last_active_drawing"):
+        drawing = map_data["last_active_drawing"]
+        
+        # 'drawing' é um GeoJSON "Feature"
+        if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
+            if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
+                geometry = drawing["geometry"]
 
     # Lógica de validação (mantida da v10)
-    if geometry and geometry.get("type") in ["Polygon", "MultiPolygon"]:
+    if geometry:
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
             st.success("✅ Polígono capturado!")
-            st.rerun() 
+            st.rerun() # FORÇA O RERUN para habilitar o botão
     else:
         if st.session_state.get('drawn_geometry') is not None:
              del st.session_state['drawn_geometry']
              st.warning("Polígono removido.")
-             st.rerun() 
+             st.rerun() # FORÇA O RERUN para desabilitar o botão
+    # --- FIM DA LÓGICA DE CAPTURA (v13) ---
 
 
 # ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
