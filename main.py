@@ -75,8 +75,9 @@ def run_full_analysis():
 
         # Cria mapa estático
         png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
-            ee_image, feature, final_vis_params, variable_config["unit"]
+        ee_image, feature, final_vis_params, variable_config["unit"]
         )
+
 
         st.markdown("### Exportar Mapas")
 
@@ -130,5 +131,6 @@ def main():
 # ==================================================================================
 if __name__ == "__main__":
     main()
+
 
 
