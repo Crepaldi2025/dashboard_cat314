@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v14)
+# main.py — Clima-Cast-Crepaldi (Corrigido v16)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -10,19 +10,14 @@ import utils
 import copy
 import locale
 import base64
-
-# --- INÍCIO DA CORREÇÃO v14 (EXPORTAÇÃO DE MAPA) ---
 import io
-import pandas as pd # Necessário para a exportação do DataFrame
-# --- FIM DA CORREÇÃO v14 ---
-
-# Revertendo para a estratégia folium + streamlit-folium APENAS para o desenho
+import pandas as pd
 import folium
 from folium.plugins import Draw
 from streamlit_folium import st_folium
 
 # ==================================================================================
-# FUNÇÕES DE CACHE (Modificada)
+# FUNÇÕES DE CACHE (Idênticas, sem alteração)
 # ==================================================================================
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
@@ -39,11 +34,6 @@ def get_geo_caching_key(session_state):
 
 @st.cache_data(ttl=3600)
 def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
-    """
-    Função cacheada que busca os dados do GEE.
-    Executa a parte "lenta" da análise.
-    """
-    
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     if not geometry: return None 
     var_cfg = gee_handler.ERA5_VARS.get(variavel)
@@ -55,17 +45,9 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
         ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry)
         if ee_image is None: return None
         results["ee_image"] = ee_image
-        
-        # --- INÍCIO DA CORREÇÃO v14 (Coleta de dados da tabela) ---
-        # Amostra a imagem para gerar a tabela
-        df_map_samples = gee_handler.get_sampled_data_as_dataframe(
-            ee_image, 
-            geometry, # Geometria da área
-            variavel    # Nome da variável
-        )
+        df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
         if df_map_samples is not None and not df_map_samples.empty:
             results["map_dataframe"] = df_map_samples
-        # --- FIM DA CORREÇÃO v14 ---
             
         if st.session_state.get("map_type", "Interativo") == "Estático":
             png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
@@ -80,7 +62,7 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
 
     return results
 
-# ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE (Modificada) ----------------------
+# ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE (Idêntica) ----------------------
 def run_full_analysis():
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
@@ -93,15 +75,11 @@ def run_full_analysis():
     geo_key = get_geo_caching_key(st.session_state)
     
     try:
-        # --- INÍCIO DA CORREÇÃO v14 ---
-        # A amostragem de dados (get_sampled_data_as_dataframe) usa .getInfo()
-        # e pode ser lenta, então o spinner deve englobar a chamada.
         spinner_message = "Processando dados no Google Earth Engine..."
         if aba == "Mapas":
             spinner_message = "Processando imagem e amostrando dados... Isso pode levar um momento."
         
         with st.spinner(spinner_message):
-        # --- FIM DA CORREÇÃO v14 ---
             analysis_data = cached_run_analysis(
                 variavel, start_date, end_date, geo_key, aba
             )
@@ -117,6 +95,10 @@ def run_full_analysis():
         st.session_state.analysis_results = None
 
 
+# ----------------------------------------------------------------------------------
+# CORREÇÃO v16:
+# Ajustado o tamanho da exibição do mapa estático e da colorbar.
+# ----------------------------------------------------------------------------------
 def render_analysis_results():
     """
     Renderiza os resultados que estão salvos em st.session_state.analysis_results.
@@ -127,6 +109,8 @@ def render_analysis_results():
     results = st.session_state.analysis_results
     aba = st.session_state.get("nav_option", "Mapas")
     
+    var_cfg = results["var_cfg"]
+
     st.markdown("---")
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
@@ -139,7 +123,6 @@ def render_analysis_results():
 
         ee_image = results["ee_image"]
         feature = results["feature"]
-        var_cfg = results["var_cfg"]
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
@@ -151,10 +134,17 @@ def render_analysis_results():
                 return
             png_url, jpg_url, colorbar_img = results["static_maps"]
 
+            # --- INÍCIO DA CORREÇÃO v16 ---
+            # Define uma largura máxima para o mapa e a colorbar.
+            # Você pode ajustar esses valores (ex: 600, 400)
+            map_width = 400 
+            colorbar_width = 400 # A colorbar geralmente acompanha a largura do mapa para ser consistente
+
             if png_url:
-                st.image(png_url, caption="Mapa Estático", use_container_width=True)
+                st.image(png_url, caption="Mapa Estático", width=map_width) # Removido use_container_width
             if colorbar_img:
-                st.image(colorbar_img, caption="Legenda", use_container_width=True)
+                st.image(colorbar_img, caption="Legenda", width=colorbar_width) # Removido use_container_width
+            # --- FIM DA CORREÇÃO v16 ---
 
             st.markdown("### Exportar Mapas")
             if png_url:
@@ -162,7 +152,6 @@ def render_analysis_results():
             if jpg_url:
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
-        # --- INÍCIO DA CORREÇÃO v14 (Exibição e Exportação da Tabela) ---
         st.markdown("---")
         st.subheader("Dados Amostrais do Mapa")
 
@@ -172,58 +161,36 @@ def render_analysis_results():
             df_map = results["map_dataframe"]
             st.dataframe(df_map, use_container_width=True)
             
-            # Lógica de exportação (copiada de charts_visualizer)
             variavel = st.session_state.variavel
             variable_name = variavel.split(" (")[0]
-            
             df_export = df_map
             file_name_safe = f"mapa_amostras_{variable_name.lower().replace(' ', '_')}"
 
-            # 1. Preparar CSV
             csv_data = df_export.to_csv(index=False, encoding='utf-8-sig')
-            
-            # 2. Preparar Excel
             excel_buffer = io.BytesIO()
             with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                 df_export.to_excel(writer, index=False, sheet_name='Dados Amostrais')
             excel_data = excel_buffer.getvalue()
 
-            # 3. Botões
             col_btn_1, col_btn_2 = st.columns(2)
             with col_btn_1:
-                st.download_button(
-                    label="Exportar Amostra (CSV)",
-                    data=csv_data,
-                    file_name=f"{file_name_safe}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
+                st.download_button("Exportar Amostra (CSV)", data=csv_data, file_name=f"{file_name_safe}.csv", mime="text/csv", use_container_width=True)
             with col_btn_2:
-                st.download_button(
-                    label="Exportar Amostra (XLSX)",
-                    data=excel_data,
-                    file_name=f"{file_name_safe}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-        # --- FIM DA CORREÇÃO v14 ---
+                st.download_button("Exportar Amostra (XLSX)", data=excel_data, file_name=f"{file_name_safe}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     elif aba == "Séries Temporais":
         if "time_series_df" not in results:
             st.warning("Não foi possível extrair a série temporal.")
             return
+            
         df = results["time_series_df"]
         charts_visualizer.display_time_series_chart(df, st.session_state.variavel, var_cfg["unit"])
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v13 (Lógica de Desenho - mantida)
+# LÓGICA DE DESENHO (Idêntica, mantida da v13)
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
-    """
-    Renderiza um mapa para o usuário desenhar um polígono.
-    Usa folium.Map + st_folium para captura estável.
-    """
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
