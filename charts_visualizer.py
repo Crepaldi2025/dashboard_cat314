@@ -1,99 +1,69 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi
+# charts_visualizer.py — Gráficos de séries temporais (Clima-Cast-Crepaldi)
 # ==================================================================================
 import streamlit as st
-import pandas as pd
 import plotly.express as px
+import pandas as pd
 
-
-def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
+# ==================================================================================
+# FUNÇÃO PRINCIPAL
+# ==================================================================================
+def exibir_grafico_series_temporais(df: pd.DataFrame):
     """
-    Cria a figura do gráfico de linha interativo de série temporal usando Plotly.
-    (Função interna, indicada pelo underscore no início do nome)
+    Exibe a série temporal da variável meteorológica selecionada.
+    O DataFrame deve conter colunas 'date' e 'value'.
     """
-    variable_name = variable.split(" (")[0]
+    if df is None or df.empty:
+        st.info("Nenhum dado de série temporal disponível.")
+        return
 
+    # === Configuração básica ===
+    df = df.sort_values("date")
+    media = df["value"].mean()
+    minimo = df["value"].min()
+    maximo = df["value"].max()
+
+    st.markdown("### 📈 Série Temporal (ERA5-Land)")
+    st.caption("Média diária dos valores sobre a área de interesse selecionada.")
+
+    # === Gráfico interativo ===
     fig = px.line(
         df,
-        x='date',
-        y='value',
-        title=f"Série Temporal de {variable_name}",
-        labels={
-            "date": "Data",
-            "value": f"{variable_name} ({unit})"
-        },
-        template="plotly_white"
+        x="date",
+        y="value",
+        markers=True,
+        line_shape="spline",
+        title="Variação temporal da variável selecionada",
+        labels={"date": "Data", "value": "Valor médio diário"},
     )
 
+    fig.update_traces(line=dict(width=2.2), marker=dict(size=4))
     fig.update_layout(
-        xaxis=dict(
-            rangeselector=dict(
-                buttons=list([
-                    dict(count=1, label="1m", step="month", stepmode="backward"),
-                    dict(count=6, label="6m", step="month", stepmode="backward"),
-                    dict(count=1, label="1a", step="year", stepmode="backward"),
-                    dict(step="all", label="Tudo")
-                ])
-            ),
-            rangeslider=dict(visible=True),
-            type="date"
-        ),
-        margin=dict(l=10, r=10, t=45, b=10),
-        height=420
+        template="plotly_white",
+        title_x=0.5,
+        hovermode="x unified",
+        margin=dict(l=20, r=20, t=50, b=20),
+        height=450,
+        showlegend=False,
     )
 
-    return fig
+    # === Linha horizontal de média ===
+    fig.add_hline(
+        y=media,
+        line_dash="dot",
+        line_color="red",
+        annotation_text=f"Média: {media:.2f}",
+        annotation_position="bottom right",
+    )
 
-
-def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
-    """
-    Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
-    """
-    # ======================================================
-    # Pré-processamento seguro do DataFrame
-    # ======================================================
-    if df is None or df.empty:
-        st.warning("Não há dados disponíveis para gerar o gráfico para o período selecionado.")
-        return
-
-    # Corrige possíveis problemas de colunas ou formatos
-    df = df.copy()
-
-    # Renomeia colunas inesperadas (caso venham de GEE como 'system:time_start')
-    if 'date' not in df.columns:
-        if 'system:time_start' in df.columns:
-            df.rename(columns={'system:time_start': 'date'}, inplace=True)
-        else:
-            st.warning("Coluna de datas não encontrada nos dados retornados.")
-            return
-
-    # Conversão de tipos
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    df['value'] = pd.to_numeric(df['value'], errors='coerce')
-
-    # Remove registros inválidos
-    df = df.dropna(subset=['date', 'value'])
-    if df.empty:
-        st.warning("Nenhum dado válido para exibir a série temporal.")
-        return
-
-    # Ordena cronologicamente
-    df = df.sort_values('date')
-
-    # ======================================================
-    # Geração e exibição do gráfico
-    # ======================================================
-    fig = _create_chart_figure(df, variable, unit)
     st.plotly_chart(fig, use_container_width=True)
 
-    # ======================================================
-    # Caixa de instruções
-    # ======================================================
-    st.info(
-        """
-        **Dica:** Utilize os controles interativos do gráfico:
-        - **Botões de Período (1m, 6m, 1a, Tudo):** Aplique zoom rápido em períodos pré-definidos.  
-        - **Controle Deslizante Inferior:** Ajuste manualmente o intervalo de datas.  
-        - **Passe o Mouse:** Veja a data e o valor exatos para cada ponto da série.
-        """
-    )
+    # === Estatísticas adicionais ===
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🌡️ Média", f"{media:.2f}")
+    col2.metric("📉 Mínimo", f"{minimo:.2f}")
+    col3.metric("📈 Máximo", f"{maximo:.2f}")
+
+# ==================================================================================
+# === FIM ===
+# ==================================================================================
