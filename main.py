@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v19)
+# main.py — Clima-Cast-Crepaldi (Corrigido v20 - COM DEPURAÇÃO)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -180,10 +180,9 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v19:
-# Mudando de `returned_objects=["last_active_drawing"]` 
-# para `returned_objects=["all_drawings"]`.
-# Esta é uma forma mais robusta de capturar os desenhos.
+# CORREÇÃO v20:
+# Adicionando a caixa de DEPURAÇÃO.
+# Mantendo a lógica de captura do v19 (all_drawings)
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -215,30 +214,29 @@ def render_polygon_drawer():
         edit_options={"edit": True, "remove": True}
     ).add_to(mapa_desenho)
     
-    # --- INÍCIO DA CORREÇÃO v19 ---
     map_data = st_folium(
         mapa_desenho, 
         width=None, 
         height=500, 
         use_container_width=True,
-        returned_objects=["all_drawings"] # <-- MUDANÇA AQUI
+        returned_objects=["all_drawings"]
     )
     
+    # --- INÍCIO DA DEPURAÇÃO v20 ---
+    with st.expander("Informações de Depuração (Por favor, envie um print disto)"):
+        st.json(map_data)
+    # --- FIM DA DEPURAÇÃO v20 ---
+
     geometry = None
     
-    # Lógica de captura agora usa 'all_drawings'
+    # Lógica de captura (v19)
     if map_data and map_data.get("all_drawings"):
         all_drawings = map_data["all_drawings"]
-        
-        # Se o usuário desenhou algo
         if all_drawings and len(all_drawings) > 0:
-            # Pega o último desenho da lista
             drawing = all_drawings[-1] 
-            
             if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
                 if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
                     geometry = drawing["geometry"]
-    # --- FIM DA CORREÇÃO v19 ---
 
     # Lógica de validação (mantida)
     if geometry:
