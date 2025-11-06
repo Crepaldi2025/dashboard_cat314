@@ -13,7 +13,7 @@ import base64 # <-- Correção do NameError (estava 'base6b64' no import implíc
 import io
 import pandas as pd
 import folium
-from folium.plugins import Draw # <-- Correção v21/v22: Usar o plugin Draw
+from folium.plugins import Draw
 from streamlit_folium import st_folium
 
 # ==================================================================================
@@ -96,10 +96,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v24:
-# 1. Corrigido `UnboundLocalError`: `var_cfg` movido para fora do `if`.
-# 2. Corrigido `NameError`: `base6b64` corrigido para `base64`.
-# 3. Corrigido `SyntaxError`: `if "time_series_df" not` completado.
+# (Função idêntica à v16, exceto pela correção do NameError)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -108,9 +105,7 @@ def render_analysis_results():
     results = st.session_state.analysis_results
     aba = st.session_state.get("nav_option", "Mapas")
     
-    # --- CORREÇÃO v24 (UnboundLocalError) ---
     var_cfg = results["var_cfg"]
-    # --- FIM DA CORREÇÃO ---
 
     st.markdown("---")
     st.subheader("Resultado da Análise")
@@ -145,9 +140,9 @@ def render_analysis_results():
 
             st.markdown("### Exportar Mapas")
             if png_url:
-                # --- CORREÇÃO v24 (NameError) ---
+                # --- INÍCIO DA CORREÇÃO v24 (NameError) ---
                 st.download_button("Exportar (PNG)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
-                # --- FIM DA CORREÇÃO ---
+                # --- FIM DA CORREÇÃO v24 (NameError) ---
             if jpg_url:
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
@@ -178,9 +173,7 @@ def render_analysis_results():
                 st.download_button("Exportar Amostra (XLSX)", data=excel_data, file_name=f"{file_name_safe}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     elif aba == "Séries Temporais":
-        # --- CORREÇÃO v24 (SyntaxError) ---
         if "time_series_df" not in results:
-        # --- FIM DA CORREÇÃO ---
             st.warning("Não foi possível extrair a série temporal.")
             return
             
@@ -190,15 +183,9 @@ def render_analysis_results():
 
 # ----------------------------------------------------------------------------------
 # CORREÇÃO v24:
-# Corrigindo o `TypeError` de 'feature_group_name'.
-# A sua versão do st_folium (0.22.0) NÃO suporta esse argumento.
-# Voltamos a usar `folium.plugins.Draw` e `returned_objects=["all_drawings"]`.
+# Corrigida a lógica de captura para lidar com o recarregamento do mapa.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
-    """
-    Renderiza um mapa para o usuário desenhar um polígono.
-    (v24)
-    """
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
@@ -215,10 +202,7 @@ def render_polygon_drawer():
         draw_options={
             "polygon": {"allowIntersection": False, "showArea": True},
             "rectangle": {"allowIntersection": False, "showArea": True},
-            "circle": False,
-            "marker": False,
-            "circlemarker": False,
-            "polyline": False,
+            "circle": False, "marker": False, "circlemarker": False, "polyline": False,
         },
         edit_options={"edit": True, "remove": True}
     ).add_to(mapa_desenho)
@@ -228,36 +212,42 @@ def render_polygon_drawer():
         width=None, 
         height=500, 
         use_container_width=True,
-        # 'feature_group_name' foi REMOVIDO
         returned_objects=["all_drawings"] 
     )
     
-    # Caixa de depuração (mantida por segurança)
-    # with st.expander("Informações de Depuração (v24)"):
-    #    st.json(map_data)
-
     geometry = None
     
-    if map_data and map_data.get("all_drawings"):
-        all_drawings = map_data["all_drawings"]
-        
+    # --- INÍCIO DA CORREÇÃO v24 (Lógica de Captura) ---
+    if map_data:
+        all_drawings = map_data.get("all_drawings")
+
+        # Caso 1: Usuário desenhou algo (a lista não está vazia)
         if all_drawings and len(all_drawings) > 0:
             drawing = all_drawings[-1] 
-            
             if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
                 if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
                     geometry = drawing["geometry"]
 
+        # Caso 2: Usuário apagou o desenho (a lista está vazia: [])
+        elif all_drawings == []: 
+            if 'drawn_geometry' in st.session_state:
+                 del st.session_state['drawn_geometry']
+                 st.warning("Polígono removido.")
+                 st.rerun()
+        
+        # Caso 3: Mapa recarregou (all_drawings é NULL/None)
+        # Neste caso, não fazemos NADA. O 'geometry' continua None
+        # e a lógica de validação abaixo não vai apagar o estado.
+
+    # Lógica de validação
     if geometry:
+        # Se uma nova geometria foi capturada, a salvamos
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
             st.success("✅ Polígono capturado!")
             st.rerun() 
-    else:
-        if st.session_state.get('drawn_geometry') is not None:
-             del st.session_state['drawn_geometry']
-             st.warning("Polígono removido.")
-             st.rerun() 
+    # A lógica 'else' que apagava o estado foi removida.
+    # --- FIM DA CORREÇÃO v24 ---
 
 
 # ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
