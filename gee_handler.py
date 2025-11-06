@@ -234,6 +234,9 @@ def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
 
 @st.cache_data
 def get_time_series_data(variable, start_date, end_date, _geometry):
+    st.write("📍 Tipo da geometria:", type(_geometry), _geometry.getInfo().get('type', 'desconhecido'))
+
+    
     """Extrai a série temporal de uma variável do ERA5-Land para a geometria informada."""
     if variable not in ERA5_VARS:
         return pd.DataFrame()
@@ -247,6 +250,8 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
         .select(bands_to_select)
     )
     collection = collection.map(lambda img: img.clip(_geometry))
+    st.write("✅ Aplicado clip à geometria:", _geometry.getInfo().get('type', 'N/A'))
+
 
     if collection.size().getInfo() == 0:
         st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
@@ -327,6 +332,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     
 
     return df
+
 
 
 
