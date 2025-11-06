@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v10)
+# main.py — Clima-Cast-Crepaldi (Corrigido v11)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -136,10 +136,10 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v10:
-# O "detalhe despercebido". O `geemap` pode retornar o objeto de
-# geometria DIRETAMENTE, em vez de um "Feature" que o contém.
-# Esta lógica agora verifica as duas possibilidades.
+# CORREÇÃO v11:
+# 1. Removido `edit_control=True` para corrigir a barra de ferramentas dupla.
+# 2. Adicionado um `st.expander` de depuração para vermos o que o 
+#    `map_data` realmente contém.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -149,14 +149,16 @@ def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
+    # --- INÍCIO DA CORREÇÃO v11 ---
     mapa_desenho = geemap.Map(
         center=[-15.78, -47.93], 
         zoom=4,
         basemap="HYBRID",       # (Mantido da v7)
         draw_control=True,      # (Mantido da v7)
-        draw_export=False,      
-        edit_control=True       
+        draw_export=False
+        # Removido 'edit_control=True' (que causava a barra dupla)
     )
+    # --- FIM DA CORREÇÃO v11 ---
     
     map_data = mapa_desenho.to_streamlit(
         width=None, 
@@ -165,43 +167,40 @@ def render_polygon_drawer():
         return_last_drawn=True 
     )
 
-    # --- INÍCIO DA CORREÇÃO v10 ---
-    drawing = None
+    # --- INÍCIO DA DEPURAÇÃO v11 ---
+    # Vamos imprimir o que o geemap está retornando.
+    with st.expander("Informações de Depuração (Pode ignorar)"):
+        st.write("Saída do `map_data`:")
+        st.json(map_data)
+    # --- FIM DA DEPURAÇÃO v11 ---
+
     geometry = None
+    
+    try:
+        # Lógica v10 (que pode estar falhando, mas não vai quebrar o app)
+        if map_data and isinstance(map_data, list) and len(map_data) > 0:
+            drawing_list = map_data[-1] 
+            if drawing_list and isinstance(drawing_list, list) and len(drawing_list) > 0:
+                drawing = drawing_list[-1] 
+                if drawing and isinstance(drawing, dict):
+                    if drawing.get("type") == "Feature":
+                        geometry = drawing.get("geometry")
+                    elif drawing.get("type") in ["Polygon", "MultiPolygon"]:
+                        geometry = drawing
+    except Exception as e:
+        st.error(f"Erro de parsing (v11): {e}")
 
-    if map_data and isinstance(map_data, list) and len(map_data) > 0:
-        # Acessa a lista interna (com base no erro v8)
-        drawing_list = map_data[-1] 
-        
-        if drawing_list and isinstance(drawing_list, list) and len(drawing_list) > 0:
-            # Acessa o dicionário (com base na falha v9)
-            drawing = drawing_list[-1]
-
-    # Agora 'drawing' é o dicionário GeoJSON
-    if drawing and isinstance(drawing, dict):
-        
-        # Hipótese 1: 'drawing' É a geometria (ex: {"type": "Polygon", ...})
-        if drawing.get("type") in ["Polygon", "MultiPolygon"]:
-            geometry = drawing
-        
-        # Hipótese 2: 'drawing' é um "Feature" que TEM a geometria (ex: {"type": "Feature", "geometry": {...}})
-        elif drawing.get("geometry") and drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
-            geometry = drawing["geometry"]
-
-    # Se encontramos uma geometria válida:
-    if geometry:
+    # Lógica de validação (mantida da v10)
+    if geometry and geometry.get("type") in ["Polygon", "MultiPolygon"]:
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
             st.success("✅ Polígono capturado!")
-            st.rerun() # FORÇA O RERUN para habilitar o botão
+            st.rerun() 
     else:
-        # Se não há geometria (ou o usuário deletou/desenhou um ponto),
-        # garante que o estado seja limpo.
         if st.session_state.get('drawn_geometry') is not None:
              del st.session_state['drawn_geometry']
              st.warning("Polígono removido.")
-             st.rerun() # FORÇA O RERUN para desabilitar o botão
-    # --- FIM DA CORREÇÃO v10 ---
+             st.rerun() 
 
 
 # ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
