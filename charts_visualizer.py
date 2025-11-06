@@ -59,7 +59,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     st.markdown("""
     <style>
     div[data-testid="stMetricValue"] {
-        font-size: 1.8rem; /* <-- Ajuste este valor se ainda estiver grande */
+        font-size: 1.2rem; /* <-- Ajuste este valor se ainda estiver grande */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -167,3 +167,4 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
