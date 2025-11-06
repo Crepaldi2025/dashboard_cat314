@@ -246,6 +246,7 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
         .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
         .select(bands_to_select)
     )
+    collection = collection.map(lambda img: img.clip(_geometry))
 
     if collection.size().getInfo() == 0:
         st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
@@ -326,6 +327,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     
 
     return df
+
 
 
 
