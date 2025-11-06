@@ -80,14 +80,17 @@ def create_interactive_map(ee_image, feature, vis_params, unidade):
 # FUNÇÃO INTERNA — COLORBAR DISCRETO
 # ==================================================================================
 def _add_colorbar_discreto(mapa, vis_params, unidade):
-    """Adiciona colorbar discreto e contrastante no canto inferior esquerdo."""
-    import geemap.foliumap as geemap
+    """Adiciona colorbar discreto e compatível em qualquer ambiente."""
+    from branca.colormap import LinearColormap
 
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
 
-    # Define rótulo
+    if not palette:
+        return  # sem paleta, não faz nada
+
+    # Rótulo da legenda
     if "°" in unidade or "temp" in unidade.lower():
         label = "Temperatura (°C)"
     elif "mm" in unidade.lower():
@@ -97,13 +100,9 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
     else:
         label = str(unidade) if unidade else ""
 
-    # Adiciona colorbar usando a função geemap.add_colorbar (evita TypeError)
-    if palette:
-        geemap.add_colorbar(
-            map=mapa,
-            colors=palette,
-            vmin=vmin,
-            vmax=vmax,
-            caption=label,
-            position="bottomleft"
-        )
+    # Cria colormap discreto com contraste e legenda
+    colormap = LinearColormap(colors=palette, vmin=vmin, vmax=vmax)
+    colormap.caption = label
+
+    # Adiciona ao mapa (canto inferior esquerdo)
+    mapa.add_child(colormap)
