@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v8)
+# main.py — Clima-Cast-Crepaldi (Corrigido v9)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -136,9 +136,10 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v8:
-# Adicionando `st.rerun()` após a captura do polígono para forçar
-# o `ui.py` a redesenhar a sidebar com o botão "Gerar Análise" habilitado.
+# CORREÇÃO v9:
+# O traceback anterior (v8) mostrou que `drawing` era uma lista.
+# Isso significa que `map_data` é uma lista de listas (ex: [ [ {...} ] ])
+# Esta correção acessa o item dentro da lista aninhada.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -164,28 +165,39 @@ def render_polygon_drawer():
         return_last_drawn=True 
     )
 
-    # Lógica de captura (v5)
+    # --- INÍCIO DA CORREÇÃO v9 ---
     if map_data and isinstance(map_data, list) and len(map_data) > 0:
-        drawing = map_data[-1] 
+        # O traceback v8 provou que map_data[-1] é uma lista, então...
+        drawing_list = map_data[-1] 
         
-        if drawing and drawing.get("geometry") and drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
+        # ...verificamos se *essa* lista contém algo
+        if drawing_list and isinstance(drawing_list, list) and len(drawing_list) > 0:
             
-            # --- INÍCIO DA CORREÇÃO v8 ---
-            # Verifica se este é um *novo* desenho (para evitar reruns infinitos)
-            if st.session_state.get('drawn_geometry') != drawing["geometry"]:
-                st.session_state.drawn_geometry = drawing["geometry"]
-                st.success("✅ Polígono capturado!")
-                st.rerun() # FORÇA O RERUN para habilitar o botão
-            # --- FIM DA CORREÇÃO v8 ---
-
-        else:
-            # Se o usuário desenhou algo que não é um polígono (ex: ponto)
-            if 'drawn_geometry' in st.session_state:
-                del st.session_state['drawn_geometry']
-                st.warning("Polígono removido. Por favor, desenhe um novo.")
-                st.rerun() # FORÇA O RERUN para desabilitar o botão
+            # Pegamos o último item dela (que *deve* ser o dict)
+            drawing = drawing_list[-1] 
+            
+            # Agora 'drawing' é (esperamos) o dicionário
+            if drawing and isinstance(drawing, dict) and drawing.get("geometry") and drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
+                
+                if st.session_state.get('drawn_geometry') != drawing["geometry"]:
+                    st.session_state.drawn_geometry = drawing["geometry"]
+                    st.success("✅ Polígono capturado!")
+                    st.rerun() # FORÇA O RERUN para habilitar o botão
             else:
-                 st.warning("Por favor, desenhe um POLÍGONO para a análise.")
+                # O usuário desenhou algo inválido (ponto, linha)
+                if 'drawn_geometry' in st.session_state:
+                    del st.session_state['drawn_geometry']
+                    st.warning("Polígono removido. Por favor, desenhe um novo.")
+                    st.rerun()
+                else:
+                    st.warning("Por favor, desenhe um POLÍGONO para a análise.")
+        
+        elif st.session_state.get('drawn_geometry'):
+             # O usuário pode ter deletado o polígono
+             del st.session_state['drawn_geometry']
+             st.warning("Polígono removido.")
+             st.rerun()
+    # --- FIM DA CORREÇÃO v9 ---
 
 
 # ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
