@@ -39,7 +39,6 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
     mapa = geemap.Map(center=[latitude, longitude], zoom=7)
     mapa.add_basemap("Esri.WorldImagery")
 
-    # Círculo de referência
     circle = folium.Circle(
         location=[latitude, longitude],
         radius=radius_km * 1000,
@@ -48,7 +47,6 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
     )
     mapa.add_child(circle)
 
-    # Adiciona camada e colorbar
     layer = geemap.ee_tile_layer(ee.Image().paint(circle), vis_params, variavel)
     mapa.add_layer(layer)
 
@@ -60,15 +58,13 @@ def display_circle_map(latitude, longitude, radius_km, variavel, vis_params):
 # MAPA INTERATIVO — COMPATÍVEL COM main.py
 # ==================================================================================
 def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
-    """Exibe o mapa interativo com fundo de satélite e colorbar discreta."""
-    # O título já vem do main.py
-
-    # Centraliza no AOI
+    """Exibe o mapa interativo com colorbar discreta no canto inferior esquerdo."""
     centroid = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
     centroid.reverse()  # (lon, lat) -> (lat, lon)
 
-    # Cria mapa com fundo satélite ESRI
     mapa = geemap.Map(center=centroid, zoom=7)
+
+    # Adiciona fundo satélite manualmente (garantido)
     basemap = folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         attr="Esri &mdash; Source: Esri, Maxar, Earthstar Geographics",
@@ -78,24 +74,82 @@ def create_interactive_map(ee_image, feature, vis_params, unit_label=""):
     )
     basemap.add_to(mapa)
 
-    # Adiciona camada do EE (sem gerar colorbar automática)
+    # Camadas do EE
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
-    # Contorno do AOI (mantém o traço preto)
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
 
-    # Colorbar discreta (canto inferior esquerdo)
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
-    # Render
     mapa.to_streamlit(height=500)
 
+
+# ==================================================================================
+# MAPA ESTÁTICO — COMPATÍVEL COM main.py
+# ==================================================================================
+def create_static_map(ee_image, feature, vis_params, unit_label=""):
+    """Gera uma imagem estática (PNG e JPG) a partir dos dados do Earth Engine."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import io
+    import base64
+    from PIL import Image
+    import requests
+
+    # Gera thumbnail da imagem EE
+    url = ee_image.getThumbURL({
+        'region': feature.geometry(),
+        'min': vis_params.get('min', 0),
+        'max': vis_params.get('max', 1),
+        'palette': vis_params.get('palette', ['blue', 'green', 'red']),
+        'dimensions': 600
+    })
+
+    try:
+        response = requests.get(url)
+        image = Image.open(io.BytesIO(response.content))
+    except Exception:
+        st.error("Falha ao gerar mapa estático.")
+        return None, None, None
+
+    # Converte para PNG e JPG (em memória)
+    png_buffer = io.BytesIO()
+    jpg_buffer = io.BytesIO()
+    image.save(png_buffer, format="PNG")
+    image.save(jpg_buffer, format="JPEG")
+
+    # Codifica em base64
+    png_base64 = base64.b64encode(png_buffer.getvalue()).decode("utf-8")
+    jpg_base64 = base64.b64encode(jpg_buffer.getvalue()).decode("utf-8")
+
+    # Exibe no Streamlit
+    st.image(image, caption=f"Mapa Estático — {unit_label}", use_column_width=True)
+
+    # Cria colorbar
+    fig, ax = plt.subplots(figsize=(5, 0.4))
+    cmap = plt.cm.get_cmap('RdYlBu_r')
+    if 'mm' in unit_label.lower():
+        cmap = plt.cm.get_cmap('turbo')
+    elif '°' in unit_label or 'temp' in unit_label.lower():
+        cmap = plt.cm.get_cmap('RdYlBu_r')
+    elif 'm/s' in unit_label.lower():
+        cmap = plt.cm.get_cmap('viridis')
+
+    cb = plt.colorbar(plt.cm.ScalarMappable(cmap=cmap), cax=ax, orientation='horizontal')
+    cb.set_label(unit_label)
+    plt.tight_layout()
+
+    colorbar_buf = io.BytesIO()
+    plt.savefig(colorbar_buf, format='png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+
+    # Retorna objetos compatíveis
+    return png_base64, jpg_base64, colorbar_buf
 
 
 # ==================================================================================
 # FUNÇÃO INTERNA — COLORBAR DISCRETO
 # ==================================================================================
 def _add_colorbar_discreto(mapa, vis_params, unidade):
-    """Adiciona colorbar discreto e compatível em qualquer ambiente."""
     from branca.colormap import LinearColormap
 
     palette = vis_params.get("palette", None)
@@ -103,9 +157,8 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
     vmax = vis_params.get("max", 1)
 
     if not palette:
-        return  # sem paleta, não faz nada
+        return
 
-    # Rótulo da legenda
     if "°" in unidade or "temp" in unidade.lower():
         label = "Temperatura (°C)"
     elif "mm" in unidade.lower():
@@ -115,19 +168,15 @@ def _add_colorbar_discreto(mapa, vis_params, unidade):
     else:
         label = str(unidade) if unidade else ""
 
-    # Cria colormap discreto com contraste e legenda
     colormap = LinearColormap(colors=palette, vmin=vmin, vmax=vmax)
     colormap.caption = label
-
-    # Adiciona ao mapa (canto inferior esquerdo)
     mapa.add_child(colormap)
 
 
 # ==================================================================================
-# FUNÇÃO INTERNA — COLORBAR FIXA (CANTO INFERIOR ESQUERDO)
+# FUNÇÃO INTERNA — COLORBAR FIXA
 # ==================================================================================
 def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
-    """Adiciona uma colorbar com branca, posicionada no canto inferior esquerdo (compatível em qualquer versão)."""
     from branca.colormap import LinearColormap
     from branca.element import Template, MacroElement
 
@@ -137,7 +186,6 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     if not palette:
         return
 
-    # Rótulo da legenda
     label = ""
     ul = (unit_label or "").lower()
     if "°" in unit_label or "temp" in ul:
@@ -152,12 +200,11 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     colormap = LinearColormap(colors=palette, vmin=vmin, vmax=vmax)
     colormap.caption = label
 
-    # Posiciona a colorbar no canto inferior esquerdo com CSS fixo
     html = colormap._repr_html_()
     template = Template(f"""
     {{% macro html(this, kwargs) %}}
-    <div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999; 
-                background: rgba(255,255,255,0.85); padding: 8px 10px; 
+    <div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999;
+                background: rgba(255,255,255,0.85); padding: 8px 10px;
                 border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.3);">
         {html}
     </div>
@@ -166,70 +213,3 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     macro = MacroElement()
     macro._template = template
     mapa.get_root().add_child(macro)
-
-# ==================================================================================
-# MAPA ESTÁTICO — COMPATÍVEL COM main.py
-# ==================================================================================
-def create_static_map(ee_image, feature, vis_params, unit_label=""):
-    """Gera uma imagem estática (PNG e JPG) a partir dos dados do Earth Engine."""
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import io
-    import base64
-    from PIL import Image
-
-    # Obtém o thumbnail da imagem EE
-    url = ee_image.getThumbURL({
-        'region': feature.geometry(),
-        'min': vis_params.get('min', 0),
-        'max': vis_params.get('max', 1),
-        'palette': vis_params.get('palette', ['blue', 'green', 'red']),
-        'dimensions': 600
-    })
-
-    # Lê a imagem a partir da URL (modo simples, sem dependências extras)
-    try:
-        import requests
-        response = requests.get(url)
-        image = Image.open(io.BytesIO(response.content))
-    except Exception:
-        st.error("Falha ao gerar mapa estático.")
-        return None, None, None
-
-    # Cria buffer PNG e JPG
-    png_buffer = io.BytesIO()
-    jpg_buffer = io.BytesIO()
-    image.save(png_buffer, format="PNG")
-    image.save(jpg_buffer, format="JPEG")
-
-    # Codifica em base64 para exibição direta
-    png_base64 = base64.b64encode(png_buffer.getvalue()).decode("utf-8")
-    jpg_base64 = base64.b64encode(jpg_buffer.getvalue()).decode("utf-8")
-
-    # Exibe o mapa no Streamlit
-    st.image(image, caption=f"Mapa Estático — {unit_label}", use_column_width=True)
-
-    # Gera mini colorbar simples
-    fig, ax = plt.subplots(figsize=(5, 0.4))
-    cmap = plt.cm.get_cmap('RdYlBu_r')  # neutro se não houver paleta
-    if 'mm' in unit_label.lower():
-        cmap = plt.cm.get_cmap('turbo')
-    elif '°' in unit_label or 'temp' in unit_label.lower():
-        cmap = plt.cm.get_cmap('RdYlBu_r')
-    elif 'm/s' in unit_label.lower():
-        cmap = plt.cm.get_cmap('viridis')
-    cb = plt.colorbar(
-        plt.cm.ScalarMappable(cmap=cmap),
-        cax=ax,
-        orientation='horizontal'
-    )
-    cb.set_label(unit_label)
-    plt.tight_layout()
-
-    colorbar_buf = io.BytesIO()
-    plt.savefig(colorbar_buf, format='png', bbox_inches='tight', dpi=150)
-    plt.close(fig)
-
-    # Retorna URLs simuladas (para manter compatibilidade com main.py)
-    return png_base64, jpg_base64, colorbar_buf
-
