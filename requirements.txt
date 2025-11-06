@@ -13,3 +13,5 @@ setuptools==75.1.0
 geobr==0.2.2
 openpyxl
 pyproj
+python-docx
+
