@@ -112,7 +112,9 @@ def main():
     st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide")
 
     # Interface
-    ui.renderizar_sidebar()
+    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
+    ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
+
 
     # Execução principal
     if st.session_state.get("analisar", False):
@@ -124,3 +126,4 @@ def main():
 # ==================================================================================
 if __name__ == "__main__":
     main()
+
