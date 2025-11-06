@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v24)
+# main.py — Clima-Cast-Crepaldi (Corrigido v25)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -9,11 +9,11 @@ import charts_visualizer
 import utils
 import copy
 import locale
-import base64 # <-- Correção do NameError (estava 'base6b64' no import implícito)
+import base64 
 import io
 import pandas as pd
 import folium
-from folium.plugins import Draw
+from folium.plugins import Draw 
 from streamlit_folium import st_folium
 
 # ==================================================================================
@@ -96,7 +96,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função idêntica à v16, exceto pela correção do NameError)
+# (Função idêntica à v24)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -140,9 +140,7 @@ def render_analysis_results():
 
             st.markdown("### Exportar Mapas")
             if png_url:
-                # --- INÍCIO DA CORREÇÃO v24 (NameError) ---
                 st.download_button("Exportar (PNG)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
-                # --- FIM DA CORREÇÃO v24 (NameError) ---
             if jpg_url:
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
@@ -182,8 +180,9 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v24:
-# Corrigida a lógica de captura para lidar com o recarregamento do mapa.
+# CORREÇÃO v25:
+# A lógica de captura do polígono foi alterada para
+# não apagar o estado (`drawn_geometry`) quando o mapa recarrega.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
@@ -217,40 +216,43 @@ def render_polygon_drawer():
     
     geometry = None
     
-    # --- INÍCIO DA CORREÇÃO v24 (Lógica de Captura) ---
-    if map_data:
-        all_drawings = map_data.get("all_drawings")
-
-        # Caso 1: Usuário desenhou algo (a lista não está vazia)
+    # --- INÍCIO DA CORREÇÃO v25 ---
+    
+    # Verificamos a saída do mapa.
+    if map_data and map_data.get("all_drawings") is not None:
+        all_drawings = map_data["all_drawings"]
+        
+        # CASO 1: O usuário desenhou algo (a lista não está vazia)
         if all_drawings and len(all_drawings) > 0:
             drawing = all_drawings[-1] 
             if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
                 if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
                     geometry = drawing["geometry"]
 
-        # Caso 2: Usuário apagou o desenho (a lista está vazia: [])
+        # CASO 2: O usuário apagou o desenho (a lista está vazia: [])
         elif all_drawings == []: 
             if 'drawn_geometry' in st.session_state:
                  del st.session_state['drawn_geometry']
                  st.warning("Polígono removido.")
                  st.rerun()
         
-        # Caso 3: Mapa recarregou (all_drawings é NULL/None)
-        # Neste caso, não fazemos NADA. O 'geometry' continua None
-        # e a lógica de validação abaixo não vai apagar o estado.
+        # CASO 3: O mapa apenas recarregou (all_drawings é None/NULL)
+        # Neste caso, não fazemos nada, 'geometry' continua None.
 
-    # Lógica de validação
+    # Lógica de validação (executada fora do bloco 'if map_data...')
     if geometry:
-        # Se uma nova geometria foi capturada, a salvamos
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
             st.success("✅ Polígono capturado!")
             st.rerun() 
+    
     # A lógica 'else' que apagava o estado foi removida.
-    # --- FIM DA CORREÇÃO v24 ---
+    # O estado só é apagado se o usuário *explicitamente* apagar (CASO 2).
+    
+    # --- FIM DA CORREÇÃO v25 ---
 
 
-# ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
+# ---------------------- FUNÇÃO MAIN (Modificada) ----------------------
 def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
@@ -265,8 +267,14 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
+    # --- INÍCIO DA CORREÇÃO v25 ---
+    # SÓ renderize o mapa de desenho se a análise NÃO estiver
+    # prestes a ser executada. Isso impede que o mapa
+    # recarregue e apague o `drawn_geometry` no meio do processo.
     if opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono":
-        render_polygon_drawer()
+        if not st.session_state.get("analysis_triggered", False):
+            render_polygon_drawer()
+    # --- FIM DA CORREÇÃO v25 ---
 
     if st.session_state.get("analysis_triggered", False):
         st.session_state.analysis_triggered = False 
