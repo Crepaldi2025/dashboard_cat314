@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v9)
+# main.py — Clima-Cast-Crepaldi (Corrigido v10)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -136,10 +136,10 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v9:
-# O traceback anterior (v8) mostrou que `drawing` era uma lista.
-# Isso significa que `map_data` é uma lista de listas (ex: [ [ {...} ] ])
-# Esta correção acessa o item dentro da lista aninhada.
+# CORREÇÃO v10:
+# O "detalhe despercebido". O `geemap` pode retornar o objeto de
+# geometria DIRETAMENTE, em vez de um "Feature" que o contém.
+# Esta lógica agora verifica as duas possibilidades.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -165,39 +165,43 @@ def render_polygon_drawer():
         return_last_drawn=True 
     )
 
-    # --- INÍCIO DA CORREÇÃO v9 ---
+    # --- INÍCIO DA CORREÇÃO v10 ---
+    drawing = None
+    geometry = None
+
     if map_data and isinstance(map_data, list) and len(map_data) > 0:
-        # O traceback v8 provou que map_data[-1] é uma lista, então...
+        # Acessa a lista interna (com base no erro v8)
         drawing_list = map_data[-1] 
         
-        # ...verificamos se *essa* lista contém algo
         if drawing_list and isinstance(drawing_list, list) and len(drawing_list) > 0:
-            
-            # Pegamos o último item dela (que *deve* ser o dict)
-            drawing = drawing_list[-1] 
-            
-            # Agora 'drawing' é (esperamos) o dicionário
-            if drawing and isinstance(drawing, dict) and drawing.get("geometry") and drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
-                
-                if st.session_state.get('drawn_geometry') != drawing["geometry"]:
-                    st.session_state.drawn_geometry = drawing["geometry"]
-                    st.success("✅ Polígono capturado!")
-                    st.rerun() # FORÇA O RERUN para habilitar o botão
-            else:
-                # O usuário desenhou algo inválido (ponto, linha)
-                if 'drawn_geometry' in st.session_state:
-                    del st.session_state['drawn_geometry']
-                    st.warning("Polígono removido. Por favor, desenhe um novo.")
-                    st.rerun()
-                else:
-                    st.warning("Por favor, desenhe um POLÍGONO para a análise.")
+            # Acessa o dicionário (com base na falha v9)
+            drawing = drawing_list[-1]
+
+    # Agora 'drawing' é o dicionário GeoJSON
+    if drawing and isinstance(drawing, dict):
         
-        elif st.session_state.get('drawn_geometry'):
-             # O usuário pode ter deletado o polígono
+        # Hipótese 1: 'drawing' É a geometria (ex: {"type": "Polygon", ...})
+        if drawing.get("type") in ["Polygon", "MultiPolygon"]:
+            geometry = drawing
+        
+        # Hipótese 2: 'drawing' é um "Feature" que TEM a geometria (ex: {"type": "Feature", "geometry": {...}})
+        elif drawing.get("geometry") and drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
+            geometry = drawing["geometry"]
+
+    # Se encontramos uma geometria válida:
+    if geometry:
+        if st.session_state.get('drawn_geometry') != geometry:
+            st.session_state.drawn_geometry = geometry
+            st.success("✅ Polígono capturado!")
+            st.rerun() # FORÇA O RERUN para habilitar o botão
+    else:
+        # Se não há geometria (ou o usuário deletou/desenhou um ponto),
+        # garante que o estado seja limpo.
+        if st.session_state.get('drawn_geometry') is not None:
              del st.session_state['drawn_geometry']
              st.warning("Polígono removido.")
-             st.rerun()
-    # --- FIM DA CORREÇÃO v9 ---
+             st.rerun() # FORÇA O RERUN para desabilitar o botão
+    # --- FIM DA CORREÇÃO v10 ---
 
 
 # ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
