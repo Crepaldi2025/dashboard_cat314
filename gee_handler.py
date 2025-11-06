@@ -29,6 +29,8 @@ def get_brazilian_geopolitical_data_local():
     return dados_geo, mapa_nomes_uf
 
 def inicializar_gee():
+    return inicializar_gee()
+    
     """
     Inicializa o Google Earth Engine.
     - Local: usa credenciais do 'earthengine authenticate'
@@ -271,4 +273,5 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     
 
     return df
+
 
