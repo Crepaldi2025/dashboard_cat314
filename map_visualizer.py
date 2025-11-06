@@ -110,7 +110,11 @@ def create_static_map(ee_image, feature, vis_params, unit_label=""):
     except Exception:
         st.error("Falha ao gerar mapa estático.")
         return None, None, None
-
+        
+    # Converte imagem para RGB (remove canal alfa se existir)
+    if image.mode == "RGBA":
+        image = image.convert("RGB")
+    
     # Converte para PNG e JPG (em memória)
     png_buffer = io.BytesIO()
     jpg_buffer = io.BytesIO()
@@ -213,3 +217,4 @@ def _add_colorbar_bottomleft(mapa, vis_params, unit_label):
     macro = MacroElement()
     macro._template = template
     mapa.get_root().add_child(macro)
+
