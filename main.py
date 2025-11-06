@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v4)
+# main.py — Clima-Cast-Crepaldi (Corrigido v5)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -110,6 +110,7 @@ def render_analysis_results():
             map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"])
 
         elif tipo_mapa == "Estático":
+            # ... (código idêntico)
             if "static_maps" not in results:
                 st.warning("Erro ao gerar mapas estáticos.")
                 return
@@ -127,6 +128,7 @@ def render_analysis_results():
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
     elif aba == "Séries Temporais":
+        # ... (código idêntico)
         if "time_series_df" not in results:
             st.warning("Não foi possível extrair a série temporal.")
             return
@@ -136,10 +138,10 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO DE TYPEERROR (v4):
-# O erro `map_data.get("last_drawn")` ocorre porque `map_data`
-# é o PRÓPRIO objeto de desenho, não um dicionário que o contém.
-# A lógica foi simplificada para `if map_data:`.
+# CORREÇÃO DE TYPEERROR (v5):
+# O erro `drawing.get("geometry")` (v4) acontecia porque `drawing` era
+# uma LISTA, não um dicionário.
+# A correção é verificar se a lista não está vazia e pegar o último item.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -158,18 +160,17 @@ def render_polygon_drawer():
         return_last_drawn=True 
     )
 
-    # ----------------- CORREÇÃO ESTÁ AQUI -----------------
-    # 'map_data' não é um dicionário, é o objeto retornado (ou None)
-    if map_data:
-        # map_data É o objeto de desenho
-        drawing = map_data
+    # ----------------- CORREÇÃO ESTÁ AQUI (v5) -----------------
+    # 'map_data' é uma LISTA de desenhos (ou None)
+    if map_data and isinstance(map_data, list) and len(map_data) > 0:
+        # Pega o último desenho da lista
+        drawing = map_data[-1] 
         
-        # Verifica se é uma geometria válida
+        # Agora 'drawing' é o dicionário que esperamos
         if drawing and drawing.get("geometry") and drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
             st.session_state.drawn_geometry = drawing["geometry"]
             st.success("✅ Polígono capturado! Você já pode clicar em 'Gerar Análise'.")
         else:
-            # Limpa se for um desenho inválido (ex: um marcador ou linha)
             if 'drawn_geometry' in st.session_state:
                 del st.session_state['drawn_geometry']
             st.warning("Por favor, desenhe um POLÍGONO para a análise.")
