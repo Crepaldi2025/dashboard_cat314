@@ -1,10 +1,10 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v13)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v18)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import io # <-- ADICIONADO PARA EXPORTAÇÃO
+import io 
 
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
@@ -52,6 +52,20 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     """
     Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
     """
+    
+    # --- INÍCIO DA CORREÇÃO v18 (Reduzir fonte da métrica) ---
+    # Injeta CSS para diminuir o tamanho da fonte do st.metric
+    # O padrão do Streamlit é muito grande (cerca de 2.5rem ou 3rem)
+    st.markdown("""
+    <style>
+    div[data-testid="stMetricValue"] {
+        font-size: 1.8rem; /* <-- Ajuste este valor se ainda estiver grande */
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    # --- FIM DA CORREÇÃO v18 ---
+    
+    
     # ======================================================
     # Pré-processamento seguro do DataFrame (Idêntico)
     # ======================================================
@@ -116,30 +130,24 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         """
     )
     
-    # --- INÍCIO DA CORREÇÃO v13 (EXPORTAÇÃO) ---
+    # ======================================================
+    # Exportação (Idêntico)
+    # ======================================================
     st.markdown("---")
     st.subheader("Exportar Dados da Série Temporal")
     
-    # Prepara o DataFrame para exportação (nomeia a coluna 'value')
     variable_name = variable.split(" (")[0]
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
-    
-    # Remove colunas de timezone (se existirem) para compatibilidade com Excel
     df_export['date'] = df_export['date'].dt.tz_localize(None)
-
-    # Cria nome do arquivo
     file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     
-    # 1. Preparar dados CSV
     csv_data = df_export.to_csv(index=False, encoding='utf-8-sig')
     
-    # 2. Preparar dados Excel
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
         df_export.to_excel(writer, index=False, sheet_name='Dados')
     excel_data = excel_buffer.getvalue()
     
-    # 3. Exibir botões de download
     col_btn_1, col_btn_2 = st.columns(2)
     
     with col_btn_1:
@@ -159,4 +167,3 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-    # --- FIM DA CORREÇÃO v13 ---
