@@ -264,13 +264,17 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     # === 3️⃣ Função de redução com foco regional ===
     def extract_value(image):
         # Reduz apenas dentro do polígono fornecido (não global!)
+        # Garante que o GEE use o polígono real, não o objeto bruto
+        region = ee.Feature(_geometry).geometry()
+
         mean_value = image.select(config["result_band"]).reduceRegion(
             reducer=ee.Reducer.mean(),
-            geometry=_geometry,
+            geometry=region,
             scale=9000,
             bestEffort=True,
             maxPixels=1e9
         ).get(config["result_band"])
+
 
         # Corrige unidades
         value = ee.Number(mean_value)
@@ -323,6 +327,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     
 
     return df
+
 
 
 
