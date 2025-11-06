@@ -269,8 +269,18 @@ def renderizar_pagina_sobre():
     cobrindo o período de **1950 até o presente**.  
     A confiabilidade e consistência do ERA5-Land o tornam uma referência para **estudos climáticos e hidrometeorológicos**.
     """)
+import gee_handler
+import streamlit as st
+
+def get_selected_feature(tipo_localizacao):
+    """Obtém a geometria e o feature selecionado pelo usuário."""
+    ee_geometry, ee_feature = gee_handler.get_area_of_interest_geometry(st.session_state)
+    if ee_geometry is None or ee_feature is None:
+        st.warning("⚠️ Nenhuma área de interesse válida foi encontrada. Selecione novamente no painel lateral.")
+    return ee_feature
 
     # Rodapé
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
 
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
+
