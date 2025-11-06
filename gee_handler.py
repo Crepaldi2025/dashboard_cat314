@@ -232,7 +232,6 @@ def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
             })
     return pd.DataFrame(data)
 
-@st.cache_data
 def get_time_series_data(variable, start_date, end_date, _geometry):
     """Extrai a série temporal do ERA5-Land restrita à geometria selecionada (Estado, Município etc)."""
     if variable not in ERA5_VARS:
@@ -324,6 +323,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     
 
     return df
+
 
 
 
