@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v7)
+# main.py — Clima-Cast-Crepaldi (Corrigido v8)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -107,7 +107,6 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
-            # Esta função já está correta (v5) e usa "HYBRID"
             map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"]) 
 
         elif tipo_mapa == "Estático":
@@ -137,10 +136,9 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v7:
-# Corrigindo o problema do Basemap (não era satélite).
-# 1. `basemap="SATELLITE"` (v5) e `add_tile_layer` (v6) falharam.
-# 2. Usando `basemap="HYBRID"` (v7) que é o satélite + rótulos.
+# CORREÇÃO v8:
+# Adicionando `st.rerun()` após a captura do polígono para forçar
+# o `ui.py` a redesenhar a sidebar com o botão "Gerar Análise" habilitado.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     """
@@ -150,16 +148,14 @@ def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
 
-    # --- INÍCIO DA CORREÇÃO v7 ---
     mapa_desenho = geemap.Map(
         center=[-15.78, -47.93], 
         zoom=4,
-        basemap="HYBRID",       # <-- SOLUÇÃO 1: Usando "HYBRID"
-        draw_control=True,      # <-- (Mantido da v6)
+        basemap="HYBRID",       # (Mantido da v7)
+        draw_control=True,      # (Mantido da v7)
         draw_export=False,      
         edit_control=True       
     )
-    # --- FIM DA CORREÇÃO v7 ---
     
     map_data = mapa_desenho.to_streamlit(
         width=None, 
@@ -168,17 +164,28 @@ def render_polygon_drawer():
         return_last_drawn=True 
     )
 
-    # Lógica de captura (v5, que estava correta)
+    # Lógica de captura (v5)
     if map_data and isinstance(map_data, list) and len(map_data) > 0:
         drawing = map_data[-1] 
         
         if drawing and drawing.get("geometry") and drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
-            st.session_state.drawn_geometry = drawing["geometry"]
-            st.success("✅ Polígono capturado! Você já pode clicar em 'Gerar Análise'.")
+            
+            # --- INÍCIO DA CORREÇÃO v8 ---
+            # Verifica se este é um *novo* desenho (para evitar reruns infinitos)
+            if st.session_state.get('drawn_geometry') != drawing["geometry"]:
+                st.session_state.drawn_geometry = drawing["geometry"]
+                st.success("✅ Polígono capturado!")
+                st.rerun() # FORÇA O RERUN para habilitar o botão
+            # --- FIM DA CORREÇÃO v8 ---
+
         else:
+            # Se o usuário desenhou algo que não é um polígono (ex: ponto)
             if 'drawn_geometry' in st.session_state:
                 del st.session_state['drawn_geometry']
-            st.warning("Por favor, desenhe um POLÍGONO para a análise.")
+                st.warning("Polígono removido. Por favor, desenhe um novo.")
+                st.rerun() # FORÇA O RERUN para desabilitar o botão
+            else:
+                 st.warning("Por favor, desenhe um POLÍGONO para a análise.")
 
 
 # ---------------------- FUNÇÃO MAIN (Idêntica) ----------------------
