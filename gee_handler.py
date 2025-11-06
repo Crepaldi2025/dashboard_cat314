@@ -234,14 +234,14 @@ def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
 
 @st.cache_data
 def get_time_series_data(variable, start_date, end_date, _geometry):
-    """Extrai a série temporal de uma variável do ERA5-Land para a geometria informada."""
+    """Extrai a série temporal do ERA5-Land restrita à geometria selecionada (Estado, Município etc)."""
     if variable not in ERA5_VARS:
         return pd.DataFrame()
 
     config = ERA5_VARS[variable]
     bands_to_select = config.get("bands", config.get("band"))
 
-    # 1️⃣ Carrega e recorta as imagens
+    # === 1️⃣ Coleção e recorte geográfico ===
     collection = (
         ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
         .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
@@ -253,49 +253,43 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
         st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
         return pd.DataFrame()
 
-    # 2️⃣ Cálculo de velocidade do vento (u/v → módulo)
+    # === 2️⃣ Correção para o vento (u/v → módulo) ===
     if variable == "Velocidade do Vento (10m)":
         def calculate_wind_speed(image):
             wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename("wind_speed")
             return image.addBands(wind_speed)
         collection = collection.map(calculate_wind_speed)
-
-    # 3️⃣ Renomeia banda simples
-    elif isinstance(bands_to_select, str):
+    else:
         collection = collection.map(lambda img: img.rename(config["result_band"]))
 
-    # 4️⃣ Função de extração da média sobre a geometria
+    # === 3️⃣ Função de redução com foco regional ===
     def extract_value(image):
+        # Reduz apenas dentro do polígono fornecido (não global!)
         mean_value = image.select(config["result_band"]).reduceRegion(
             reducer=ee.Reducer.mean(),
             geometry=_geometry,
-            scale=10000,
+            scale=9000,
             bestEffort=True,
             maxPixels=1e9
         ).get(config["result_band"])
 
-        final_value = ee.Number(mean_value)
+        # Corrige unidades
+        value = ee.Number(mean_value)
         if config["unit"] == "°C":
-            final_value = final_value.subtract(273.15)
+            value = value.subtract(273.15)
         elif config["unit"] == "mm":
-            final_value = final_value.multiply(1000)
+            value = value.multiply(1000)
 
-        return image.set("date", image.date().format("YYYY-MM-dd")).set("value", final_value)
+        return image.set("date", image.date().format("YYYY-MM-dd")).set("value", value)
 
-    # 5️⃣ Aplica extração em cada imagem
+    # === 4️⃣ Aplica e agrega ===
     series = collection.map(extract_value)
+    data = series.aggregate_array("date").getInfo()
+    values = series.aggregate_array("value").getInfo()
 
-    # 6️⃣ Recupera dados
-    try:
-        data = series.aggregate_array("date").getInfo()
-        values = series.aggregate_array("value").getInfo()
-    except Exception as e:
-        st.error(f"Falha ao recuperar dados: {e}")
-        return pd.DataFrame()
-
-    # 7️⃣ Monta DataFrame final
+    # === 5️⃣ Monta DataFrame ===
     if not data or not values:
-        st.warning("Não foi possível extrair valores válidos para a área selecionada.")
+        st.warning("Não foi possível extrair dados para a área selecionada.")
         return pd.DataFrame()
 
     df = pd.DataFrame({"date": data, "value": values})
@@ -330,6 +324,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     
 
     return df
+
 
 
 
