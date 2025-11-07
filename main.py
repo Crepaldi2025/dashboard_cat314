@@ -137,7 +137,7 @@ def render_analysis_results():
         local_str = "para o círculo definido"
         
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-    titulo_serie = f"Série Temporal de {variavel} {local_str}"
+    titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}" # Atualizado para incluir período
 
 
     if aba == "Mapas":
@@ -163,6 +163,7 @@ def render_analysis_results():
             ) 
 
         elif tipo_mapa == "Estático":
+            # ... (código idêntico)
             if "static_map_png_url" not in results:
                 st.warning("Erro ao gerar mapas estáticos.")
                 return
@@ -203,7 +204,7 @@ def render_analysis_results():
                 st.download_button("Exportar (PNG - Somente Mapa)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
 
         st.markdown("---") 
-        st.subheader("Tabela de Dados") # (Idêntico v38)
+        st.subheader("Tabela de Dados") 
 
         if "map_dataframe" not in results or results["map_dataframe"].empty:
             st.warning("Não foi possível extrair dados amostrais para a tabela.")
@@ -211,8 +212,7 @@ def render_analysis_results():
             df_map = results["map_dataframe"]
             st.dataframe(df_map, use_container_width=True)
             
-            # --- INÍCIO DA CORREÇÃO v39 ---
-            st.subheader("Exportar Tabela") # <-- Título adicionado
+            st.subheader("Exportar Tabela")
             
             variavel = st.session_state.variavel
             variable_name = variavel.split(" (")[0]
@@ -227,24 +227,15 @@ def render_analysis_results():
 
             col_btn_1, col_btn_2 = st.columns(2)
             with col_btn_1:
-                st.download_button(
-                    label="Exportar para CSV", # <-- Texto unificado
-                    data=csv_data, 
-                    file_name=f"{file_name_safe}.csv", 
-                    mime="text/csv", 
-                    use_container_width=True
-                )
+                st.download_button("Exportar para CSV", data=csv_data, file_name=f"{file_name_safe}.csv", mime="text/csv", use_container_width=True)
             with col_btn_2:
-                st.download_button(
-                    label="Exportar para XLSX (Excel)", # <-- Texto unificado
-                    data=excel_data, 
-                    file_name=f"{file_name_safe}.xlsx", 
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-                    use_container_width=True
-                )
-            # --- FIM DA CORREÇÃO v39 ---
+                st.download_button("Exportar para XLSX (Excel)", data=excel_data, file_name=f"{file_name_safe}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     elif aba == "Séries Temporais":
+        # --- INÍCIO DA CORREÇÃO v39 ---
+        st.markdown("---")
+        st.subheader(titulo_serie) # <-- Título dinâmico exibido aqui
+        
         if "time_series_df" not in results:
             st.warning("Não foi possível extrair a série temporal.")
             return
@@ -254,9 +245,10 @@ def render_analysis_results():
         charts_visualizer.display_time_series_chart(
             df, 
             st.session_state.variavel, 
-            var_cfg["unit"], 
-            title=titulo_serie 
+            var_cfg["unit"] 
+            # O argumento 'title' foi removido da chamada
         )
+        # --- FIM DA CORREÇÃO v39 ---
 
 # ----------------------------------------------------------------------------------
 # LÓGICA DE DESENHO (Idêntica, mantida da v25)
