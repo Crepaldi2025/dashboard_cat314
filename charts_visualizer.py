@@ -6,19 +6,19 @@ import pandas as pd
 import plotly.express as px
 import io 
 
-def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str, title: str = ""):
+# --- INÍCIO DA CORREÇÃO v39 ---
+def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
     Cria a figura do gráfico de linha interativo de série temporal usando Plotly.
-    (v32) - Aceita um título dinâmico.
+    (v39) - Título removido, pois agora é gerenciado pelo main.py.
     """
     variable_name = variable.split(" (")[0]
-    final_title = title if title else f"Série Temporal de {variable_name}"
-
+    
     fig = px.line(
         df,
         x='date',
         y='value',
-        title=final_title, 
+        title=None, # <-- Título removido daqui
         labels={
             "date": "Data",
             "value": f"{variable_name} ({unit})"
@@ -26,6 +26,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str, title: str 
         template="plotly_white",
         markers=True
     )
+# --- FIM DA CORREÇÃO v39 ---
 
     fig.update_layout(
         xaxis=dict(
@@ -40,7 +41,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str, title: str 
             rangeslider=dict(visible=True),
             type="date"
         ),
-        margin=dict(l=10, r=10, t=45, b=10),
+        margin=dict(l=10, r=10, t=20, b=10), # <-- Margem do topo diminuída
         height=420
     )
     
@@ -59,10 +60,12 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     return excel_buffer.getvalue()
 
 
-def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title: str = ""):
+# --- INÍCIO DA CORREÇÃO v39 ---
+def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
+# --- FIM DA CORREÇÃO v39 ---
     """
     Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
-    (v39) - Unifica o título da tabela de dados.
+    (v39) - Título não é mais passado para _create_chart_figure.
     """
     
     st.markdown("""
@@ -108,10 +111,12 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title:
     df_clean = df_clean.sort_values('date')
 
     # ======================================================
-    # Geração e exibição do gráfico (Modificado v32)
+    # Geração e exibição do gráfico
     # ======================================================
     try:
-        fig = _create_chart_figure(df_clean, variable, unit, title=title)
+        # --- INÍCIO DA CORREÇÃO v39 ---
+        fig = _create_chart_figure(df_clean, variable, unit) # 'title' removido
+        # --- FIM DA CORREÇÃO v39 ---
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao gerar o gráfico Plotly: {e}")
@@ -139,7 +144,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title:
     )
     
     # ======================================================
-    # Tabela de Dados e Exportação (Modificado v39)
+    # Tabela de Dados e Exportação (Idêntico v38)
     # ======================================================
     st.markdown("---")
     
@@ -147,14 +152,12 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title:
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
     df_export['date'] = df_export['date'].dt.tz_localize(None) 
     
-    st.subheader("Tabela de Dados") # (Idêntico v38)
+    st.subheader("Tabela de Dados") 
     df_display = df_export.copy()
     df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
     st.dataframe(df_display, use_container_width=True, height=300)
 
-    # --- INÍCIO DA CORREÇÃO v39 ---
-    st.subheader("Exportar Tabela") # <-- Título Unificado
-    # --- FIM DA CORREÇÃO v39 ---
+    st.subheader("Exportar Tabela")
     
     file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     
