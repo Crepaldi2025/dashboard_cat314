@@ -5,9 +5,8 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v34) - Ajustado o CSS do título do mapa interativo:
-#         - Fonte aumentada para 18px.
-#         - Adicionada margem inferior de 10px.
+# (v35) - REMOVIDA a lógica do título HTML flutuante. O título
+#         agora é renderizado diretamente pelo main.py (st.subheader).
 # ==================================================================================
 
 import streamlit as st
@@ -31,11 +30,12 @@ from branca.element import Template, MacroElement
 # MAPA INTERATIVO (Resultado da Análise)
 # ==================================================================================
 
+# --- INÍCIO DA CORREÇÃO v35 ---
 def create_interactive_map(ee_image: ee.Image, 
                            feature: ee.Feature, 
                            vis_params: dict, 
-                           unit_label: str = "",
-                           title: str = ""):
+                           unit_label: str = ""):
+# --- FIM DA CORREÇÃO v35 ---
     """
     (v34) Cria e exibe um mapa interativo que se centraliza e 
     dá zoom automaticamente na área de interesse.
@@ -57,27 +57,9 @@ def create_interactive_map(ee_image: ee.Image,
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
-    if title:
-        # --- INÍCIO DA CORREÇÃO v34 (Estilo do Título) ---
-        title_html = f'''
-             <div style="
-                 position: fixed; 
-                 top: 10px; right: 10px; z-index: 9998;
-                 font-size: 18px; /* <-- Aumentado de 16px */
-                 font-weight: bold; color: #333;
-                 background-color: rgba(255, 255, 255, 0.75);
-                 padding: 5px 10px; border-radius: 5px;
-                 border: 1px solid lightgray;
-                 margin-bottom: 10px; /* <-- Adicionado espaçamento */
-                 ">
-             {title}
-             </div>
-             '''
-        # --- FIM DA CORREÇÃO v34 ---
-        
-        title_macro = MacroElement()
-        title_macro._template = Template(title_html)
-        mapa.get_root().add_child(title_macro)
+    # --- INÍCIO DA CORREÇÃO v35 ---
+    # Bloco de código do Título HTML foi REMOVIDO מכאן
+    # --- FIM DA CORREÇÃO v35 ---
 
     if bounds:
         mapa.fit_bounds(bounds)
@@ -88,6 +70,7 @@ def create_interactive_map(ee_image: ee.Image,
 # ==================================================================================
 # COLORBAR PARA MAPAS INTERATIVOS (Idêntico v31)
 # ==================================================================================
+# (Nenhuma alteração nesta seção)
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
@@ -142,6 +125,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 # ==================================================================================
 # COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico v29)
 # ==================================================================================
+# (Nenhuma alteração nesta seção)
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
                            label: str) -> str:
@@ -187,6 +171,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
 # ==================================================================================
 # MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico v17)
 # ==================================================================================
+# (Nenhuma alteração nesta seção)
 
 def create_static_map(ee_image: ee.Image, 
                       feature: ee.Feature, 
@@ -236,6 +221,7 @@ def create_static_map(ee_image: ee.Image,
 # ==================================================================================
 # FUNÇÕES DE COSTURA DE IMAGEM (Idênticas v31)
 # ==================================================================================
+# (Nenhuma alteração nesta seção)
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
     """
