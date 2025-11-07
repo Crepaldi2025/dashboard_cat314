@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v30)
+# main.py — Clima-Cast-Crepaldi (Corrigido v31)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -53,7 +53,10 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
             png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
                 ee_image, feature, var_cfg["vis_params"], var_cfg["unit"]
             )
-            results["static_maps"] = (png_url, jpg_url, colorbar_img)
+            # Salva os *componentes* nos resultados
+            results["static_map_png_url"] = png_url
+            results["static_map_jpg_url"] = jpg_url
+            results["static_colorbar_b64"] = colorbar_img
 
     elif aba == "Séries Temporais":
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
@@ -96,7 +99,8 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# Lógica do Título (v30)
+# CORREÇÃO v31:
+# Lógica do mapa estático modificada para costurar imagens ANTES do download.
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -124,11 +128,10 @@ def render_analysis_results():
         feature = results["feature"]
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
-        # --- Geração do Título Dinâmico (v30) ---
+        # Geração do Título Dinâmico (Idêntica v30)
         variavel = st.session_state.variavel
         tipo_periodo = st.session_state.tipo_periodo
         tipo_local = st.session_state.tipo_localizacao.lower()
-        
         if tipo_periodo == "Personalizado":
             start_str = st.session_state.data_inicio.strftime('%d/%m/%Y')
             end_str = st.session_state.data_fim.strftime('%d/%m/%Y')
@@ -137,51 +140,79 @@ def render_analysis_results():
             periodo_str = f"mensal ({st.session_state.mes_mensal} de {st.session_state.ano_mensal})"
         elif tipo_periodo == "Anual":
             periodo_str = f"anual ({st.session_state.ano_anual})"
-        
         if tipo_local == "estado":
             local_str = f"no {tipo_local} de {st.session_state.estado.split(' - ')[0]}"
         elif tipo_local == "município":
             local_str = f"no {tipo_local} de {st.session_state.municipio}"
         elif tipo_local == "polígono":
             local_str = "para a área desenhada"
-        else: # Círculo
+        else: 
             local_str = "para o círculo definido"
-            
         titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-        # --- Fim da Geração do Título ---
+
 
         if tipo_mapa == "Interativo":
             map_visualizer.create_interactive_map(
-                ee_image, 
-                feature, 
-                vis_params, 
-                var_cfg["unit"], 
-                title=titulo_mapa  # Passa o título para a função
+                ee_image, feature, vis_params, var_cfg["unit"], title=titulo_mapa
             ) 
 
         elif tipo_mapa == "Estático":
-            if "static_maps" not in results:
+            if "static_map_png_url" not in results:
                 st.warning("Erro ao gerar mapas estáticos.")
                 return
-            png_url, jpg_url, colorbar_img = results["static_maps"]
+            
+            # Pega os componentes (separados)
+            png_url = results["static_map_png_url"]
+            jpg_url = results["static_map_jpg_url"]
+            colorbar_b64 = results["static_colorbar_b64"]
 
-            st.subheader(titulo_mapa) # Exibe o título
+            # Exibe o título
+            st.subheader(titulo_mapa)
             
             map_width = 400 
-            colorbar_width = 400
-
+            
+            # Exibe os componentes (separados)
             if png_url:
                 st.image(png_url, width=map_width)
-            if colorbar_img:
-                st.image(colorbar_img, width=colorbar_width)
+            if colorbar_b64:
+                st.image(colorbar_b64, width=map_width)
             
             st.markdown("---") 
-
             st.markdown("### Exportar Mapas")
-            if png_url:
-                st.download_button("Exportar (PNG)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
-            if jpg_url:
-                st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
+            
+            # --- INÍCIO DA CORREÇÃO v31 (Costura para Download) ---
+            try:
+                # 1. Gerar imagem do título (largura 800 para bater com o PNG do GEE)
+                title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
+                
+                # 2. Decodificar mapa e colorbar de volta para bytes
+                map_png_bytes = base64.b64decode(png_url.split(",")[1])
+                map_jpg_bytes = base64.b64decode(jpg_url.split(",")[1])
+                colorbar_bytes = base64.b64decode(colorbar_b64.split(",")[1])
+                
+                # 3. Costurar para PNG
+                final_png_data = map_visualizer._stitch_images_to_bytes(
+                    title_bytes, map_png_bytes, colorbar_bytes, format='PNG'
+                )
+                
+                # 4. Costurar para JPG
+                final_jpg_data = map_visualizer._stitch_images_to_bytes(
+                    title_bytes, map_jpg_bytes, colorbar_bytes, format='JPEG'
+                )
+
+                # 5. Criar botões de download com os dados costurados
+                if final_png_data:
+                    st.download_button("Exportar (PNG)", data=final_png_data, file_name="mapa_completo.png", mime="image/png", use_container_width=True)
+                if final_jpg_data:
+                    st.download_button("Exportar (JPEG)", data=final_jpg_data, file_name="mapa_completo.jpeg", mime="image/jpeg", use_container_width=True)
+
+            except Exception as e:
+                st.error(f"Erro ao preparar imagens para download: {e}")
+                # Fallback: oferece apenas o mapa original se a costura falhar
+                st.download_button("Exportar (PNG - Somente Mapa)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
+
+            # --- FIM DA CORREÇÃO v31 ---
+
 
         st.markdown("---") 
         st.subheader("Dados Amostrais do Mapa")
