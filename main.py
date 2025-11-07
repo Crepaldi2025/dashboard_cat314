@@ -96,8 +96,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v30:
-# Movida a lógica de criação de título para ser usada por AMBOS os tipos de mapa.
+# Lógica do Título (v30)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -125,15 +124,12 @@ def render_analysis_results():
         feature = results["feature"]
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
-        # --- INÍCIO DA CORREÇÃO v30 (Mover título) ---
-        
-        # 1. Gerar o título dinâmico (agora usado por ambos os mapas)
+        # --- Geração do Título Dinâmico (v30) ---
         variavel = st.session_state.variavel
         tipo_periodo = st.session_state.tipo_periodo
         tipo_local = st.session_state.tipo_localizacao.lower()
         
         if tipo_periodo == "Personalizado":
-            # Para o mapa interativo, é melhor ter as datas no título
             start_str = st.session_state.data_inicio.strftime('%d/%m/%Y')
             end_str = st.session_state.data_fim.strftime('%d/%m/%Y')
             periodo_str = f"de {start_str} a {end_str}"
@@ -152,17 +148,15 @@ def render_analysis_results():
             local_str = "para o círculo definido"
             
         titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-        # --- FIM DA CORREÇÃO v30 ---
-
+        # --- Fim da Geração do Título ---
 
         if tipo_mapa == "Interativo":
-            # 2. Passar o título para o mapa interativo
             map_visualizer.create_interactive_map(
                 ee_image, 
                 feature, 
                 vis_params, 
                 var_cfg["unit"], 
-                title=titulo_mapa  # <-- Título adicionado
+                title=titulo_mapa  # Passa o título para a função
             ) 
 
         elif tipo_mapa == "Estático":
@@ -171,8 +165,7 @@ def render_analysis_results():
                 return
             png_url, jpg_url, colorbar_img = results["static_maps"]
 
-            # 3. Exibir o título no mapa estático
-            st.subheader(titulo_mapa)
+            st.subheader(titulo_mapa) # Exibe o título
             
             map_width = 400 
             colorbar_width = 400
