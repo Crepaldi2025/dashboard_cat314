@@ -141,22 +141,25 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     )
     
     # ======================================================
-    # Exportação (Idêntico)
+    # Tabela de Dados e Exportação (Adicionado v29)
     # ======================================================
     st.markdown("---")
-    st.subheader("Exportar Dados da Série Temporal")
     
     variable_name = variable.split(" (")[0]
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
-    df_export['date'] = df_export['date'].dt.tz_localize(None)
+    df_export['date'] = df_export['date'].dt.tz_localize(None) 
+    
+    st.subheader("Tabela de Dados") 
+    df_display = df_export.copy()
+    df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
+    st.dataframe(df_display, use_container_width=True, height=300)
+
+    st.subheader("Exportar Tabela")
+    
     file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     
-    csv_data = df_export.to_csv(index=False, encoding='utf-8-sig')
-    
-    excel_buffer = io.BytesIO()
-    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-        df_export.to_excel(writer, index=False, sheet_name='Dados')
-    excel_data = excel_buffer.getvalue()
+    csv_data = df_export.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
+    excel_data = _convert_df_to_excel(df_export)
     
     col_btn_1, col_btn_2 = st.columns(2)
     
