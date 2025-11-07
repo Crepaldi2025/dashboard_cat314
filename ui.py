@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v48)
+# ui.py — (Corrigido v47)
 # ==================================================================================
 
 import streamlit as st
@@ -11,7 +11,7 @@ import docx
 import os
 
 # ==================================================================================
-# CONFIGURAÇÃO INICIAL
+# CONFIGURAÇÃO INICIAL (Idêntica)
 # ==================================================================================
 st.set_page_config(
     page_title="Clima-Cast-Crepaldi",
@@ -30,11 +30,14 @@ except locale.Error:
 # FUNÇÕES AUXILIARES
 # ==================================================================================
 
-# Lista manual de meses para garantir o português (v38)
+# --- INÍCIO DA CORREÇÃO v47 (Aplicando v38) ---
+# Lista manual de meses para garantir o português
 NOMES_MESES_PT = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ]
+# --- FIM DA CORREÇÃO v47 ---
+
 
 @st.cache_data
 def _carregar_texto_docx(file_path):
@@ -69,7 +72,7 @@ def reset_analysis_state():
         if key in st.session_state:
             del st.session_state[key]
 
-# (Correção v41)
+# --- INÍCIO DA CORREÇÃO v47 (Aplicando v41) ---
 def reset_analysis_results_only():
     """
     Callback "LEVE": Limpa APENAS os resultados, mantendo a geometria.
@@ -82,6 +85,7 @@ def reset_analysis_results_only():
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
+# --- FIM DA CORREÇÃO v47 ---
     
 # ==================================================================================
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
@@ -151,10 +155,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
                 else: 
-                    # --- INÍCIO DA CORREÇÃO v48 (Aplicando v47) ---
+                    # --- INÍCIO DA CORREÇÃO v47 ---
                     # Mensagem genérica que funciona para ambas as abas
                     st.info("O mapa de desenho aparecerá na tela principal.")
-                    # --- FIM DA CORREÇÃO v48 ---
+                    # --- FIM DA CORREÇÃO v47 ---
 
                 # Ajuda para Polígono (v45)
                 with st.popover("ℹ️ Ajuda: Polígono"):
@@ -225,9 +229,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if not st.session_state.get('drawn_geometry'):
                     disable_button = True
                     tooltip_message = "Por favor, desenhe um polígono no mapa principal primeiro."
-                # --- INÍCIO DA CORREÇÃO v48 (Aplicando v47) ---
+                # --- INÍCIO DA CORREÇÃO v47 ---
                 # REMOVIDA a restrição que desabilitava o botão na aba "Séries Temporais"
-                # --- FIM DA CORREÇÃO v48 ---
+                # --- FIM DA CORREÇÃO v47 ---
             
             elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
                 if not (st.session_state.get('latitude') is not None and 
