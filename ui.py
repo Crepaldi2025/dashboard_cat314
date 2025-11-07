@@ -87,6 +87,8 @@ def reset_analysis_results_only():
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
 # ==================================================================================
 
+# Removida a função 'configurar_pagina' (v41)
+
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
         st.header("Painel de Controle")
@@ -163,7 +165,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     **Como usar:**
                     1.  Certifique-se de que a aba **"Mapas"** está selecionada (no topo da sidebar).
                     2.  O mapa de desenho aparecerá na tela principal.
-                    3.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa.
+                    3.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa e clique em **"Finish"** para confirmar.
                     """)
                 # --- FIM DA CORREÇÃO v45 ---
             
@@ -329,4 +331,3 @@ def renderizar_pagina_sobre():
     
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
-
