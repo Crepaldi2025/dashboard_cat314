@@ -5,9 +5,8 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v34) - Modificada a função `create_interactive_map` para centralizar
-#         automaticamente o mapa usando `fit_bounds` (ajuste de limites)
-#         em vez de um centroide e zoom fixos.
+# (v34) - Adicionadas funções `_make_title_image` e `_stitch_images_to_bytes`
+#         para permitir a exportação do mapa com título e legenda.
 # ==================================================================================
 
 import streamlit as st
@@ -27,7 +26,7 @@ from branca.colormap import StepColormap
 from branca.element import Template, MacroElement 
 
 # ==================================================================================
-# MAPA INTERATIVO (Resultado da Análise)
+# MAPA INTERATIVO (Resultado da Análise) (Idêntico v33)
 # ==================================================================================
 
 def create_interactive_map(ee_image: ee.Image, 
@@ -36,21 +35,24 @@ def create_interactive_map(ee_image: ee.Image,
                            unit_label: str = "",
                            title: str = ""):
     """
-    (v34) Cria e exibe um mapa interativo que se centraliza e 
-    dá zoom automaticamente na área de interesse.
+    Cria e exibe um mapa interativo com os dados do GEE e o contorno da área.
     """
-    
-    # --- INÍCIO DA CORREÇÃO v34 (Centralização) ---
-    
-    # 1. Cria um mapa genérico (o centro não importa, será sobrescrito)
+    try:
+        coords = feature.geometry().bounds().getInfo()['coordinates'][0]
+        lon_min = coords[0][0]
+        lat_min = coords[0][1]
+        lon_max = coords[2][0]
+        lat_max = coords[2][1]
+        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
+    except Exception:
+        bounds = None
+
     mapa = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="HYBRID")
-    
-    # 2. Adiciona as camadas (dados e contorno)
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
     
-    # 3. Adiciona os controles (legenda e título)
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
+    
     if title:
         title_html = f'''
              <div style="
@@ -68,35 +70,13 @@ def create_interactive_map(ee_image: ee.Image,
         title_macro._template = Template(title_html)
         mapa.get_root().add_child(title_macro)
 
-    # 4. Centraliza o mapa usando os limites da geometria
-    try:
-        # Pede ao GEE as coordenadas do "bounding box"
-        # Formato GEE: [[lon_min, lat_min], [lon_max, lat_min], ...]
-        coords = feature.geometry().bounds().getInfo()['coordinates'][0]
-        
-        # Converte para o formato do Folium: [[lat_min, lon_min], [lat_max, lon_max]]
-        lon_min = coords[0][0]
-        lat_min = coords[0][1]
-        lon_max = coords[2][0]
-        lat_max = coords[2][1]
-        
-        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
-        
-        # Aplica o ajuste de limites
+    if bounds:
         mapa.fit_bounds(bounds)
     
-    except Exception as e:
-        st.warning(f"Não foi possível centralizar o mapa automaticamente: {e}")
-        # Se falhar, usa o fallback (centro do Brasil)
-        mapa.set_center(-15.78, -47.93, 4)
-
-    # --- FIM DA CORREÇÃO v34 ---
-
     mapa.to_streamlit(height=500, use_container_width=True)
 
-
 # ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS (Idêntico v31)
+# COLORBAR INTERATIVA (Idêntico v31)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
@@ -150,7 +130,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 
 # ==================================================================================
-# COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico v29)
+# COLORBAR ESTÁTICA (Idêntico v29)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
@@ -243,3 +223,101 @@ def create_static_map(ee_image: ee.Image,
     except Exception as e:
         st.error(f"Erro ao gerar mapa estático: {e}")
         return None, None, None
+
+
+# --- INÍCIO DA CORREÇÃO v34 (Funções de Costura) ---
+def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
+    """
+    Cria uma imagem PNG (como bytes) a partir de um texto de título usando Matplotlib.
+
+    Args:
+        title_text (str): O texto a ser renderizado.
+        width (int): A largura da imagem (em pixels) para corresponder ao mapa.
+        height (int): A altura da imagem (em pixels).
+
+    Returns:
+        bytes: Os bytes da imagem PNG.
+    """
+    try:
+        # Converte pixels para polegadas para o figsize
+        dpi = 100
+        fig_width = width / dpi
+        fig_height = height / dpi
+
+        fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
+        fig.patch.set_facecolor('white') # Fundo branco
+
+        # Adiciona o texto centralizado
+        plt.text(0.5, 0.5, title_text, 
+                 ha='center', va='center', 
+                 fontsize=14, # Você pode ajustar este tamanho
+                 fontweight='bold',
+                 wrap=True)
+
+        plt.axis('off') # Remove eixos
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.05, facecolor='white')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception as e:
+        st.error(f"Erro ao criar imagem do título: {e}")
+        return None
+
+def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, 
+                            colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
+    """
+    Costura verticalmente três imagens (título, mapa, colorbar) em uma única imagem.
+
+    Args:
+        title_bytes (bytes): Bytes da imagem do título.
+        map_bytes (bytes): Bytes da imagem do mapa.
+        colorbar_bytes (bytes): Bytes da imagem da colorbar.
+        format (str): O formato final ('PNG' ou 'JPEG').
+
+    Returns:
+        bytes: Os bytes da imagem final costurada.
+    """
+    try:
+        title_img = Image.open(io.BytesIO(title_bytes))
+        map_img = Image.open(io.BytesIO(map_bytes))
+        colorbar_img = Image.open(io.BytesIO(colorbar_bytes))
+
+        # Assume que todas as imagens devem ter a largura do mapa (800px)
+        width = map_img.width
+        
+        # Redimensiona título e colorbar para corresponder à largura do mapa
+        # (mantendo a proporção da altura)
+        def resize_to_width(img, target_width):
+            if img.width == target_width:
+                return img
+            ratio = target_width / img.width
+            target_height = int(img.height * ratio)
+            return img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+        title_img = resize_to_width(title_img, width)
+        colorbar_img = resize_to_width(colorbar_img, width)
+
+        # Calcula a altura total
+        total_height = title_img.height + map_img.height + colorbar_img.height
+
+        # Cria a nova imagem de fundo (branca)
+        final_img = Image.new('RGB', (width, total_height), 'white')
+
+        # Cola as imagens na ordem
+        final_img.paste(title_img, (0, 0))
+        final_img.paste(map_img, (0, title_img.height))
+        final_img.paste(colorbar_img, (0, title_img.height + map_img.height))
+
+        # Salva o resultado em um buffer de bytes
+        final_buffer = io.BytesIO()
+        save_format = 'JPEG' if format.upper() == 'JPEG' else 'PNG'
+        final_img.save(final_buffer, format=save_format)
+        
+        return final_buffer.getvalue()
+        
+    except Exception as e:
+        st.error(f"Erro ao costurar imagens: {e}")
+        return None
+# --- FIM DA CORREÇÃO v34 ---
