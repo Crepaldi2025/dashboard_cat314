@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v29)
+# main.py — Clima-Cast-Crepaldi (Corrigido v30)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -96,8 +96,8 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v29:
-# Re-adicionando a lógica do título (v27) e removendo os captions (v27)
+# CORREÇÃO v30:
+# Movida a lógica de criação de título para ser usada por AMBOS os tipos de mapa.
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -114,7 +114,7 @@ def render_analysis_results():
 
     if aba == "Mapas":
         
-        st.markdown("---") # Linha separadora (v28)
+        st.markdown("---") 
         
         tipo_mapa = st.session_state.get("map_type", "Interativo")
         if "ee_image" not in results:
@@ -125,8 +125,45 @@ def render_analysis_results():
         feature = results["feature"]
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
+        # --- INÍCIO DA CORREÇÃO v30 (Mover título) ---
+        
+        # 1. Gerar o título dinâmico (agora usado por ambos os mapas)
+        variavel = st.session_state.variavel
+        tipo_periodo = st.session_state.tipo_periodo
+        tipo_local = st.session_state.tipo_localizacao.lower()
+        
+        if tipo_periodo == "Personalizado":
+            # Para o mapa interativo, é melhor ter as datas no título
+            start_str = st.session_state.data_inicio.strftime('%d/%m/%Y')
+            end_str = st.session_state.data_fim.strftime('%d/%m/%Y')
+            periodo_str = f"de {start_str} a {end_str}"
+        elif tipo_periodo == "Mensal":
+            periodo_str = f"mensal ({st.session_state.mes_mensal} de {st.session_state.ano_mensal})"
+        elif tipo_periodo == "Anual":
+            periodo_str = f"anual ({st.session_state.ano_anual})"
+        
+        if tipo_local == "estado":
+            local_str = f"no {tipo_local} de {st.session_state.estado.split(' - ')[0]}"
+        elif tipo_local == "município":
+            local_str = f"no {tipo_local} de {st.session_state.municipio}"
+        elif tipo_local == "polígono":
+            local_str = "para a área desenhada"
+        else: # Círculo
+            local_str = "para o círculo definido"
+            
+        titulo_mapa = f"{variavel} {periodo_str} {local_str}"
+        # --- FIM DA CORREÇÃO v30 ---
+
+
         if tipo_mapa == "Interativo":
-            map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"]) 
+            # 2. Passar o título para o mapa interativo
+            map_visualizer.create_interactive_map(
+                ee_image, 
+                feature, 
+                vis_params, 
+                var_cfg["unit"], 
+                title=titulo_mapa  # <-- Título adicionado
+            ) 
 
         elif tipo_mapa == "Estático":
             if "static_maps" not in results:
@@ -134,48 +171,18 @@ def render_analysis_results():
                 return
             png_url, jpg_url, colorbar_img = results["static_maps"]
 
-            # --- INÍCIO DA LÓGICA DO TÍTULO (v27/v29) ---
-            
-            # 1. Obter os componentes do título
-            variavel = st.session_state.variavel
-            tipo_periodo = st.session_state.tipo_periodo
-            tipo_local = st.session_state.tipo_localizacao.lower() # "município", "estado"
-            
-            # Formatar o período
-            if tipo_periodo == "Personalizado":
-                periodo_str = "para o período selecionado" 
-            elif tipo_periodo == "Mensal":
-                periodo_str = f"mensal ({st.session_state.mes_mensal} de {st.session_state.ano_mensal})"
-            elif tipo_periodo == "Anual":
-                periodo_str = f"anual ({st.session_state.ano_anual})"
-            
-            # Formatar o local
-            if tipo_local == "estado":
-                local_str = f"no {tipo_local} de {st.session_state.estado.split(' - ')[0]}"
-            elif tipo_local == "município":
-                local_str = f"no {tipo_local} de {st.session_state.municipio}"
-            elif tipo_local == "polígono":
-                local_str = "para a área desenhada"
-            else: # Círculo
-                local_str = "para o círculo definido"
-                
-            titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-            
-            # 2. Exibir o título
+            # 3. Exibir o título no mapa estático
             st.subheader(titulo_mapa)
             
-            # 3. Exibir imagem SEM caption
-            map_width = 450 
-            colorbar_width = 450
+            map_width = 400 
+            colorbar_width = 400
 
             if png_url:
-                st.image(png_url, width=map_width) # 'caption' removido
+                st.image(png_url, width=map_width)
             if colorbar_img:
-                st.image(colorbar_img, width=colorbar_width) # 'caption' removido
+                st.image(colorbar_img, width=colorbar_width)
             
-            # --- FIM DA LÓGICA DO TÍTULO ---
-            
-            st.markdown("---") # Linha separadora (v28)
+            st.markdown("---") 
 
             st.markdown("### Exportar Mapas")
             if png_url:
@@ -183,7 +190,7 @@ def render_analysis_results():
             if jpg_url:
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
-        st.markdown("---") # Linha separadora (v28)
+        st.markdown("---") 
         st.subheader("Dados Amostrais do Mapa")
 
         if "map_dataframe" not in results or results["map_dataframe"].empty:
@@ -300,4 +307,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
