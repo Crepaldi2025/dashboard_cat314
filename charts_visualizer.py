@@ -1,16 +1,16 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v39)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v29)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io 
 
-# --- INÍCIO DA CORREÇÃO v39 ---
+# --- INÍCIO DA CORREÇÃO v29 ---
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
     Cria a figura do gráfico de linha interativo de série temporal usando Plotly.
-    (v39) - Título removido, pois agora é gerenciado pelo main.py.
+    (v29) - Título removido, pois agora é gerenciado pelo main.py.
     """
     variable_name = variable.split(" (")[0]
     
@@ -26,7 +26,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         template="plotly_white",
         markers=True
     )
-# --- FIM DA CORREÇÃO v39 ---
+# --- FIM DA CORREÇÃO v29 ---
 
     fig.update_layout(
         xaxis=dict(
@@ -49,7 +49,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
 
     return fig
 
-
+# --- INÍCIO DA CORREÇÃO v29 (Adicionando helper) ---
 def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     """
     Converte um DataFrame para um arquivo Excel (XLSX) em memória.
@@ -58,20 +58,19 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Dados')
     return excel_buffer.getvalue()
+# --- FIM DA CORREÇÃO v29 ---
 
 
-# --- INÍCIO DA CORREÇÃO v39 ---
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
-# --- FIM DA CORREÇÃO v39 ---
     """
     Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
-    (v39) - Título não é mais passado para _create_chart_figure.
     """
     
+    # CSS para diminuir a fonte da métrica (v18)
     st.markdown("""
     <style>
     div[data-testid="stMetricValue"] {
-        font-size: 1.2rem;
+        font-size: 1.2rem; 
     }
     </style>
     """, unsafe_allow_html=True)
@@ -114,9 +113,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     # Geração e exibição do gráfico
     # ======================================================
     try:
-        # --- INÍCIO DA CORREÇÃO v39 ---
-        fig = _create_chart_figure(df_clean, variable, unit) # 'title' removido
-        # --- FIM DA CORREÇÃO v39 ---
+        fig = _create_chart_figure(df_clean, variable, unit)
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao gerar o gráfico Plotly: {e}")
@@ -144,25 +141,22 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     )
     
     # ======================================================
-    # Tabela de Dados e Exportação (Idêntico v38)
+    # Exportação (Idêntico)
     # ======================================================
     st.markdown("---")
+    st.subheader("Exportar Dados da Série Temporal")
     
     variable_name = variable.split(" (")[0]
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
-    df_export['date'] = df_export['date'].dt.tz_localize(None) 
-    
-    st.subheader("Tabela de Dados") 
-    df_display = df_export.copy()
-    df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
-    st.dataframe(df_display, use_container_width=True, height=300)
-
-    st.subheader("Exportar Tabela")
-    
+    df_export['date'] = df_export['date'].dt.tz_localize(None)
     file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     
-    csv_data = df_export.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
-    excel_data = _convert_df_to_excel(df_export)
+    csv_data = df_export.to_csv(index=False, encoding='utf-8-sig')
+    
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+        df_export.to_excel(writer, index=False, sheet_name='Dados')
+    excel_data = excel_buffer.getvalue()
     
     col_btn_1, col_btn_2 = st.columns(2)
     
