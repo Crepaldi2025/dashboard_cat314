@@ -5,8 +5,8 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v36) - REMOVIDA a lógica do título HTML flutuante. O título
-#         agora é renderizado diretamente pelo main.py (st.subheader).
+# (v40) - Altera a formatação da legenda interativa (colorbar)
+#         para usar `colormap.fmt` em vez de `tick_labels`.
 # ==================================================================================
 
 import streamlit as st
@@ -30,14 +30,12 @@ from branca.element import Template, MacroElement
 # MAPA INTERATIVO (Resultado da Análise)
 # ==================================================================================
 
-# --- INÍCIO DA CORREÇÃO v36 ---
 def create_interactive_map(ee_image: ee.Image, 
                            feature: ee.Feature, 
                            vis_params: dict, 
                            unit_label: str = ""):
-# --- FIM DA CORREÇÃO v36 ---
     """
-    (v34) Cria e exibe um mapa interativo que se centraliza e 
+    (v36) Cria e exibe um mapa interativo que se centraliza e 
     dá zoom automaticamente na área de interesse.
     """
     
@@ -56,10 +54,6 @@ def create_interactive_map(ee_image: ee.Image,
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
-    
-    # --- INÍCIO DA CORREÇÃO v36 ---
-    # Bloco de código do Título HTML foi REMOVIDO daqui
-    # --- FIM DA CORREÇÃO v36 ---
 
     if bounds:
         mapa.fit_bounds(bounds)
@@ -68,13 +62,13 @@ def create_interactive_map(ee_image: ee.Image,
 
 
 # ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS (Idêntico v31)
+# COLORBAR PARA MAPAS INTERATIVOS (Modificado)
 # ==================================================================================
-# (Nenhuma alteração nesta seção)
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
-    (v31) Adiciona legenda discreta com valores inteiros.
+    (v40) Função auxiliar interna para adicionar uma legenda (colorbar) 
+    DISCRETA e com valores INTEIROS no canto inferior esquerdo.
     """
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
@@ -93,7 +87,14 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         vmax=vmax
     )
     
-    colormap.tick_labels = [f'{i:.0f}' for i in colormap.index]
+    # --- INÍCIO DA CORREÇÃO v40 ---
+    # Remove a tentativa anterior:
+    # colormap.tick_labels = [f'{i:.0f}' for i in colormap.index]
+    
+    # Adiciona a nova tentativa:
+    # Define o formato de string para os números da legenda (float com 0 casas decimais)
+    colormap.fmt = '%.0f'
+    # --- FIM DA CORREÇÃO v40 ---
 
     ul = (unit_label or "").lower()
     if "°" in unit_label or "temp" in ul:
