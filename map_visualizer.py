@@ -5,9 +5,7 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v29) - Atualiza as funções de colorbar para renderização discreta (10 passos).
-#       - Importa `StepColormap` (para interativo) e `mcolors` (para estático).
-#       - Remove a lógica de 'ticks' antiga de `create_static_map`.
+# (v30) - Força os valores da legenda interativa (index) a serem inteiros.
 # ==================================================================================
 
 import streamlit as st
@@ -17,16 +15,13 @@ import io
 import base64
 import requests
 from PIL import Image
-import numpy as np # <-- ADICIONADO para linspace
+import numpy as np 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
 from matplotlib.colorbar import ColorbarBase
 from matplotlib import cm
-import matplotlib.colors as mcolors # <-- ADICIONADO para BoundaryNorm
-
-# --- INÍCIO DA CORREÇÃO v29 ---
-from branca.colormap import StepColormap # <-- ADICIONADO para legenda discreta
-# --- FIM DA CORREÇÃO v29 ---
+import matplotlib.colors as mcolors 
+from branca.colormap import StepColormap 
 
 
 # ==================================================================================
@@ -52,7 +47,6 @@ def create_interactive_map(ee_image: ee.Image,
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
     
-    # Atualizado para chamar a nova função de legenda discreta
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
     mapa.to_streamlit(height=500, use_container_width=True)
@@ -64,8 +58,8 @@ def create_interactive_map(ee_image: ee.Image,
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
-    (v29) Função auxiliar interna para adicionar uma legenda (colorbar) 
-    DISCRETA flutuante no canto inferior esquerdo.
+    (v30) Função auxiliar interna para adicionar uma legenda (colorbar) 
+    DISCRETA e com valores INTEIROS no canto inferior esquerdo.
     """
     from branca.element import Template, MacroElement
     
@@ -76,19 +70,19 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     if not palette or len(palette) == 0:
         return 
 
-    # --- INÍCIO DA CORREÇÃO v29 ---
-    # Gera 11 valores (para 10 intervalos) entre o min e o max
-    N_STEPS = len(palette) # O número de passos é definido pelo n° de cores
-    index = np.linspace(vmin, vmax, N_STEPS + 1)
+    N_STEPS = len(palette) 
     
-    # Usa StepColormap em vez de LinearColormap
+    # --- INÍCIO DA CORREÇÃO v30 ---
+    # Gera 11 valores e os converte para inteiro
+    index = np.linspace(vmin, vmax, N_STEPS + 1).astype(int) 
+    # --- FIM DA CORREÇÃO v30 ---
+
     colormap = StepColormap(
         colors=palette, 
         index=index, 
         vmin=vmin, 
         vmax=vmax
     )
-    # --- FIM DA CORREÇÃO v29 ---
 
     # Formata a etiqueta da legenda
     ul = (unit_label or "").lower()
@@ -120,7 +114,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 
 # ==================================================================================
-# COLORBAR COMPACTA (MAPA ESTÁTICO) (Modificado)
+# COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
@@ -128,54 +122,34 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
     """
     (v29) Função auxiliar interna para gerar uma imagem de legenda (colorbar) 
     horizontal DISCRETA usando Matplotlib.
-
-    Args:
-        palette (list): A lista de 10 cores.
-        vmin (float): O valor mínimo da escala.
-        vmax (float): O valor máximo da escala.
-        label (str): A etiqueta da unidade (ex: "Temperatura (°C)").
-
-    Returns:
-        str: Uma string de Data URL (base64) da imagem PNG da legenda.
     """
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
     
-    # --- INÍCIO DA CORREÇÃO v29 ---
     try:
         N_STEPS = len(palette)
-        # Cria os 11 limites (boundaries) para os 10 intervalos
         boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
-        
-        # Cria o colormap discreto
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
-        
-        # Cria a normalização discreta
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
-        
     except Exception as e:
         st.error(f"Erro ao criar colormap: {e}")
         plt.close(fig)
         return None
 
-    # Gera a colorbar usando a normalização discreta
     cb = ColorbarBase(
         ax, 
         cmap=cmap, 
         norm=norm, 
         boundaries=boundaries,
-        ticks=boundaries, # Define os ticks nos limites
+        ticks=boundaries,
         spacing='proportional',
         orientation="horizontal"
     )
-    # --- FIM DA CORREÇÃO v29 ---
         
     cb.set_label(label, fontsize=7)
-    # Formata os ticks para serem legíveis (ex: 500.0 -> 500)
     cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     
-    # Salva a figura em um buffer de bytes em memória
     buf = io.BytesIO()
     plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
     plt.close(fig)
@@ -186,7 +160,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
 
 
 # ==================================================================================
-# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Modificado)
+# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico)
 # ==================================================================================
 
 def create_static_map(ee_image: ee.Image, 
@@ -197,7 +171,6 @@ def create_static_map(ee_image: ee.Image,
     Gera o mapa estático (PNG/JPG) e a legenda (colorbar) discreta.
     """
     try:
-        # Lógica de mesclagem (v17) - Idêntica
         visualized_data = ee_image.visualize(
             min=vis_params["min"],
             max=vis_params["max"],
@@ -223,19 +196,10 @@ def create_static_map(ee_image: ee.Image,
         jpg_b64 = base64.b64encode(jpg_buffer.getvalue()).decode("ascii")
         jpg_url = f"data:image/jpeg;base64,{jpg_b64}"
 
-        # ===============================================
-        # 7. Geração da Colorbar (Legenda)
-        # ===============================================
-        
         palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
         vmin = vis_params.get("min", 0)
         vmax = vis_params.get("max", 1)
         label = unit_label or ""
-        
-        # --- INÍCIO DA CORREÇÃO v29 ---
-        # REMOVIDA a lógica antiga de 'ticks'
-        # A nova função _make_compact_colorbar agora cuida dos ticks.
-        # --- FIM DA CORREÇÃO v29 ---
         
         colorbar_img = _make_compact_colorbar(palette, vmin, vmax, label)
 
