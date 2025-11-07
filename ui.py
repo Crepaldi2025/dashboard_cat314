@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v44)
+# ui.py — (Corrigido v43)
 # ==================================================================================
 
 import streamlit as st
@@ -87,8 +87,7 @@ def reset_analysis_results_only():
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
 # ==================================================================================
 
-def configurar_pagina():
-    st.markdown("---")
+# Removida a função 'configurar_pagina' (v41)
 
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
@@ -141,7 +140,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
-                # --- INÍCIO DA CORREÇÃO v44 ---
+                # --- INÍCIO DA CORREÇÃO v43 ---
+                # Adiciona o popover de ajuda para Círculo
                 with st.popover("ℹ️ Ajuda: Círculo (Lat/Lon/Raio)"):
                     st.markdown("""
                     **Como usar:**
@@ -149,7 +149,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     2.  **Longitude:** Insira a longitude do ponto central (em graus decimais). Valores positivos para Leste, negativos para Oeste (ex: `-45.46`).
                     3.  **Raio (km):** Defina o raio em quilômetros ao redor do ponto central.
                     """)
-                # --- FIM DA CORREÇÃO v44 ---
+                # --- FIM DA CORREÇÃO v43 ---
 
             elif tipo_localizacao == "Polígono":
                 if st.session_state.get('drawn_geometry'):
@@ -159,7 +159,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 else: 
                     st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
 
-                # --- INÍCIO DA CORREÇÃO v44 ---
+                # --- INÍCIO DA CORREÇÃO v43 ---
+                # Adiciona o popover de ajuda para Polígono (texto simplificado)
                 with st.popover("ℹ️ Ajuda: Polígono"):
                     st.markdown("""
                     **Como usar:**
@@ -167,7 +168,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     2.  O mapa de desenho aparecerá na tela principal.
                     3.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa e clique em **"Finish"** para confirmar.
                     """)
-                # --- FIM DA CORREÇÃO v44 ---
+                # --- FIM DA CORREÇÃO v43 ---
             
             st.divider()
 
@@ -229,6 +230,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                      disable_button = True
                      tooltip_message = "O desenho de polígono só funciona na aba 'Mapas'."
             
+            # (v42) Adiciona verificação de valores válidos para o Círculo
             elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
                 if not (st.session_state.get('latitude') is not None and 
                         st.session_state.get('longitude') is not None and 
