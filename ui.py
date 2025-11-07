@@ -155,7 +155,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
                 elif opcao_selecionada == "Mapas":
-                    st.info("Use as ferramentas no mapa principal para desenhar sua área.")
+                    #st.info("Use as ferramentas no mapa principal para desenhar sua área.")
                 else: 
                     st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
 
@@ -333,4 +333,5 @@ def renderizar_pagina_sobre():
     
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
+
 
