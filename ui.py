@@ -27,7 +27,7 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES
+# FUNÇÕES AUXILIARES (Idênticas)
 # ==================================================================================
 
 # Lista manual de meses para garantir o português (v38)
@@ -263,4 +263,72 @@ def renderizar_pagina_principal(opcao_navegacao):
     with col1:
         logo_col, title_col = st.columns([1, 5])
         with logo_col:
-            st.image("logo.png", width
+            st.image("logo.png", width=70)
+        with title_col:
+            st.title(f"Clima-Cast-Crepaldi: {opcao_navegacao}")
+
+    with col2:
+        st.write("")
+        st.markdown(f"<p style='text-align: right; color: grey;'>{data_hora_formatada}</p>", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    # A mensagem de placeholder agora é condicional (v41)
+    if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
+        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
+
+
+def renderizar_resumo_selecao():
+    with st.expander("Resumo dos Filtros Utilizados", expanded=False):
+        col_resumo1, col_resumo2 = st.columns(2)
+        
+        try:
+            with col_resumo1:
+                st.markdown(f"**Base de Dados:** `{st.session_state.base_de_dados}`")
+                st.markdown(f"**Variável:** `{st.session_state.variavel}`")
+                st.markdown(f"**Tipo de Localização:** `{st.session_state.tipo_localizacao}`")
+                if st.session_state.tipo_localizacao == "Estado":
+                    st.markdown(f"**Estado:** `{st.session_state.estado}`")
+                elif st.session_state.tipo_localizacao == "Município":
+                    st.markdown(f"**Estado:** `{st.session_state.estado}`")
+                    st.markdown(f"**Município:** `{st.session_state.municipio}`")
+                elif st.session_state.tipo_localizacao == "Círculo (Lat/Lon/Raio)":
+                    st.markdown(f"**Centro:** `Lat: {st.session_state.latitude}, Lon: {st.session_state.longitude}`")
+                    st.markdown(f"**Raio:** `{st.session_state.raio} km`")
+                elif st.session_state.tipo_localizacao == "Polígono":
+                    st.markdown(f"**Área:** `Desenhada no mapa`")
+            with col_resumo2:
+                st.markdown(f"**Tipo de Período:** `{st.session_state.tipo_periodo}`")
+                if st.session_state.tipo_periodo == "Personalizado":
+                    data_inicio_fmt = st.session_state.data_inicio.strftime('%d/%m/%Y')
+                    data_fim_fmt = st.session_state.data_fim.strftime('%d/%m/%Y')
+                    st.markdown(f"**Data de Início:** `{data_inicio_fmt}`")
+                    st.markdown(f"**Data de Fim:** `{data_fim_fmt}`")
+                elif st.session_state.tipo_periodo == "Mensal":
+                    st.markdown(f"**Período:** `{st.session_state.mes_mensal} de {st.session_state.ano_mensal}`")
+                elif st.session_state.tipo_periodo == "Anual":
+                    st.markdown(f"**Período:** `Ano de {st.session_state.ano_anual}`")
+                if st.session_state.get('nav_option') == "Mapas":
+                    st.markdown(f"**Tipo de Mapa:** `{st.session_state.map_type}`")
+            st.info("Por favor, confira suas seleções. A busca pelos dados será iniciada com base nestes parâmetros.")
+        except AttributeError:
+            st.warning("Filtros foram redefinidos. Por favor, selecione novamente.")
+
+
+def renderizar_pagina_sobre():
+    texto_sobre = _carregar_texto_docx("sobre.docx")
+    
+    if texto_sobre is None:
+        st.warning("Arquivo `sobre.docx` não encontrado. Exibindo texto padrão.")
+        st.markdown("""
+        **Objetivo**
+        
+        O sistema tem como principal objetivo proporcionar uma interface intuitiva e interativa para consulta, análise e visualização 
+        de dados meteorológicos históricos dos municípios brasileiros...
+        
+        *(Por favor, crie um arquivo chamado 'sobre.docx' na mesma pasta do 'main.py' com o conteúdo desta página.)*
+        """)
+    else:
+        st.markdown(texto_sobre, unsafe_allow_html=True)
+    
+    st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
