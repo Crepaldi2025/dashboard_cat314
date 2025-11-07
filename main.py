@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v38)
+# main.py — Clima-Cast-Crepaldi (Corrigido v39)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -98,7 +98,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função atualizada v38)
+# (Função atualizada v39)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -203,16 +203,16 @@ def render_analysis_results():
                 st.download_button("Exportar (PNG - Somente Mapa)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
 
         st.markdown("---") 
-        
-        # --- INÍCIO DA CORREÇÃO v38 ---
-        st.subheader("Tabela de Dados") # <-- Título Unificado
-        # --- FIM DA CORREÇÃO v38 ---
+        st.subheader("Tabela de Dados") # (Idêntico v38)
 
         if "map_dataframe" not in results or results["map_dataframe"].empty:
             st.warning("Não foi possível extrair dados amostrais para a tabela.")
         else:
             df_map = results["map_dataframe"]
             st.dataframe(df_map, use_container_width=True)
+            
+            # --- INÍCIO DA CORREÇÃO v39 ---
+            st.subheader("Exportar Tabela") # <-- Título adicionado
             
             variavel = st.session_state.variavel
             variable_name = variavel.split(" (")[0]
@@ -227,9 +227,22 @@ def render_analysis_results():
 
             col_btn_1, col_btn_2 = st.columns(2)
             with col_btn_1:
-                st.download_button("Exportar Amostra (CSV)", data=csv_data, file_name=f"{file_name_safe}.csv", mime="text/csv", use_container_width=True)
+                st.download_button(
+                    label="Exportar para CSV", # <-- Texto unificado
+                    data=csv_data, 
+                    file_name=f"{file_name_safe}.csv", 
+                    mime="text/csv", 
+                    use_container_width=True
+                )
             with col_btn_2:
-                st.download_button("Exportar Amostra (XLSX)", data=excel_data, file_name=f"{file_name_safe}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                st.download_button(
+                    label="Exportar para XLSX (Excel)", # <-- Texto unificado
+                    data=excel_data, 
+                    file_name=f"{file_name_safe}.xlsx", 
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                    use_container_width=True
+                )
+            # --- FIM DA CORREÇÃO v39 ---
 
     elif aba == "Séries Temporais":
         if "time_series_df" not in results:
