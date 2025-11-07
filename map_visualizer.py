@@ -5,7 +5,7 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v35) - REMOVIDA a lógica do título HTML flutuante. O título
+# (v36) - REMOVIDA a lógica do título HTML flutuante. O título
 #         agora é renderizado diretamente pelo main.py (st.subheader).
 # ==================================================================================
 
@@ -30,12 +30,12 @@ from branca.element import Template, MacroElement
 # MAPA INTERATIVO (Resultado da Análise)
 # ==================================================================================
 
-# --- INÍCIO DA CORREÇÃO v35 ---
+# --- INÍCIO DA CORREÇÃO v36 ---
 def create_interactive_map(ee_image: ee.Image, 
                            feature: ee.Feature, 
                            vis_params: dict, 
                            unit_label: str = ""):
-# --- FIM DA CORREÇÃO v35 ---
+# --- FIM DA CORREÇÃO v36 ---
     """
     (v34) Cria e exibe um mapa interativo que se centraliza e 
     dá zoom automaticamente na área de interesse.
@@ -57,9 +57,9 @@ def create_interactive_map(ee_image: ee.Image,
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
-    # --- INÍCIO DA CORREÇÃO v35 ---
-    # Bloco de código do Título HTML foi REMOVIDO מכאן
-    # --- FIM DA CORREÇÃO v35 ---
+    # --- INÍCIO DA CORREÇÃO v36 ---
+    # Bloco de código do Título HTML foi REMOVIDO daqui
+    # --- FIM DA CORREÇÃO v36 ---
 
     if bounds:
         mapa.fit_bounds(bounds)
