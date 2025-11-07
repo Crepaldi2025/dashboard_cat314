@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v44)
+# main.py — Clima-Cast-Crepaldi (Corrigido v43)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -100,7 +100,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função atualizada v44)
+# (Função atualizada v43)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -159,7 +159,7 @@ def render_analysis_results():
             
             st.subheader(titulo_mapa) 
             
-            # --- INÍCIO DA CORREÇÃO v44 (Ajuda Botões do Mapa) ---
+            # --- INÍCIO DA CORREÇÃO v43 (Ajuda Botões do Mapa) ---
             with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
                 st.markdown("""
                 **Como usar os botões do mapa:**
@@ -168,7 +168,7 @@ def render_analysis_results():
                 * **Camadas (□):** (No canto superior direito) Permite alternar entre o mapa de satélite (HYBRID) e o mapa de ruas (OpenStreetMap).
                 * **Contorno:** A linha preta representa os limites da área de análise.
                 """)
-            # --- FIM DA CORREÇÃO v44 ---
+            # --- FIM DA CORREÇÃO v43 ---
             
             map_visualizer.create_interactive_map(
                 ee_image, 
@@ -262,12 +262,16 @@ def render_analysis_results():
         )
 
 # ----------------------------------------------------------------------------------
-# LÓGICA DE DESENHO (Idêntica, mantida da v41)
+# CORREÇÃO v43:
+# A lógica de renderização do mapa de desenho foi ajustada para
+# não apagar o polígono quando os resultados já existem.
+# O Popover de ajuda foi movido para o ui.py
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     
-    # (Correção v40/v44) - A info e o popover foram movidos para o ui.py
+    # (Correção v43) - A info e o popover de ajuda para "Polígono"
+    # agora estão no ui.py e não são mais necessários aqui.
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Finish' (na barra superior) para confirmar.")
 
     mapa_desenho = folium.Map(
