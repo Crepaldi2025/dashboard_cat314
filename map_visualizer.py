@@ -5,7 +5,8 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v32) - Adiciona um título HTML flutuante ao mapa interativo.
+# (v33) - Corrige 'NameError' movendo as importações de 'Template' e 
+#         'MacroElement' para o topo do arquivo, tornando-as globais.
 # ==================================================================================
 
 import streamlit as st
@@ -22,9 +23,11 @@ from matplotlib.colorbar import ColorbarBase
 from matplotlib import cm
 import matplotlib.colors as mcolors 
 from branca.colormap import StepColormap 
-# --- INÍCIO DA CORREÇÃO v30 ---
-from branca.element import Template, MacroElement # Necessário para o título
-# --- FIM DA CORREÇÃO v30 ---
+
+# --- INÍCIO DA CORREÇÃO v33 ---
+# Movido do 'add_colorbar' para o topo para ser usado por ambas as funções
+from branca.element import Template, MacroElement 
+# --- FIM DA CORREÇÃO v33 ---
 
 
 # ==================================================================================
@@ -35,7 +38,7 @@ def create_interactive_map(ee_image: ee.Image,
                            feature: ee.Feature, 
                            vis_params: dict, 
                            unit_label: str = "",
-                           title: str = ""): # <-- Título adicionado
+                           title: str = ""): # <-- Título adicionado (v30)
     """
     Cria e exibe um mapa interativo com os dados do GEE e o contorno da área.
     """
@@ -53,9 +56,8 @@ def create_interactive_map(ee_image: ee.Image,
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
-    # --- INÍCIO DA CORREÇÃO v30 (Adicionar Título) ---
+    # Adiciona o Título (lógica v30)
     if title:
-        # Cria um elemento HTML/CSS para o título flutuante
         title_html = f'''
              <div style="
                  position: fixed; 
@@ -68,11 +70,10 @@ def create_interactive_map(ee_image: ee.Image,
              {title}
              </div>
              '''
-        # Adiciona o elemento ao mapa
+        # Agora 'MacroElement' e 'Template' são reconhecidos
         title_macro = MacroElement()
         title_macro._template = Template(title_html)
         mapa.get_root().add_child(title_macro)
-    # --- FIM DA CORREÇÃO v30 ---
 
     mapa.to_streamlit(height=500, use_container_width=True)
 
