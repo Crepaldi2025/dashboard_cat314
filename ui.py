@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v38)
+# ui.py — (Corrigido v40)
 # ==================================================================================
 
 import streamlit as st
@@ -30,16 +30,6 @@ except locale.Error:
 # FUNÇÕES AUXILIARES (Modificada)
 # ==================================================================================
 
-# --- INÍCIO DA CORREÇÃO v38 ---
-# Lista manual de meses para garantir o português,
-# independentemente do locale do servidor.
-NOMES_MESES_PT = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-]
-# --- FIM DA CORREÇÃO v38 ---
-
-
 @st.cache_data
 def _carregar_texto_docx(file_path):
     """
@@ -60,6 +50,10 @@ def _carregar_texto_docx(file_path):
         return None
 
 def reset_analysis_state():
+    """
+    Callback DESTRUTIVO: Limpa TUDO, incluindo a geometria desenhada.
+    Usado quando o usuário muda a Variável, Localização ou Período.
+    """
     keys_to_clear = [
         'analysis_triggered',   
         'analysis_results',     
@@ -68,10 +62,27 @@ def reset_analysis_state():
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
+
+# --- INÍCIO DA CORREÇÃO v40 ---
+def reset_analysis_results_only():
+    """
+    Callback "LEVE": Limpa APENAS os resultados, mantendo a geometria.
+    Usado ao trocar o Tipo de Mapa (Interativo/Estático).
+    """
+    keys_to_clear = [
+        'analysis_triggered',   
+        'analysis_results',     
+    ]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+# --- FIM DA CORREÇÃO v40 ---
     
 # ==================================================================================
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
 # ==================================================================================
+def configurar_pagina():
+    st.markdown("---")
 
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
@@ -82,7 +93,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             ["Mapas", "Séries Temporais", "Sobre o Aplicativo"],
             label_visibility="collapsed",
             key='nav_option',
-            on_change=reset_analysis_state
+            on_change=reset_analysis_state # <- CORRETO: Mudar de aba limpa tudo
         )
         st.markdown("---")
         opcao_selecionada = st.session_state.get('nav_option', 'Mapas')
@@ -102,7 +113,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.selectbox("Selecione o tipo de área de interesse", 
                          ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], 
                          key='tipo_localizacao', 
-                         on_change=reset_analysis_state)
+                         on_change=reset_analysis_state) # <- CORRETO: Mudar o tipo de local limpa tudo
             
             tipo_localizacao = st.session_state.get('tipo_localizacao', 'Estado')
             lista_estados_formatada = ["Selecione..."] + [f"{mapa_nomes_uf[uf]} - {uf}" for uf in sorted(mapa_nomes_uf)]
@@ -131,7 +142,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
             st.divider()
 
-            # 5. PERÍODO (Lógica Condicional)
             st.subheader("4. Período de Análise")
             
             if opcao_selecionada == "Mapas":
@@ -141,9 +151,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             tipo_periodo = st.session_state.get('tipo_periodo', 'Personalizado')
             ano_atual = datetime.now().year
-            
-            # (Mantida a v35, de 1950 em diante)
-            lista_anos = list(range(ano_atual, 1949, -1)) 
+            lista_anos = list(range(ano_atual, 1949, -1)) # (v35)
 
             st.session_state.date_error = False
             if tipo_periodo == "Personalizado":
@@ -160,22 +168,24 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if st.session_state.data_fim < st.session_state.data_inicio:
                     st.error("Atenção: A data final é anterior à data inicial.")
                     st.session_state.date_error = True
-            
             elif tipo_periodo == "Mensal":
                 st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
-                # --- INÍCIO DA CORREÇÃO v38 ---
-                # Usa a lista manual em PT-BR em vez de 'calendar.month_name'
-                st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
-                # --- FIM DA CORREÇÃO v38 ---
-            
+                # (v38) Usa a lista manual em PT-BR
+                st.selectbox("Mês", ui.NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
             elif tipo_periodo == "Anual":
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
-            
             st.divider()
 
             if opcao_selecionada == "Mapas":
                 st.subheader("5. Tipo de Mapa")
-                st.radio("Selecione o formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_state)
+                # --- INÍCIO DA CORREÇÃO v40 ---
+                st.radio("Selecione o formato", 
+                         ["Interativo", "Estático"], 
+                         key='map_type', 
+                         horizontal=True, 
+                         on_change=reset_analysis_results_only # <-- USA O CALLBACK "LEVE"
+                )
+                # --- FIM DA CORREÇÃO v40 ---
                 st.divider()
 
             disable_button = st.session_state.get('date_error', False)
@@ -202,10 +212,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         return opcao_selecionada
 
-# ==================================================================================
-# (O restante do arquivo: renderizar_pagina_principal, 
-#  renderizar_resumo_selecao, renderizar_pagina_sobre é idêntico ao v27)
-# ==================================================================================
 
 def renderizar_pagina_principal(opcao_navegacao):
     agora = datetime.now()
