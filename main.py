@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v41)
+# main.py — Clima-Cast-Crepaldi (Corrigido v40)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -34,7 +34,6 @@ def get_geo_caching_key(session_state):
 
 @st.cache_data(ttl=3600)
 def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
-    # (Função idêntica à v31)
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     if not geometry: return None 
     var_cfg = gee_handler.ERA5_VARS.get(variavel)
@@ -67,7 +66,6 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
 
 # ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE (Idêntica) ----------------------
 def run_full_analysis():
-    # (Função idêntica à v31)
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
 
@@ -100,7 +98,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função idêntica à v36 - sem alterações)
+# (Função idêntica à v39)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -249,13 +247,32 @@ def render_analysis_results():
         )
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v41:
-# A lógica de captura foi melhorada para não apagar a geometria
-# quando o mapa recarrega (ex: ao clicar no rádio "Estático" -> "Interativo")
+# CORREÇÃO v40:
+# Adicionado um `st.popover` para explicar os botões de desenho.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
-    st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Gerar Análise' na barra lateral quando terminar.")
+
+    # --- INÍCIO DA CORREÇÃO v40 ---
+    # Divide a área em colunas para alinhar a informação e o botão de ajuda
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Finish' (na barra superior) para confirmar.")
+    with col2:
+        with st.popover("ℹ️ Ajuda com os Botões"):
+            st.markdown("""
+            **Como Desenhar:**
+            1.  Clique no ícone de **Polígono** (⬟) ou **Retângulo** (■) na barra à esquerda.
+            2.  Clique no mapa para adicionar pontos.
+            3.  **Para terminar:** Clique em **"Finish"** na barra de ferramentas que aparece no topo (NÃO clique no primeiro ponto).
+
+            **Outros Botões:**
+            * **Editar (⬟✎):** Permite mover os pontos de um polígono já desenhado.
+            * **Lixeira (🗑️):** Apaga todos os polígonos.
+            * **Zoom (+/-):** Aproxima ou afasta o mapa.
+            * **Camadas (□):** (No canto superior direito) Altera o mapa de fundo (se houver outras camadas).
+            """)
+    # --- FIM DA CORREÇÃO v40 ---
 
     mapa_desenho = folium.Map(
         location=[-15.78, -47.93], 
@@ -285,50 +302,27 @@ def render_polygon_drawer():
     
     geometry = None
     
-    # --- INÍCIO DA CORREÇÃO v41 ---
     if map_data:
-        # Pega a lista de desenhos retornada pelo mapa
         all_drawings = map_data.get("all_drawings")
 
-        # CASO 1: O usuário desenhou algo (a lista não é vazia)
         if all_drawings and len(all_drawings) > 0:
             drawing = all_drawings[-1] 
             if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
                 if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
                     geometry = drawing["geometry"]
-
-        # CASO 2: O usuário apagou o desenho (a lista está explicitamente vazia: [])
-        # Isso só acontece se o usuário usar a ferramenta "lixeira" no mapa.
         elif all_drawings == []: 
             if 'drawn_geometry' in st.session_state:
                  del st.session_state['drawn_geometry']
                  st.warning("Polígono removido.")
                  st.rerun()
-        
-        # CASO 3: O mapa apenas recarregou (all_drawings é None/NULL)
-        # Ex: O usuário clicou em "Gerar Análise" ou trocou de "Estático" para "Interativo".
-        # Neste caso, não fazemos NADA. O 'geometry' continua None.
-        elif all_drawings is None:
-            pass 
-    
-    # Lógica de validação (separada)
+
     if geometry:
-        # Se uma nova geometria válida foi capturada (CASO 1)...
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
             st.success("✅ Polígono capturado!")
-            st.rerun() # Recarrega para habilitar o botão
-            
-    # A lógica 'else' que apagava o estado foi removida.
-    # O estado só é apagado se o usuário *explicitamente* apagar (CASO 2).
-    # --- FIM DA CORREÇÃO v41 ---
-
+            st.rerun() 
     
-# ----------------------------------------------------------------------------------
-# CORREÇÃO v41:
-# A lógica de renderização do mapa de desenho foi ajustada para
-# não apagar o polígono quando os resultados já existem.
-# ----------------------------------------------------------------------------------
+# ---------------------- FUNÇÃO MAIN (Idêntica à v25) ----------------------
 def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
@@ -343,38 +337,15 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # --- INÍCIO DA CORREÇÃO v41 ---
-    # Define quando mostrar o mapa de desenho vs. os resultados
-    
-    # Estamos no modo Polígono?
-    is_polygon_mode = (
-        opcao_menu == "Mapas" and 
-        st.session_state.get('tipo_localizacao') == "Polígono"
-    )
-    
-    # A análise já foi disparada?
-    is_analysis_running = st.session_state.get("analysis_triggered", False)
-    
-    # Já temos resultados para mostrar?
-    has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
+    if opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono":
+        if not st.session_state.get("analysis_triggered", False):
+            render_polygon_drawer()
 
-    # SÓ mostre o mapa de desenho se:
-    # 1. Estamos no modo Polígono
-    # 2. A análise NÃO está rodando agora
-    # 3. NÃO há resultados para mostrar
-    if is_polygon_mode and not is_analysis_running and not has_results:
-        render_polygon_drawer()
-
-    # Lógica de Execução
-    if is_analysis_running:
+    if st.session_state.get("analysis_triggered", False):
         st.session_state.analysis_triggered = False 
         run_full_analysis() 
 
-    # Lógica de Renderização de Resultados
-    # (A função render_analysis_results() já verifica internamente se 'analysis_results' existe)
     render_analysis_results()
-    # --- FIM DA CORREÇÃO v41 ---
-
 
 if __name__ == "__main__":
     main()
