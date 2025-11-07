@@ -1,5 +1,5 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v38)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v39)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
@@ -62,7 +62,7 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title: str = ""):
     """
     Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
-    (v38) - Unifica o título da tabela de dados.
+    (v39) - Unifica o título da tabela de dados.
     """
     
     st.markdown("""
@@ -139,7 +139,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title:
     )
     
     # ======================================================
-    # Tabela de Dados e Exportação (Modificado v38)
+    # Tabela de Dados e Exportação (Modificado v39)
     # ======================================================
     st.markdown("---")
     
@@ -147,14 +147,15 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title:
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
     df_export['date'] = df_export['date'].dt.tz_localize(None) 
     
-    # --- INÍCIO DA CORREÇÃO v38 ---
-    st.subheader("Tabela de Dados") # <-- Título Unificado
+    st.subheader("Tabela de Dados") # (Idêntico v38)
     df_display = df_export.copy()
     df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
     st.dataframe(df_display, use_container_width=True, height=300)
-    # --- FIM DA CORREÇÃO v38 ---
 
-    st.subheader("Exportar Dados da Série Temporal")
+    # --- INÍCIO DA CORREÇÃO v39 ---
+    st.subheader("Exportar Tabela") # <-- Título Unificado
+    # --- FIM DA CORREÇÃO v39 ---
+    
     file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     
     csv_data = df_export.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
