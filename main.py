@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v33)
+# main.py — Clima-Cast-Crepaldi (Corrigido v36)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -98,7 +98,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função atualizada v33)
+# (Função atualizada v36)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -155,16 +155,16 @@ def render_analysis_results():
 
         if tipo_mapa == "Interativo":
             
-            # --- INÍCIO DA CORREÇÃO v33 ---
+            # --- INÍCIO DA CORREÇÃO v36 ---
             st.subheader(titulo_mapa) # Exibe o título ANTES do mapa
             map_visualizer.create_interactive_map(
                 ee_image, 
                 feature, 
                 vis_params, 
                 var_cfg["unit"] 
-                # O argumento 'title' foi removido
+                # O argumento 'title' foi removido da chamada
             ) 
-            # --- FIM DA CORREÇÃO v33 ---
+            # --- FIM DA CORREÇÃO v36 ---
 
         elif tipo_mapa == "Estático":
             if "static_map_png_url" not in results:
@@ -174,7 +174,8 @@ def render_analysis_results():
             jpg_url = results["static_map_jpg_url"]
             colorbar_b64 = results["static_colorbar_b64"]
 
-            st.subheader(titulo_mapa)
+            st.subheader(titulo_mapa) # Exibe o título
+            
             map_width = 400 
             
             if png_url:
