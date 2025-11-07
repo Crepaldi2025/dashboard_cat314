@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v46)
+# ui.py — (Corrigido v47)
 # ==================================================================================
 
 import streamlit as st
@@ -87,8 +87,6 @@ def reset_analysis_results_only():
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
 # ==================================================================================
 
-# Removida a função 'configurar_pagina' (v41)
-
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
         st.header("Painel de Controle")
@@ -151,19 +149,17 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             elif tipo_localizacao == "Polígono":
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
-                
-                # --- INÍCIO DA CORREÇÃO v46 ---
-                # Remove st.info desnecessário daqui
-                elif opcao_selecionada != "Mapas": 
-                    st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
-                # --- FIM DA CORREÇÃO v46 ---
+                else: 
+                    # --- INÍCIO DA CORREÇÃO v47 ---
+                    st.info("O mapa de desenho aparecerá na tela principal.")
+                    # --- FIM DA CORREÇÃO v47 ---
 
                 with st.popover("ℹ️ Ajuda: Polígono"):
                     st.markdown("""
                     **Como usar:**
-                    1.  Certifique-se de que a aba **"Mapas"** está selecionada (no topo da sidebar).
-                    2.  O mapa de desenho aparecerá na tela principal.
-                    3.  Use as ferramentas de desenho.
+                    1.  O mapa de desenho aparecerá na tela principal.
+                    2.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa.
+                    3.  Clique em **"Finish"** na barra de ferramentas do mapa para confirmar.
                     """)
             
             st.divider()
@@ -173,11 +169,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if opcao_selecionada == "Mapas":
                 st.selectbox("Selecione o tipo de período", ["Personalizado", "Mensal", "Anual"], key='tipo_periodo', on_change=reset_analysis_state)
             else:
+                # Na aba "Séries Temporais", força o período Personalizado
                 st.session_state.tipo_periodo = "Personalizado"
             
             tipo_periodo = st.session_state.get('tipo_periodo', 'Personalizado')
             ano_atual = datetime.now().year
-            lista_anos = list(range(ano_atual, 1949, -1)) # (v35)
+            lista_anos = list(range(ano_atual, 1949, -1)) 
 
             st.session_state.date_error = False
             if tipo_periodo == "Personalizado":
@@ -197,7 +194,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             elif tipo_periodo == "Mensal":
                 st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
-                st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state) # (v38)
+                st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
             
             elif tipo_periodo == "Anual":
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
@@ -210,7 +207,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                          ["Interativo", "Estático"], 
                          key='map_type', 
                          horizontal=True, 
-                         on_change=reset_analysis_results_only # (v41)
+                         on_change=reset_analysis_results_only 
                 )
                 st.divider()
 
@@ -221,9 +218,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if not st.session_state.get('drawn_geometry'):
                     disable_button = True
                     tooltip_message = "Por favor, desenhe um polígono no mapa principal primeiro."
-                if opcao_selecionada != "Mapas":
-                     disable_button = True
-                     tooltip_message = "O desenho de polígono só funciona na aba 'Mapas'."
+                # --- INÍCIO DA CORREÇÃO v47 ---
+                # REMOVIDA a restrição que desabilitava o botão na aba "Séries Temporais"
+                # --- FIM DA CORREÇÃO v47 ---
             
             elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
                 if not (st.session_state.get('latitude') is not None and 
@@ -247,7 +244,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
 # ==================================================================================
 # (O restante do arquivo: renderizar_pagina_principal, 
-#  renderizar_resumo_selecao, renderizar_pagina_sobre é idêntico ao v27)
+#  renderizar_resumo_selecao, renderizar_pagina_sobre é idêntico)
 # ==================================================================================
 
 def renderizar_pagina_principal(opcao_navegacao):
@@ -326,4 +323,3 @@ def renderizar_pagina_sobre():
     
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
-
