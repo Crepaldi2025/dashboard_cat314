@@ -53,6 +53,7 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
             png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
                 ee_image, feature, var_cfg["vis_params"], var_cfg["unit"]
             )
+            # Salva os componentes (v31)
             results["static_map_png_url"] = png_url
             results["static_map_jpg_url"] = jpg_url
             results["static_colorbar_b64"] = colorbar_img
@@ -113,7 +114,8 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # Geração do Título Dinâmico (Idêntico v36)
+    # --- Geração do Título Dinâmico (v39) ---
+    # (Movido para cima, para ser usado por Mapas e Séries)
     variavel = st.session_state.variavel
     tipo_periodo = st.session_state.tipo_periodo
     tipo_local = st.session_state.tipo_localizacao.lower()
@@ -137,7 +139,9 @@ def render_analysis_results():
         local_str = "para o círculo definido"
         
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-    titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}" # Atualizado para incluir período
+    # Título para séries (agora inclui o período)
+    titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
+    # --- Fim da Geração do Título ---
 
 
     if aba == "Mapas":
@@ -163,7 +167,6 @@ def render_analysis_results():
             ) 
 
         elif tipo_mapa == "Estático":
-            # ... (código idêntico)
             if "static_map_png_url" not in results:
                 st.warning("Erro ao gerar mapas estáticos.")
                 return
