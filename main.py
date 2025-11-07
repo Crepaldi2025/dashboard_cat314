@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v31)
+# main.py — Clima-Cast-Crepaldi (Corrigido v32)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -53,7 +53,6 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
             png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
                 ee_image, feature, var_cfg["vis_params"], var_cfg["unit"]
             )
-            # Salva os *componentes* nos resultados
             results["static_map_png_url"] = png_url
             results["static_map_jpg_url"] = jpg_url
             results["static_colorbar_b64"] = colorbar_img
@@ -99,8 +98,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v31:
-# Lógica do mapa estático modificada para costurar imagens ANTES do download.
+# (Função atualizada v32)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -115,6 +113,35 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
+    # --- Geração do Título Dinâmico (v30/v32) ---
+    # (Movido para cima, para ser usado por Mapas e Séries)
+    variavel = st.session_state.variavel
+    tipo_periodo = st.session_state.tipo_periodo
+    tipo_local = st.session_state.tipo_localizacao.lower()
+    
+    if tipo_periodo == "Personalizado":
+        start_str = st.session_state.data_inicio.strftime('%d/%m/%Y')
+        end_str = st.session_state.data_fim.strftime('%d/%m/%Y')
+        periodo_str = f"de {start_str} a {end_str}"
+    elif tipo_periodo == "Mensal":
+        periodo_str = f"mensal ({st.session_state.mes_mensal} de {st.session_state.ano_mensal})"
+    elif tipo_periodo == "Anual":
+        periodo_str = f"anual ({st.session_state.ano_anual})"
+    
+    if tipo_local == "estado":
+        local_str = f"no {tipo_local} de {st.session_state.estado.split(' - ')[0]}"
+    elif tipo_local == "município":
+        local_str = f"no {tipo_local} de {st.session_state.municipio}"
+    elif tipo_local == "polígono":
+        local_str = "para a área desenhada"
+    else: # Círculo
+        local_str = "para o círculo definido"
+        
+    # Título para mapas (ex: "Temperatura... anual (2023) no estado...")
+    titulo_mapa = f"{variavel} {periodo_str} {local_str}"
+    # Título para séries (ex: "Série Temporal de Temperatura... no estado...")
+    titulo_serie = f"Série Temporal de {variavel} {local_str}"
+
     if aba == "Mapas":
         
         st.markdown("---") 
@@ -128,50 +155,26 @@ def render_analysis_results():
         feature = results["feature"]
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
-        # Geração do Título Dinâmico (Idêntica v30)
-        variavel = st.session_state.variavel
-        tipo_periodo = st.session_state.tipo_periodo
-        tipo_local = st.session_state.tipo_localizacao.lower()
-        if tipo_periodo == "Personalizado":
-            start_str = st.session_state.data_inicio.strftime('%d/%m/%Y')
-            end_str = st.session_state.data_fim.strftime('%d/%m/%Y')
-            periodo_str = f"de {start_str} a {end_str}"
-        elif tipo_periodo == "Mensal":
-            periodo_str = f"mensal ({st.session_state.mes_mensal} de {st.session_state.ano_mensal})"
-        elif tipo_periodo == "Anual":
-            periodo_str = f"anual ({st.session_state.ano_anual})"
-        if tipo_local == "estado":
-            local_str = f"no {tipo_local} de {st.session_state.estado.split(' - ')[0]}"
-        elif tipo_local == "município":
-            local_str = f"no {tipo_local} de {st.session_state.municipio}"
-        elif tipo_local == "polígono":
-            local_str = "para a área desenhada"
-        else: 
-            local_str = "para o círculo definido"
-        titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-
-
         if tipo_mapa == "Interativo":
             map_visualizer.create_interactive_map(
-                ee_image, feature, vis_params, var_cfg["unit"], title=titulo_mapa
+                ee_image, 
+                feature, 
+                vis_params, 
+                var_cfg["unit"], 
+                title=titulo_mapa 
             ) 
 
         elif tipo_mapa == "Estático":
             if "static_map_png_url" not in results:
                 st.warning("Erro ao gerar mapas estáticos.")
                 return
-            
-            # Pega os componentes (separados)
             png_url = results["static_map_png_url"]
             jpg_url = results["static_map_jpg_url"]
             colorbar_b64 = results["static_colorbar_b64"]
 
-            # Exibe o título
             st.subheader(titulo_mapa)
-            
             map_width = 400 
             
-            # Exibe os componentes (separados)
             if png_url:
                 st.image(png_url, width=map_width)
             if colorbar_b64:
@@ -180,39 +183,26 @@ def render_analysis_results():
             st.markdown("---") 
             st.markdown("### Exportar Mapas")
             
-            # --- INÍCIO DA CORREÇÃO v31 (Costura para Download) ---
             try:
-                # 1. Gerar imagem do título (largura 800 para bater com o PNG do GEE)
                 title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
-                
-                # 2. Decodificar mapa e colorbar de volta para bytes
                 map_png_bytes = base64.b64decode(png_url.split(",")[1])
                 map_jpg_bytes = base64.b64decode(jpg_url.split(",")[1])
                 colorbar_bytes = base64.b64decode(colorbar_b64.split(",")[1])
                 
-                # 3. Costurar para PNG
                 final_png_data = map_visualizer._stitch_images_to_bytes(
                     title_bytes, map_png_bytes, colorbar_bytes, format='PNG'
                 )
-                
-                # 4. Costurar para JPG
                 final_jpg_data = map_visualizer._stitch_images_to_bytes(
                     title_bytes, map_jpg_bytes, colorbar_bytes, format='JPEG'
                 )
 
-                # 5. Criar botões de download com os dados costurados
                 if final_png_data:
                     st.download_button("Exportar (PNG)", data=final_png_data, file_name="mapa_completo.png", mime="image/png", use_container_width=True)
                 if final_jpg_data:
                     st.download_button("Exportar (JPEG)", data=final_jpg_data, file_name="mapa_completo.jpeg", mime="image/jpeg", use_container_width=True)
-
             except Exception as e:
                 st.error(f"Erro ao preparar imagens para download: {e}")
-                # Fallback: oferece apenas o mapa original se a costura falhar
                 st.download_button("Exportar (PNG - Somente Mapa)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
-
-            # --- FIM DA CORREÇÃO v31 ---
-
 
         st.markdown("---") 
         st.subheader("Dados Amostrais do Mapa")
@@ -246,8 +236,15 @@ def render_analysis_results():
             return
             
         df = results["time_series_df"]
-        charts_visualizer.display_time_series_chart(df, st.session_state.variavel, var_cfg["unit"])
-
+        
+        # --- INÍCIO DA CORREÇÃO v32 ---
+        charts_visualizer.display_time_series_chart(
+            df, 
+            st.session_state.variavel, 
+            var_cfg["unit"], 
+            title=titulo_serie # <-- Passa o novo título
+        )
+        # --- FIM DA CORREÇÃO v32 ---
 
 # ----------------------------------------------------------------------------------
 # LÓGICA DE DESENHO (Idêntica, mantida da v25)
