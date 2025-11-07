@@ -5,8 +5,9 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v34) - Adicionadas funções `_make_title_image` e `_stitch_images_to_bytes`
-#         para permitir a exportação do mapa com título e legenda.
+# (v34) - Ajustado o CSS do título do mapa interativo:
+#         - Fonte aumentada para 18px.
+#         - Adicionada margem inferior de 10px.
 # ==================================================================================
 
 import streamlit as st
@@ -25,8 +26,9 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 
+
 # ==================================================================================
-# MAPA INTERATIVO (Resultado da Análise) (Idêntico v33)
+# MAPA INTERATIVO (Resultado da Análise)
 # ==================================================================================
 
 def create_interactive_map(ee_image: ee.Image, 
@@ -35,8 +37,10 @@ def create_interactive_map(ee_image: ee.Image,
                            unit_label: str = "",
                            title: str = ""):
     """
-    Cria e exibe um mapa interativo com os dados do GEE e o contorno da área.
+    (v34) Cria e exibe um mapa interativo que se centraliza e 
+    dá zoom automaticamente na área de interesse.
     """
+    
     try:
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
@@ -54,18 +58,23 @@ def create_interactive_map(ee_image: ee.Image,
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
     if title:
+        # --- INÍCIO DA CORREÇÃO v34 (Estilo do Título) ---
         title_html = f'''
              <div style="
                  position: fixed; 
                  top: 10px; right: 10px; z-index: 9998;
-                 font-size: 16px; font-weight: bold; color: #333;
+                 font-size: 18px; /* <-- Aumentado de 16px */
+                 font-weight: bold; color: #333;
                  background-color: rgba(255, 255, 255, 0.75);
                  padding: 5px 10px; border-radius: 5px;
                  border: 1px solid lightgray;
+                 margin-bottom: 10px; /* <-- Adicionado espaçamento */
                  ">
              {title}
              </div>
              '''
+        # --- FIM DA CORREÇÃO v34 ---
+        
         title_macro = MacroElement()
         title_macro._template = Template(title_html)
         mapa.get_root().add_child(title_macro)
@@ -75,8 +84,9 @@ def create_interactive_map(ee_image: ee.Image,
     
     mapa.to_streamlit(height=500, use_container_width=True)
 
+
 # ==================================================================================
-# COLORBAR INTERATIVA (Idêntico v31)
+# COLORBAR PARA MAPAS INTERATIVOS (Idêntico v31)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
@@ -130,7 +140,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 
 # ==================================================================================
-# COLORBAR ESTÁTICA (Idêntico v29)
+# COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico v29)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
@@ -223,39 +233,26 @@ def create_static_map(ee_image: ee.Image,
     except Exception as e:
         st.error(f"Erro ao gerar mapa estático: {e}")
         return None, None, None
+# ==================================================================================
+# FUNÇÕES DE COSTURA DE IMAGEM (Idênticas v31)
+# ==================================================================================
 
-
-# --- INÍCIO DA CORREÇÃO v34 (Funções de Costura) ---
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
     """
     Cria uma imagem PNG (como bytes) a partir de um texto de título usando Matplotlib.
-
-    Args:
-        title_text (str): O texto a ser renderizado.
-        width (int): A largura da imagem (em pixels) para corresponder ao mapa.
-        height (int): A altura da imagem (em pixels).
-
-    Returns:
-        bytes: Os bytes da imagem PNG.
     """
     try:
-        # Converte pixels para polegadas para o figsize
         dpi = 100
         fig_width = width / dpi
         fig_height = height / dpi
-
         fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
-        fig.patch.set_facecolor('white') # Fundo branco
-
-        # Adiciona o texto centralizado
+        fig.patch.set_facecolor('white')
         plt.text(0.5, 0.5, title_text, 
                  ha='center', va='center', 
-                 fontsize=14, # Você pode ajustar este tamanho
+                 fontsize=14, 
                  fontweight='bold',
                  wrap=True)
-
-        plt.axis('off') # Remove eixos
-        
+        plt.axis('off')
         buf = io.BytesIO()
         plt.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.05, facecolor='white')
         plt.close(fig)
@@ -269,26 +266,14 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
                             colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
     """
     Costura verticalmente três imagens (título, mapa, colorbar) em uma única imagem.
-
-    Args:
-        title_bytes (bytes): Bytes da imagem do título.
-        map_bytes (bytes): Bytes da imagem do mapa.
-        colorbar_bytes (bytes): Bytes da imagem da colorbar.
-        format (str): O formato final ('PNG' ou 'JPEG').
-
-    Returns:
-        bytes: Os bytes da imagem final costurada.
     """
     try:
         title_img = Image.open(io.BytesIO(title_bytes))
         map_img = Image.open(io.BytesIO(map_bytes))
         colorbar_img = Image.open(io.BytesIO(colorbar_bytes))
 
-        # Assume que todas as imagens devem ter a largura do mapa (800px)
         width = map_img.width
         
-        # Redimensiona título e colorbar para corresponder à largura do mapa
-        # (mantendo a proporção da altura)
         def resize_to_width(img, target_width):
             if img.width == target_width:
                 return img
@@ -299,18 +284,13 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
         title_img = resize_to_width(title_img, width)
         colorbar_img = resize_to_width(colorbar_img, width)
 
-        # Calcula a altura total
         total_height = title_img.height + map_img.height + colorbar_img.height
-
-        # Cria a nova imagem de fundo (branca)
         final_img = Image.new('RGB', (width, total_height), 'white')
 
-        # Cola as imagens na ordem
         final_img.paste(title_img, (0, 0))
         final_img.paste(map_img, (0, title_img.height))
         final_img.paste(colorbar_img, (0, title_img.height + map_img.height))
 
-        # Salva o resultado em um buffer de bytes
         final_buffer = io.BytesIO()
         save_format = 'JPEG' if format.upper() == 'JPEG' else 'PNG'
         final_img.save(final_buffer, format=save_format)
@@ -320,4 +300,3 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
     except Exception as e:
         st.error(f"Erro ao costurar imagens: {e}")
         return None
-# --- FIM DA CORREÇÃO v34 ---
