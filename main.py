@@ -165,8 +165,8 @@ def render_analysis_results():
             st.subheader(titulo_mapa)
             
             # 3. Exibir imagem SEM caption
-            map_width = 400 
-            colorbar_width = 400
+            map_width = 450 
+            colorbar_width = 450
 
             if png_url:
                 st.image(png_url, width=map_width) # 'caption' removido
@@ -300,3 +300,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
