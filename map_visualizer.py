@@ -5,8 +5,9 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v33) - Corrige 'NameError' movendo as importações de 'Template' e 
-#         'MacroElement' para o topo do arquivo, tornando-as globais.
+# (v34) - Modificada a função `create_interactive_map` para centralizar
+#         automaticamente o mapa usando `fit_bounds` (ajuste de limites)
+#         em vez de um centroide e zoom fixos.
 # ==================================================================================
 
 import streamlit as st
@@ -23,12 +24,7 @@ from matplotlib.colorbar import ColorbarBase
 from matplotlib import cm
 import matplotlib.colors as mcolors 
 from branca.colormap import StepColormap 
-
-# --- INÍCIO DA CORREÇÃO v33 ---
-# Movido do 'add_colorbar' para o topo para ser usado por ambas as funções
 from branca.element import Template, MacroElement 
-# --- FIM DA CORREÇÃO v33 ---
-
 
 # ==================================================================================
 # MAPA INTERATIVO (Resultado da Análise)
@@ -38,25 +34,23 @@ def create_interactive_map(ee_image: ee.Image,
                            feature: ee.Feature, 
                            vis_params: dict, 
                            unit_label: str = "",
-                           title: str = ""): # <-- Título adicionado (v30)
+                           title: str = ""):
     """
-    Cria e exibe um mapa interativo com os dados do GEE e o contorno da área.
+    (v34) Cria e exibe um mapa interativo que se centraliza e 
+    dá zoom automaticamente na área de interesse.
     """
-    try:
-        centroid = feature.geometry().centroid(maxError=1).getInfo()["coordinates"]
-        centroid.reverse()
-        zoom = 7
-    except Exception:
-        centroid = [-15.78, -47.93] 
-        zoom = 4
-
-    mapa = geemap.Map(center=centroid, zoom=zoom, basemap="HYBRID")
+    
+    # --- INÍCIO DA CORREÇÃO v34 (Centralização) ---
+    
+    # 1. Cria um mapa genérico (o centro não importa, será sobrescrito)
+    mapa = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="HYBRID")
+    
+    # 2. Adiciona as camadas (dados e contorno)
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
     
+    # 3. Adiciona os controles (legenda e título)
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
-    
-    # Adiciona o Título (lógica v30)
     if title:
         title_html = f'''
              <div style="
@@ -70,10 +64,33 @@ def create_interactive_map(ee_image: ee.Image,
              {title}
              </div>
              '''
-        # Agora 'MacroElement' e 'Template' são reconhecidos
         title_macro = MacroElement()
         title_macro._template = Template(title_html)
         mapa.get_root().add_child(title_macro)
+
+    # 4. Centraliza o mapa usando os limites da geometria
+    try:
+        # Pede ao GEE as coordenadas do "bounding box"
+        # Formato GEE: [[lon_min, lat_min], [lon_max, lat_min], ...]
+        coords = feature.geometry().bounds().getInfo()['coordinates'][0]
+        
+        # Converte para o formato do Folium: [[lat_min, lon_min], [lat_max, lon_max]]
+        lon_min = coords[0][0]
+        lat_min = coords[0][1]
+        lon_max = coords[2][0]
+        lat_max = coords[2][1]
+        
+        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
+        
+        # Aplica o ajuste de limites
+        mapa.fit_bounds(bounds)
+    
+    except Exception as e:
+        st.warning(f"Não foi possível centralizar o mapa automaticamente: {e}")
+        # Se falhar, usa o fallback (centro do Brasil)
+        mapa.set_center(-15.78, -47.93, 4)
+
+    # --- FIM DA CORREÇÃO v34 ---
 
     mapa.to_streamlit(height=500, use_container_width=True)
 
@@ -84,8 +101,7 @@ def create_interactive_map(ee_image: ee.Image,
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
-    (v31) Função auxiliar interna para adicionar uma legenda (colorbar) 
-    DISCRETA e com valores INTEIROS no canto inferior esquerdo.
+    (v31) Adiciona legenda discreta com valores inteiros.
     """
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
@@ -104,7 +120,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         vmax=vmax
     )
     
-    # Força a formatação dos labels como inteiros
     colormap.tick_labels = [f'{i:.0f}' for i in colormap.index]
 
     ul = (unit_label or "").lower()
@@ -141,8 +156,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
                            label: str) -> str:
     """
-    (v29) Função auxiliar interna para gerar uma imagem de legenda (colorbar) 
-    horizontal DISCRETA usando Matplotlib.
+    (v29) Gera legenda horizontal discreta (Matplotlib).
     """
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
