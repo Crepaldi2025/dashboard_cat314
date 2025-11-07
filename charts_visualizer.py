@@ -1,5 +1,5 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v37)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v38)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
@@ -12,15 +12,13 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str, title: str 
     (v32) - Aceita um título dinâmico.
     """
     variable_name = variable.split(" (")[0]
-    
-    # Define o título: usa o título dinâmico se fornecido, senão usa um genérico.
     final_title = title if title else f"Série Temporal de {variable_name}"
 
     fig = px.line(
         df,
         x='date',
         y='value',
-        title=final_title, # <-- Título dinâmico aplicado aqui
+        title=final_title, 
         labels={
             "date": "Data",
             "value": f"{variable_name} ({unit})"
@@ -64,10 +62,9 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title: str = ""):
     """
     Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
-    (v37) - Adiciona a exibição do st.dataframe com os dados da série.
+    (v38) - Unifica o título da tabela de dados.
     """
     
-    # CSS para diminuir a fonte da métrica (v18)
     st.markdown("""
     <style>
     div[data-testid="stMetricValue"] {
@@ -142,27 +139,24 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title:
     )
     
     # ======================================================
-    # Tabela de Dados e Exportação (Modificado v37)
+    # Tabela de Dados e Exportação (Modificado v38)
     # ======================================================
     st.markdown("---")
     
-    # Prepara o DataFrame para exibição e exportação
     variable_name = variable.split(" (")[0]
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
-    df_export['date'] = df_export['date'].dt.tz_localize(None) # Remove timezone
+    df_export['date'] = df_export['date'].dt.tz_localize(None) 
     
-    # --- INÍCIO DA CORREÇÃO v37 (Exibir Tabela) ---
-    st.subheader("Dados da Série Temporal")
-    # Formata a data para exibição na tabela
+    # --- INÍCIO DA CORREÇÃO v38 ---
+    st.subheader("Tabela de Dados") # <-- Título Unificado
     df_display = df_export.copy()
     df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
     st.dataframe(df_display, use_container_width=True, height=300)
-    # --- FIM DA CORREÇÃO v37 ---
+    # --- FIM DA CORREÇÃO v38 ---
 
     st.subheader("Exportar Dados da Série Temporal")
     file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     
-    # (Usa o df_export, não o df_display, para manter o tipo 'datetime' no Excel)
     csv_data = df_export.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
     excel_data = _convert_df_to_excel(df_export)
     
