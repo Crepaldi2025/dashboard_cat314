@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v43)
+# main.py — Clima-Cast-Crepaldi (Corrigido v44)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -100,7 +100,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função idêntica à v36 - sem alterações)
+# (Função atualizada v44)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -156,7 +156,20 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
+            
             st.subheader(titulo_mapa) 
+            
+            # --- INÍCIO DA CORREÇÃO v44 (Ajuda Botões do Mapa) ---
+            with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
+                st.markdown("""
+                **Como usar os botões do mapa:**
+                * **Zoom (+/-):** Aproxima ou afasta o mapa.
+                * **Tela Cheia (⛶):** Exibe o mapa em tela cheia.
+                * **Camadas (□):** (No canto superior direito) Permite alternar entre o mapa de satélite e o mapa de ruas.
+                * **Contorno:** A linha preta representa os limites da área de análise que você selecionou.
+                """)
+            # --- FIM DA CORREÇÃO v44 ---
+            
             map_visualizer.create_interactive_map(
                 ee_image, 
                 feature, 
@@ -249,12 +262,12 @@ def render_analysis_results():
         )
 
 # ----------------------------------------------------------------------------------
-# LÓGICA DE DESENHO (Idêntica, mantida da v25)
+# LÓGICA DE DESENHO (Idêntica, mantida da v41)
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     
-    # (Correção v40) - Movido o popover para o ui.py
+    # A ajuda foi movida para o ui.py (v44)
     st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Finish' (na barra superior) para confirmar.")
 
     mapa_desenho = folium.Map(
@@ -309,9 +322,7 @@ def render_polygon_drawer():
             st.rerun() 
     
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v43:
-# A lógica de renderização do mapa de desenho foi ajustada para
-# não apagar o polígono quando os resultados já existem.
+# (Função main idêntica à v41)
 # ----------------------------------------------------------------------------------
 def main():
     if 'gee_initialized' not in st.session_state:
@@ -327,36 +338,22 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # --- INÍCIO DA CORREÇÃO v43 ---
-    
-    # Estamos no modo Polígono?
     is_polygon_mode = (
         opcao_menu == "Mapas" and 
         st.session_state.get('tipo_localizacao') == "Polígono"
     )
-    
-    # A análise já foi disparada?
     is_analysis_running = st.session_state.get("analysis_triggered", False)
-    
-    # Já temos uma geometria desenhada?
     has_geometry = 'drawn_geometry' in st.session_state
+    has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
 
-    # SÓ mostre o mapa de desenho se:
-    # 1. Estamos no modo Polígono
-    # 2. A análise NÃO está rodando agora
-    # 3. A geometria AINDA NÃO FOI DESENHADA
-    if is_polygon_mode and not is_analysis_running and not has_geometry:
+    if is_polygon_mode and not is_analysis_running and not has_geometry and not has_results:
         render_polygon_drawer()
 
-    # Lógica de Execução
     if is_analysis_running:
         st.session_state.analysis_triggered = False 
         run_full_analysis() 
 
-    # Lógica de Renderização de Resultados
-    # (A função render_analysis_results() já verifica internamente se 'analysis_results' existe)
     render_analysis_results()
-    # --- FIM DA CORREÇÃO v43 ---
 
 
 if __name__ == "__main__":
