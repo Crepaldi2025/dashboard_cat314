@@ -27,7 +27,7 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES (Idênticas)
+# FUNÇÕES AUXILIARES
 # ==================================================================================
 
 # Lista manual de meses para garantir o português (v38)
@@ -69,10 +69,11 @@ def reset_analysis_state():
         if key in st.session_state:
             del st.session_state[key]
 
+# --- INÍCIO DA CORREÇÃO v43 ---
 def reset_analysis_results_only():
     """
     Callback "LEVE": Limpa APENAS os resultados, mantendo a geometria.
-    Usado ao trocar o Tipo de Mapa (Interativo/Estático). (v41)
+    Usado ao trocar o Tipo de Mapa (Interativo/Estático).
     """
     keys_to_clear = [
         'analysis_triggered',   
@@ -81,12 +82,11 @@ def reset_analysis_results_only():
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
+# --- FIM DA CORREÇÃO v43 ---
     
 # ==================================================================================
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
 # ==================================================================================
-
-# Removida a função 'configurar_pagina' (v41)
 
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
@@ -140,6 +140,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
                 # --- INÍCIO DA CORREÇÃO v43 ---
+                # Adiciona o popover de ajuda para Círculo
                 with st.popover("ℹ️ Ajuda: Círculo (Lat/Lon/Raio)"):
                     st.markdown("""
                     **Como usar:**
@@ -157,7 +158,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 else: 
                     st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
 
-                # --- INÍCIO DA CORREÇÃO v43 ---
+                # Adiciona o popover de ajuda para Polígono
                 with st.popover("ℹ️ Ajuda: Polígono"):
                     st.markdown("""
                     **Como usar:**
@@ -168,7 +169,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     5.  Para finalizar, clique em **"Finish"** (na barra de ferramentas do mapa).
                     6.  O `st.success` aparecerá aqui e o botão "Gerar Análise" será habilitado.
                     """)
-                # --- FIM DA CORREÇÃO v43 ---
             
             st.divider()
 
@@ -210,12 +210,15 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             if opcao_selecionada == "Mapas":
                 st.subheader("5. Tipo de Mapa")
+                # --- INÍCIO DA CORREÇÃO v43 ---
+                # Atribui o callback "leve" (v41)
                 st.radio("Selecione o formato", 
                          ["Interativo", "Estático"], 
                          key='map_type', 
                          horizontal=True, 
-                         on_change=reset_analysis_results_only # (v41)
+                         on_change=reset_analysis_results_only 
                 )
+                # --- FIM DA CORREÇÃO v43 ---
                 st.divider()
 
             disable_button = st.session_state.get('date_error', False)
