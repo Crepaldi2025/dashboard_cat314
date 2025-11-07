@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v45)
+# ui.py — (Corrigido v46)
 # ==================================================================================
 
 import streamlit as st
@@ -140,7 +140,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
-                # --- INÍCIO DA CORREÇÃO v45 ---
                 with st.popover("ℹ️ Ajuda: Círculo (Lat/Lon/Raio)"):
                     st.markdown("""
                     **Como usar:**
@@ -148,18 +147,17 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     2.  **Longitude:** Insira a longitude do ponto central (em graus decimais). Valores positivos para Leste, negativos para Oeste (ex: `-45.46`).
                     3.  **Raio (km):** Defina o raio em quilômetros ao redor do ponto central.
                     """)
-                # --- FIM DA CORREÇÃO v45 ---
 
             elif tipo_localizacao == "Polígono":
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
-                # --- INÍCIO DA CORREÇÃO v45 ---
+                
+                # --- INÍCIO DA CORREÇÃO v46 ---
                 # Remove st.info desnecessário daqui
                 elif opcao_selecionada != "Mapas": 
                     st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
-                # --- FIM DA CORREÇÃO v45 ---
+                # --- FIM DA CORREÇÃO v46 ---
 
-                # --- INÍCIO DA CORREÇÃO v45 ---
                 with st.popover("ℹ️ Ajuda: Polígono"):
                     st.markdown("""
                     **Como usar:**
@@ -167,7 +165,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     2.  O mapa de desenho aparecerá na tela principal.
                     3.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa.
                     """)
-                # --- FIM DA CORREÇÃO v45 ---
             
             st.divider()
 
@@ -209,12 +206,11 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             if opcao_selecionada == "Mapas":
                 st.subheader("5. Tipo de Mapa")
-                # (v41) Usa o callback "leve"
                 st.radio("Selecione o formato", 
                          ["Interativo", "Estático"], 
                          key='map_type', 
                          horizontal=True, 
-                         on_change=reset_analysis_results_only 
+                         on_change=reset_analysis_results_only # (v41)
                 )
                 st.divider()
 
@@ -271,7 +267,6 @@ def renderizar_pagina_principal(opcao_navegacao):
         st.markdown(f"<p style='text-align: right; color: grey;'>{data_hora_formatada}</p>", unsafe_allow_html=True)
     
     st.markdown("---")
-    # A mensagem de placeholder agora é condicional (v41)
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
@@ -331,4 +326,3 @@ def renderizar_pagina_sobre():
     
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
-
