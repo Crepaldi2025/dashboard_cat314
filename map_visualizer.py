@@ -5,8 +5,7 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v31) - Corrige a formatação da legenda interativa (colorbar) para
-#         exibir números inteiros, sobrescrevendo os 'tick_labels'.
+# (v32) - Adiciona um título HTML flutuante ao mapa interativo.
 # ==================================================================================
 
 import streamlit as st
@@ -23,6 +22,9 @@ from matplotlib.colorbar import ColorbarBase
 from matplotlib import cm
 import matplotlib.colors as mcolors 
 from branca.colormap import StepColormap 
+# --- INÍCIO DA CORREÇÃO v30 ---
+from branca.element import Template, MacroElement # Necessário para o título
+# --- FIM DA CORREÇÃO v30 ---
 
 
 # ==================================================================================
@@ -32,7 +34,8 @@ from branca.colormap import StepColormap
 def create_interactive_map(ee_image: ee.Image, 
                            feature: ee.Feature, 
                            vis_params: dict, 
-                           unit_label: str = ""):
+                           unit_label: str = "",
+                           title: str = ""): # <-- Título adicionado
     """
     Cria e exibe um mapa interativo com os dados do GEE e o contorno da área.
     """
@@ -50,11 +53,32 @@ def create_interactive_map(ee_image: ee.Image,
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
     
+    # --- INÍCIO DA CORREÇÃO v30 (Adicionar Título) ---
+    if title:
+        # Cria um elemento HTML/CSS para o título flutuante
+        title_html = f'''
+             <div style="
+                 position: fixed; 
+                 top: 10px; right: 10px; z-index: 9998;
+                 font-size: 16px; font-weight: bold; color: #333;
+                 background-color: rgba(255, 255, 255, 0.75);
+                 padding: 5px 10px; border-radius: 5px;
+                 border: 1px solid lightgray;
+                 ">
+             {title}
+             </div>
+             '''
+        # Adiciona o elemento ao mapa
+        title_macro = MacroElement()
+        title_macro._template = Template(title_html)
+        mapa.get_root().add_child(title_macro)
+    # --- FIM DA CORREÇÃO v30 ---
+
     mapa.to_streamlit(height=500, use_container_width=True)
 
 
 # ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS (Modificado)
+# COLORBAR PARA MAPAS INTERATIVOS (Idêntico v31)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
@@ -62,8 +86,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     (v31) Função auxiliar interna para adicionar uma legenda (colorbar) 
     DISCRETA e com valores INTEIROS no canto inferior esquerdo.
     """
-    from branca.element import Template, MacroElement
-    
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
@@ -72,8 +94,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         return 
 
     N_STEPS = len(palette) 
-    
-    # Gera 11 valores e os converte para inteiro (mantido da v30)
     index = np.linspace(vmin, vmax, N_STEPS + 1).astype(int) 
 
     colormap = StepColormap(
@@ -82,14 +102,10 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         vmin=vmin, 
         vmax=vmax
     )
-
-    # --- INÍCIO DA CORREÇÃO v31 ---
-    # A StepColormap, por padrão, formata os labels como float (ex: "4.0").
-    # Vamos sobrescrever os 'tick_labels' para forçar a formatação como inteiros.
+    
+    # Força a formatação dos labels como inteiros
     colormap.tick_labels = [f'{i:.0f}' for i in colormap.index]
-    # --- FIM DA CORREÇÃO v31 ---
 
-    # Formata a etiqueta da legenda
     ul = (unit_label or "").lower()
     if "°" in unit_label or "temp" in ul:
         label = "Temperatura (°C)"
@@ -102,7 +118,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
     colormap.caption = label
     
-    # HTML/CSS para posicionar a legenda
     html = colormap._repr_html_()
     template = Template(f"""
     {{% macro html(this, kwargs) %}}
@@ -119,7 +134,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 
 # ==================================================================================
-# COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico)
+# COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico v29)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
@@ -152,7 +167,6 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
     )
         
     cb.set_label(label, fontsize=7)
-    # O formatador ':g' remove zeros decimais desnecessários (ex: 40.0 -> 40)
     cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     
@@ -166,7 +180,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
 
 
 # ==================================================================================
-# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico)
+# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico v17)
 # ==================================================================================
 
 def create_static_map(ee_image: ee.Image, 
