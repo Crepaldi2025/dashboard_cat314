@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v26)
+# main.py — Clima-Cast-Crepaldi (Corrigido v27)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -130,16 +130,48 @@ def render_analysis_results():
                 return
             png_url, jpg_url, colorbar_img = results["static_maps"]
 
-            # --- INÍCIO DA CORREÇÃO v26 (Tamanho do Mapa Estático) ---
-            # Diminuindo o tamanho de 800 para 600
+            # --- INÍCIO DA CORREÇÃO v27 (Título dinâmico) ---
+            
+            # 1. Obter os componentes do título
+            variavel = st.session_state.variavel
+            tipo_periodo = st.session_state.tipo_periodo
+            tipo_local = st.session_state.tipo_localizacao.lower() # "município", "estado"
+            
+            # Formatar o período
+            if tipo_periodo == "Personalizado":
+                # As datas exatas já estão no "Resumo dos Filtros"
+                periodo_str = "para o período selecionado" 
+            elif tipo_periodo == "Mensal":
+                periodo_str = f"mensal ({st.session_state.mes_mensal} de {st.session_state.ano_mensal})"
+            elif tipo_periodo == "Anual":
+                periodo_str = f"anual ({st.session_state.ano_anual})"
+            
+            # Formatar o local
+            if tipo_local == "estado":
+                local_str = f"no {tipo_local} de {st.session_state.estado.split(' - ')[0]}"
+            elif tipo_local == "município":
+                local_str = f"no {tipo_local} de {st.session_state.municipio}"
+            elif tipo_local == "polígono":
+                local_str = "para a área desenhada"
+            else: # Círculo
+                local_str = "para o círculo definido"
+                
+            # Montar o título
+            titulo_mapa = f"{variavel} {periodo_str} {local_str}"
+            
+            # 2. Exibir o título
+            st.subheader(titulo_mapa)
+            
+            # 3. Exibir imagem SEM caption
             map_width = 400 
             colorbar_width = 400
-            # --- FIM DA CORREÇÃO v26 ---
 
             if png_url:
-                st.image(png_url, caption="Mapa Estático", width=map_width) 
+                st.image(png_url, width=map_width) # 'caption' removido
             if colorbar_img:
-                st.image(colorbar_img, caption="Legenda", width=colorbar_width) 
+                st.image(colorbar_img, width=colorbar_width) # 'caption' removido
+            
+            # --- FIM DA CORREÇÃO v27 ---
 
             st.markdown("### Exportar Mapas")
             if png_url:
@@ -264,4 +296,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
