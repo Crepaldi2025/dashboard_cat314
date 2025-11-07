@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v40)
+# ui.py — (Corrigido v41)
 # ==================================================================================
 
 import streamlit as st
@@ -27,8 +27,14 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES (Modificada)
+# FUNÇÕES AUXILIARES
 # ==================================================================================
+
+# Lista manual de meses para garantir o português (v38)
+NOMES_MESES_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+]
 
 @st.cache_data
 def _carregar_texto_docx(file_path):
@@ -63,7 +69,7 @@ def reset_analysis_state():
         if key in st.session_state:
             del st.session_state[key]
 
-# --- INÍCIO DA CORREÇÃO v40 ---
+# --- INÍCIO DA CORREÇÃO v41 ---
 def reset_analysis_results_only():
     """
     Callback "LEVE": Limpa APENAS os resultados, mantendo a geometria.
@@ -76,7 +82,7 @@ def reset_analysis_results_only():
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
-# --- FIM DA CORREÇÃO v40 ---
+# --- FIM DA CORREÇÃO v41 ---
     
 # ==================================================================================
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
@@ -170,22 +176,21 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.session_state.date_error = True
             elif tipo_periodo == "Mensal":
                 st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
-                # (v38) Usa a lista manual em PT-BR
-                st.selectbox("Mês", ui.NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
+                st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state) # (v38)
             elif tipo_periodo == "Anual":
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
             st.divider()
 
             if opcao_selecionada == "Mapas":
                 st.subheader("5. Tipo de Mapa")
-                # --- INÍCIO DA CORREÇÃO v40 ---
+                # --- INÍCIO DA CORREÇÃO v41 ---
                 st.radio("Selecione o formato", 
                          ["Interativo", "Estático"], 
                          key='map_type', 
                          horizontal=True, 
                          on_change=reset_analysis_results_only # <-- USA O CALLBACK "LEVE"
                 )
-                # --- FIM DA CORREÇÃO v40 ---
+                # --- FIM DA CORREÇÃO v41 ---
                 st.divider()
 
             disable_button = st.session_state.get('date_error', False)
@@ -230,7 +235,8 @@ def renderizar_pagina_principal(opcao_navegacao):
         st.markdown(f"<p style='text-align: right; color: grey;'>{data_hora_formatada}</p>", unsafe_allow_html=True)
     
     st.markdown("---")
-    if "analysis_results" not in st.session_state:
+    # A mensagem de placeholder agora é condicional (v41)
+    if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 
