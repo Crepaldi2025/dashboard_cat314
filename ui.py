@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v27)
+# ui.py — (Corrigido v35)
 # ==================================================================================
 
 import streamlit as st
@@ -27,10 +27,9 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES (Modificada)
+# FUNÇÕES AUXILIARES (Idênticas)
 # ==================================================================================
 
-# --- INÍCIO DA CORREÇÃO v27 (Erro 'NoneType' / Página em Branco) ---
 @st.cache_data
 def _carregar_texto_docx(file_path):
     """
@@ -43,26 +42,12 @@ def _carregar_texto_docx(file_path):
     try:
         doc = docx.Document(file_path)
         full_text = []
-        
-        # Lógica simplificada: Apenas pega o texto de cada parágrafo.
-        # Isso é muito mais seguro e não vai quebrar em parágrafos vazios.
         for para in doc.paragraphs:
             full_text.append(para.text)
-                
-        # Junta os parágrafos com quebra de linha dupla (formatação Markdown)
         return "\n\n".join(full_text)
     except Exception as e:
-        # Se falhar (ex: arquivo corrompido), mostra o erro.
         st.error(f"Erro ao ler o arquivo {file_path}: {e}")
         return None
-# --- FIM DA CORREÇÃO v27 ---
-
-
-# ==================================================================================
-# FUNÇÕES PRINCIPAIS (Restante idêntico)
-# ==================================================================================
-def configurar_pagina():
-    st.markdown("---")
 
 def reset_analysis_state():
     keys_to_clear = [
@@ -74,6 +59,9 @@ def reset_analysis_state():
         if key in st.session_state:
             del st.session_state[key]
     
+# ==================================================================================
+# RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
+# ==================================================================================
 
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
@@ -133,6 +121,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
             st.divider()
 
+            # 5. PERÍODO (Lógica Condicional)
             st.subheader("4. Período de Análise")
             
             if opcao_selecionada == "Mapas":
@@ -142,7 +131,11 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             tipo_periodo = st.session_state.get('tipo_periodo', 'Personalizado')
             ano_atual = datetime.now().year
-            lista_anos = list(range(ano_atual, 1979, -1)) 
+            
+            # --- INÍCIO DA CORREÇÃO v35 ---
+            # Alterado de 1979 para 1949 (para incluir 1950)
+            lista_anos = list(range(ano_atual, 1949, -1)) 
+            # --- FIM DA CORREÇÃO v35 ---
 
             st.session_state.date_error = False
             if tipo_periodo == "Personalizado":
@@ -159,12 +152,15 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if st.session_state.data_fim < st.session_state.data_inicio:
                     st.error("Atenção: A data final é anterior à data inicial.")
                     st.session_state.date_error = True
+            
             elif tipo_periodo == "Mensal":
                 st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
                 nomes_meses = [calendar.month_name[i].capitalize() for i in range(1, 13)]
                 st.selectbox("Mês", nomes_meses, key='mes_mensal', on_change=reset_analysis_state)
+            
             elif tipo_periodo == "Anual":
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
+            
             st.divider()
 
             if opcao_selecionada == "Mapas":
@@ -196,6 +192,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         return opcao_selecionada
 
+# ==================================================================================
+# (O restante do arquivo: renderizar_pagina_principal, 
+#  renderizar_resumo_selecao, renderizar_pagina_sobre é idêntico ao v27)
+# ==================================================================================
 
 def renderizar_pagina_principal(opcao_navegacao):
     agora = datetime.now()
@@ -214,7 +214,8 @@ def renderizar_pagina_principal(opcao_navegacao):
         st.markdown(f"<p style='text-align: right; color: grey;'>{data_hora_formatada}</p>", unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
+    if "analysis_results" not in st.session_state:
+        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 
 def renderizar_resumo_selecao():
@@ -255,7 +256,6 @@ def renderizar_resumo_selecao():
 
 
 def renderizar_pagina_sobre():
-    # --- INÍCIO DA CORREÇÃO v27 (Leitura do DOCX) ---
     texto_sobre = _carregar_texto_docx("sobre.docx")
     
     if texto_sobre is None:
@@ -269,10 +269,7 @@ def renderizar_pagina_sobre():
         *(Por favor, crie um arquivo chamado 'sobre.docx' na mesma pasta do 'main.py' com o conteúdo desta página.)*
         """)
     else:
-        # A mágica acontece aqui: st.markdown() vai renderizar o texto
-        # (que já está formatado como Markdown no seu .docx)
         st.markdown(texto_sobre, unsafe_allow_html=True)
-    # --- FIM DA CORREÇÃO v27 ---
-
+    
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT3B14 / UNIFEI</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
