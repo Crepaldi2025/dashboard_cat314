@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v29)
+# main.py — Clima-Cast-Crepaldi (Corrigido v25)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -167,7 +167,7 @@ def render_analysis_results():
             map_visualizer.create_interactive_map(ee_image, feature, vis_params, var_cfg["unit"]) 
 
         elif tipo_mapa == "Estático":
-            # Usar os nomes de chave corretos (se a v31 falhou)
+            # (A chave correta é static_maps, não static_map_png_url)
             if "static_maps" not in results: 
                 st.warning("Erro ao gerar mapas estáticos.")
                 return
@@ -237,7 +237,7 @@ def render_analysis_results():
 
 
 # ----------------------------------------------------------------------------------
-# LÓGICA DE DESENHO (Idêntica, mantida da v25)
+# LÓGICA DE DESENHO (Modificada v25)
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
@@ -271,27 +271,39 @@ def render_polygon_drawer():
     
     geometry = None
     
+    # --- INÍCIO DA CORREÇÃO v25 (Lógica de Captura) ---
     if map_data:
         all_drawings = map_data.get("all_drawings")
 
+        # Caso 1: Usuário desenhou algo (a lista não está vazia)
         if all_drawings and len(all_drawings) > 0:
             drawing = all_drawings[-1] 
             if drawing and isinstance(drawing, dict) and drawing.get("geometry"):
                 if drawing["geometry"].get("type") in ["Polygon", "MultiPolygon"]:
                     geometry = drawing["geometry"]
+
+        # Caso 2: Usuário apagou o desenho (a lista está vazia: [])
         elif all_drawings == []: 
             if 'drawn_geometry' in st.session_state:
                  del st.session_state['drawn_geometry']
                  st.warning("Polígono removido.")
                  st.rerun()
+        
+        # Caso 3: Mapa recarregou (all_drawings é NULL/None)
+        # Neste caso, não fazemos NADA. O 'geometry' continua None
+        # e a lógica de validação abaixo não vai apagar o estado.
 
+    # Lógica de validação
     if geometry:
+        # Se uma nova geometria foi capturada, a salvamos
         if st.session_state.get('drawn_geometry') != geometry:
             st.session_state.drawn_geometry = geometry
             st.success("✅ Polígono capturado!")
             st.rerun() 
+    # A lógica 'else' que apagava o estado foi removida.
+    # --- FIM DA CORREÇÃO v25 ---
     
-# ---------------------- FUNÇÃO MAIN (Idêntica à v25) ----------------------
+# ---------------------- FUNÇÃO MAIN (Modificada v25) ----------------------
 def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
@@ -306,9 +318,14 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
+    # --- INÍCIO DA CORREÇÃO v25 ---
+    # SÓ renderize o mapa de desenho se a análise NÃO estiver
+    # prestes a ser executada. Isso impede que o mapa
+    # recarregue e apague o `drawn_geometry` no meio do processo.
     if opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono":
         if not st.session_state.get("analysis_triggered", False):
             render_polygon_drawer()
+    # --- FIM DA CORREÇÃO v25 ---
 
     if st.session_state.get("analysis_triggered", False):
         st.session_state.analysis_triggered = False 
