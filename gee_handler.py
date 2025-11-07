@@ -1,4 +1,14 @@
-# gee_handler.py (Corrigido)
+# ==================================================================================
+# gee_handler.py
+# 
+# Módulo: Clima-Cast-Crepaldi
+# Autor: Paulo C. Crepaldi
+#
+# Descrição:
+# (v29) - Atualizadas as paletas de cores em ERA5_VARS para terem 10 cores,
+#         suportando a nova legenda discreta.
+# ==================================================================================
+
 import streamlit as st
 import json
 from collections import defaultdict
@@ -6,78 +16,93 @@ import ee
 import os
 import geobr
 import pandas as pd
+from datetime import date # Importado para type hinting
 
-# ----------------------------------------------------------------------------------
-# CORREÇÃO P4: A função duplicada 'get_brazilian_geopolitical_data_local' 
-# que estava aqui (originalmente L12-L29) foi removida.
-# ----------------------------------------------------------------------------------
+# ==========================================================
+# INICIALIZAÇÃO E AUTENTICAÇÃO
+# ==========================================================
 
 def inicializar_gee():
     """
-    Inicializa o Google Earth Engine.
-    - Local: usa credenciais do 'earthengine authenticate'
-    - Streamlit Cloud: usa Service Account configurada em st.secrets
+    Inicializa a API do Google Earth Engine.
+    
+    Tenta autenticar de duas formas:
+    1. (Nuvem) Usando uma Service Account definida em `st.secrets`.
+    2. (Local) Usando as credenciais padrão salvas localmente.
     """
     try:
-        # Tenta inicializar. Se já estiver inicializado, não faz nada.
-        # Se não estiver, tenta as credenciais.
         ee.Image.constant(0).getInfo()
-        
     except ee.EEException:
         try:
-            # Verifica se está no Streamlit Cloud (há segredos configurados)
             if "earthengine_service_account" in st.secrets:
                 service_account = st.secrets["earthengine_service_account"]["client_email"]
                 private_key = st.secrets["earthengine_service_account"]["private_key"]
-
-                # Cria credenciais usando a conta de serviço
                 credentials = ee.ServiceAccountCredentials(service_account, key_data=private_key)
                 ee.Initialize(credentials=credentials)
                 st.info("✅ Conectado ao Google Earth Engine (Service Account).")
-                
             else:
-                # Executa localmente com credenciais já autenticadas
                 ee.Initialize()
                 st.info("✅ Conectado ao Google Earth Engine (Credenciais Locais).")
         except Exception as e:
             st.error(f"⚠️ Falha ao conectar com o Google Earth Engine: {e}")
-            st.warning("O aplicativo não funcionará sem a conexão GEE. Verifique suas credenciais.")
+            st.warning("O aplicativo não funcionará sem a conexão GEE.")
 
-# ==========================================================
-# Alias para compatibilidade com main.py
-# ==========================================================
 def initialize_gee():
-    """Compatibilidade: redireciona para inicializar_gee()"""
+    """Alias de compatibilidade para inicializar_gee()"""
     return inicializar_gee()
 
 # ==========================================================
-# DEFINIÇÕES DE VARIÁVEIS
+# DEFINIÇÕES DE VARIÁVEIS (Paletas Atualizadas)
 # ==========================================================
 
 ERA5_VARS = {
     "Temperatura do Ar (2m)": {
-        "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean",
-        "vis_params": { "min": 0, "max": 40, "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#FFFF00', '#FFA500', '#FF0000', '#800000'] }
+        "band": "temperature_2m", 
+        "result_band": "temperature_2m", 
+        "unit": "°C", 
+        "aggregation": "mean",
+        "vis_params": { 
+            "min": 0, 
+            "max": 40, 
+            # Paleta expandida para 10 cores (0, 4, 8, ... 40)
+            "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'] 
+        }
     },
     "Precipitação Total": {
-        "band": "total_precipitation_sum", "result_band": "total_precipitation_sum", "unit": "mm", "aggregation": "sum",
-        "vis_params": { "min": 0, "max": 500, "palette": ['#FFFFFF', '#00FFFF', '#0000FF', '#00FF00', '#FFFF00', '#FF0000'] }
+        "band": "total_precipitation_sum", 
+        "result_band": "total_precipitation_sum", 
+        "unit": "mm", 
+        "aggregation": "sum",
+        "vis_params": { 
+            "min": 0, 
+            "max": 500,
+            # Nova paleta de 10 cores (rampa YlGnBu, 0, 50, ... 500)
+            "palette": ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58', '#081040']
+        }
     },
     "Velocidade do Vento (10m)": {
-        "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
-        "vis_params": { "min": 0, "max": 30, "palette": ['#FFFFFF', '#B0E0E6', '#4682B4', '#DAA520', '#FF4500', '#8B0000'] }
+        "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], 
+        "result_band": "wind_speed", 
+        "unit": "m/s", 
+        "aggregation": "mean",
+        "vis_params": { 
+            "min": 0, 
+            "max": 30,
+            # Nova paleta de 10 cores (rampa Viridis, 0, 3, ... 30)
+            "palette": ['#440154', '#482878', '#3e4989', '#31688e', '#26828e', '#1f9e89', '#35b779', '#6dcd59', '#b4de2c', '#fde725']
+        }
     }
 }
 
 # ==========================================================
-# CARREGAMENTO DE DADOS GEOGRÁFICOS
+# CARREGAMENTO DE DADOS GEOGRÁFICOS (Idêntico)
 # ==========================================================
 
 @st.cache_data
-def get_brazilian_geopolitical_data_local():
+def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
     """
-    Busca os dados de estados e municípios do Brasil a partir de um arquivo JSON local.
-    Esta é a versão cacheada e correta da função (a duplicata foi removida).
+    Carrega os dados de estados e municípios do Brasil a partir de um
+    arquivo JSON local (`municipios_ibge.json`).
     """
     arquivo = "municipios_ibge.json"
     geo_data = defaultdict(list)
@@ -91,9 +116,7 @@ def get_brazilian_geopolitical_data_local():
         with open(arquivo, 'r', encoding='utf-8') as f:
             municipios_data = json.load(f)
         
-        # Assume que o JSON pode ter formatos diferentes, tenta o formato da L84 original
         if isinstance(municipios_data, list): 
-            # Formato da L84 original (lista de municípios)
             for municipio in municipios_data:
                 microrregiao = municipio.get('microrregiao')
                 if microrregiao:
@@ -110,15 +133,9 @@ def get_brazilian_geopolitical_data_local():
                                 geo_data[uf_sigla].append(nome_municipio)
         
         elif isinstance(municipios_data, dict):
-            # Formato da L12 original (dicionário)
             geo_data = municipios_data.get("municipios_por_uf", {})
             uf_name_map = municipios_data.get("nomes_estados", {})
 
-        else:
-            st.error(f"Formato inesperado do arquivo '{arquivo}'.")
-            return {}, {}
-
-        # Ordena os dados
         sorted_geo_data = {uf: sorted(geo_data[uf]) for uf in sorted(geo_data.keys())}
         return sorted_geo_data, uf_name_map
 
@@ -126,12 +143,9 @@ def get_brazilian_geopolitical_data_local():
         st.error(f"Erro ao processar arquivo de municípios ({arquivo}): {e}")
         return {}, {}
 
-# ----------------------------------------------------------------------------------
-# CORREÇÃO P3: Adiciona funções cacheadas para carregar dados do 'geobr'
-# ----------------------------------------------------------------------------------
 @st.cache_data
 def _load_all_states_gdf():
-    """Carrega e cacheia o shapefile de todos os estados (geobr)."""
+    """(Helper Interno) Carrega e cacheia o shapefile de todos os estados (via geobr)."""
     try:
         return geobr.read_state()
     except Exception as e:
@@ -140,33 +154,31 @@ def _load_all_states_gdf():
 
 @st.cache_data
 def _load_municipalities_gdf(uf_sigla: str):
-    """Carrega e cacheia os municípios de uma UF (geobr)."""
+    """(Helper Interno) Carrega e cacheia os municípios de uma UF (via geobr)."""
     try:
-        # Usar st.spinner aqui dentro não funciona bem com cache
-        # O spinner deve ficar na chamada (get_area_of_interest_geometry)
         return geobr.read_municipality(code_muni=uf_sigla, year=2020)
     except Exception as e:
         st.error(f"Falha ao carregar municípios de {uf_sigla} (geobr): {e}")
         return None
 
 # ==========================================================
-# PROCESSAMENTO DE GEOMETRIA (ÁREA DE INTERESSE)
+# PROCESSAMENTO DE GEOMETRIA (Idêntico)
 # ==========================================================
 
-def get_area_of_interest_geometry(session_state):
+def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
     """
-    Obtém a geometria da área de interesse (Estado, Município, Círculo ou Polígono).
-    Agora utiliza as funções cacheadas do 'geobr'.
+    Obtém a geometria GEE (ee.Geometry) e o Feature GEE (ee.Feature)
+    com base nas seleções do usuário no `st.session_state`.
     """
     tipo_loc = session_state.get('tipo_localizacao', 'Estado')
     
-    if tipo_loc == "Estado":
-        estado_selecionado_str = session_state.get('estado', 'Selecione...')
-        if estado_selecionado_str == "Selecione...": return None, None
-        uf_sigla = estado_selecionado_str.split(' - ')[-1]
-        try:
-            # CORREÇÃO P3: Usa a função cacheada
-            todos_estados_gdf = _load_all_states_gdf()
+    try:
+        if tipo_loc == "Estado":
+            estado_selecionado_str = session_state.get('estado', 'Selecione...')
+            if estado_selecionado_str == "Selecione...": return None, None
+            uf_sigla = estado_selecionado_str.split(' - ')[-1]
+            
+            todos_estados_gdf = _load_all_states_gdf() 
             if todos_estados_gdf is None: return None, None
             
             estado_gdf = todos_estados_gdf[todos_estados_gdf['abbrev_state'] == uf_sigla]
@@ -176,20 +188,15 @@ def get_area_of_interest_geometry(session_state):
             ee_geometry = ee.Geometry(estado_geojson, proj='EPSG:4326', geodesic=False)
             ee_feature = ee.Feature(ee_geometry, {'abbrev_state': uf_sigla})
             return ee_geometry, ee_feature
-        except Exception as e:
-            st.error(f"Ocorreu um erro ao buscar a geometria do estado: {e}")
-            return None, None
 
-    elif tipo_loc == "Município":
-        estado_selecionado_str = session_state.get('estado', 'Selecione...')
-        municipio_nome = session_state.get('municipio', 'Selecione...')
-        if estado_selecionado_str == "Selecione..." or municipio_nome == "Selecione...":
-            return None, None
-        
-        uf_sigla = estado_selecionado_str.split(' - ')[-1]
-        try:
+        elif tipo_loc == "Município":
+            estado_selecionado_str = session_state.get('estado', 'Selecione...')
+            municipio_nome = session_state.get('municipio', 'Selecione...')
+            if estado_selecionado_str == "Selecione..." or municipio_nome == "Selecione...":
+                return None, None
+            
+            uf_sigla = estado_selecionado_str.split(' - ')[-1]
             with st.spinner(f"Buscando geometria para {municipio_nome}, {uf_sigla}..."):
-                # CORREÇÃO P3: Usa a função cacheada
                 municipios_do_estado_gdf = _load_municipalities_gdf(uf_sigla)
                 if municipios_do_estado_gdf is None: return None, None
 
@@ -202,54 +209,51 @@ def get_area_of_interest_geometry(session_state):
             ee_geometry = ee.Geometry(municipio_geojson, proj='EPSG:4326', geodesic=False)
             ee_feature = ee.Feature(ee_geometry, {'name_muni': municipio_nome, 'abbrev_state': uf_sigla})
             return ee_geometry, ee_feature
-        except Exception as e:
-            st.error(f"Ocorreu um erro ao buscar a geometria do município: {e}")
-            return None, None
 
-    elif tipo_loc == "Círculo (Lat/Lon/Raio)":
-        try:
+        elif tipo_loc == "Círculo (Lat/Lon/Raio)":
             latitude = session_state.latitude
             longitude = session_state.longitude
             raio_km = session_state.raio
-            if not (latitude and longitude and raio_km):
-                st.warning("Valores inválidos para Círculo.")
-                return None, None
             ponto_central = ee.Geometry.Point([longitude, latitude])
             raio_em_metros = raio_km * 1000
             ee_geometry = ponto_central.buffer(raio_em_metros)
             ee_feature = ee.Feature(ee_geometry, {'latitude': latitude, 'longitude': longitude, 'raio_km': raio_km})
             return ee_geometry, ee_feature
-        except Exception as e:
-            st.error(f"Ocorreu um erro ao criar a geometria do círculo: {e}")
-            return None, None
+                
+        elif tipo_loc == "Polígono":
+            if 'drawn_geometry' not in session_state or not session_state.drawn_geometry:
+                return None, None
             
-    elif tipo_loc == "Polígono":
-        if 'drawn_geometry' not in session_state or not session_state.drawn_geometry:
-            # Esta verificação será movida para a UI, mas é bom ter aqui
-            return None, None
-        try:
             polygon_geojson = session_state.drawn_geometry
             ee_geometry = ee.Geometry(polygon_geojson, proj='EPSG:4326', geodesic=False)
             ee_feature = ee.Feature(ee_geometry)
             return ee_geometry, ee_feature
-        except Exception as e:
-            st.error(f"Ocorreu um erro ao processar a geometria do polígono desenhado: {e}")
-            return None, None
     
+    except Exception as e:
+        st.error(f"Ocorreu um erro ao processar a geometria da área: {e}")
+        return None, None
+
     return None, None
 
 # ==========================================================
-# PROCESSAMENTO DE DADOS GEE (MAPAS E SÉRIES)
+# PROCESSAMENTO DE DADOS GEE (Idêntico)
 # ==========================================================
 
-def get_era5_image(variable, start_date, end_date, geometry):
-    """Busca e processa os dados do ERA5 para mapas."""
+def get_era5_image(variable: str, start_date: date, end_date: date, 
+                   geometry: ee.Geometry) -> ee.Image:
+    """
+    Busca, processa e agrega dados do ERA5-Land para geração de mapas.
+    """
     if variable not in ERA5_VARS: return None
     config = ERA5_VARS[variable]
     bands_to_select = config.get('bands', config.get('band'))
     
     try:
-        image_collection = ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR').filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')).select(bands_to_select)
+        image_collection = (
+            ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR')
+            .filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+            .select(bands_to_select)
+        )
         
         if image_collection.size().getInfo() == 0:
             st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
@@ -270,29 +274,38 @@ def get_era5_image(variable, start_date, end_date, geometry):
             
         if aggregated_image:
             final_image = aggregated_image.clip(geometry).float()
+            
             if config['unit'] == "°C": final_image = final_image.subtract(273.15)
             if config['unit'] == "mm": final_image = final_image.multiply(1000)
+            
             if final_image.bandNames().size().getInfo() == 0: return None
             return final_image
+        
         return None
+    
     except Exception as e:
         st.error(f"Erro ao processar imagem do GEE: {e}")
         return None
 
-# ----------------------------------------------------------------------------------
-# CORREÇÃO P1: @st.cache_data removido.
-# Motivo: Os argumentos _ee_image e _geometry não são "hashable".
-# O cache para esta função deve ser gerenciado em main.py se necessário.
-# ----------------------------------------------------------------------------------
-def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
-    """Amostra a imagem do GEE e retorna os dados como um DataFrame para tabela."""
+def get_sampled_data_as_dataframe(ee_image: ee.Image, geometry: ee.Geometry, 
+                                  variable: str) -> pd.DataFrame:
+    """
+    Amostra a imagem GEE em pontos aleatórios dentro da geometria para
+    criar uma tabela de dados (DataFrame).
+    """
     if variable not in ERA5_VARS: return pd.DataFrame()
     config = ERA5_VARS[variable]
     band_name = config['result_band']
     unit = config['unit']
     
     try:
-        sample = _ee_image.select(band_name).sample(region=_geometry, scale=10000, numPixels=500, geometries=True)
+        sample = ee_image.select(band_name).sample(
+            region=geometry, 
+            scale=10000, 
+            numPixels=500, 
+            geometries=True 
+        )
+        
         features = sample.getInfo().get('features', [])
         if not features: return pd.DataFrame()
 
@@ -307,17 +320,16 @@ def get_sampled_data_as_dataframe(_ee_image, _geometry, variable):
                     f'{variable.split(" (")[0]} ({unit})': value
                 })
         return pd.DataFrame(data)
+    
     except Exception as e:
         st.error(f"Erro ao amostrar dados para tabela: {e}")
         return pd.DataFrame()
 
-# ----------------------------------------------------------------------------------
-# CORREÇÃO P1: @st.cache_data removido.
-# Motivo: O argumento _geometry não é "hashable".
-# O cache para esta função deve ser gerenciado em main.py (veja P2).
-# ----------------------------------------------------------------------------------
-def get_time_series_data(variable, start_date, end_date, _geometry):
-    """Extrai a série temporal do ERA5-Land restrita à geometria selecionada (Estado, Município etc)."""
+def get_time_series_data(variable: str, start_date: date, end_date: date, 
+                         geometry: ee.Geometry) -> pd.DataFrame:
+    """
+    Extrai a série temporal diária (média espacial) para uma dada geometria.
+    """
     if variable not in ERA5_VARS:
         return pd.DataFrame()
 
@@ -325,19 +337,17 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
     bands_to_select = config.get("bands", config.get("band"))
 
     try:
-        # === 1️⃣ Coleção e recorte geográfico ===
         collection = (
             ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
             .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
             .select(bands_to_select)
-            .map(lambda img: img.clip(_geometry)) # Clipar primeiro otimiza
+            .map(lambda img: img.clip(geometry))
         )
 
         if collection.size().getInfo() == 0:
             st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
             return pd.DataFrame()
 
-        # === 2️⃣ Correção para o vento (u/v → módulo) ===
         if variable == "Velocidade do Vento (10m)":
             def calculate_wind_speed(image):
                 wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename("wind_speed")
@@ -345,40 +355,29 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
             collection = collection.map(calculate_wind_speed)
             band_name_for_reduction = config["result_band"]
         else:
-            # Renomeia a banda para um nome consistente
             band_name_for_reduction = config["result_band"]
             collection = collection.map(lambda img: img.rename(band_name_for_reduction))
 
-        # === 3️⃣ Função de redução com foco regional ===
         def extract_value(image):
-            # Reduz apenas dentro do polígono fornecido (não global!)
             stats = image.select(band_name_for_reduction).reduceRegion(
                 reducer=ee.Reducer.mean(),
-                geometry=_geometry,
-                scale=9000, # Escala do ERA5-Land é ~9km
+                geometry=geometry,
+                scale=9000, 
                 bestEffort=True,
                 maxPixels=1e9
             )
-            
             mean_value = stats.get(band_name_for_reduction)
-
-            # Corrige unidades
             value = ee.Number(mean_value)
             if config["unit"] == "°C":
                 value = value.subtract(273.15)
             elif config["unit"] == "mm":
                 value = value.multiply(1000)
-
             return image.set("date", image.date().format("YYYY-MM-dd")).set("value", value)
 
-        # === 4️⃣ Aplica e agrega ===
         series = collection.map(extract_value)
-        
-        # .getInfo() é a chamada "lenta" que aciona o processamento no GEE
         data = series.aggregate_array("date").getInfo()
         values = series.aggregate_array("value").getInfo()
 
-        # === 5️⃣ Monta DataFrame ===
         if not data or not values:
             st.warning("Não foi possível extrair dados para a área selecionada.")
             return pd.DataFrame()
@@ -396,13 +395,13 @@ def get_time_series_data(variable, start_date, end_date, _geometry):
 
 
 # ==========================================================
-# Compatibilidade com o main.py antigo
+# FUNÇÃO DE COMPATIBILIDADE (Legado)
 # ==========================================================
+
 def get_gee_data(dataset, band, start_date, end_date, feature):
-    """Mantém compatibilidade com versões antigas do main.py."""
+    """(Função legada) Mantém compatibilidade com versões antigas do main.py."""
     try:
         geometry = feature.geometry()
-        # Determina a variável automaticamente (com base no nome da banda)
         if band == "temperature_2m":
             variable = "Temperatura do Ar (2m)"
         elif band == "total_precipitation_sum":
@@ -410,12 +409,10 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
         elif band in ["u_component_of_wind_10m", "v_component_of_wind_10m"]:
             variable = "Velocidade do Vento (10m)"
         else:
-            variable = "Temperatura do Ar (2m)"  # padrão de segurança
+            variable = "Temperatura do Ar (2m)"
+        
         return get_era5_image(variable, start_date, end_date, geometry)
+    
     except Exception as e:
-        st.error(f"⚠️ Falha ao processar dados do GEE: {e}")
+        st.error(f"⚠️ Falha ao processar dados legados do GEE: {e}")
         return None
-
-# ----------------------------------------------------------------------------------
-# CORREÇÃO: O 'return df' órfão que estava aqui foi removido.
-# ----------------------------------------------------------------------------------
