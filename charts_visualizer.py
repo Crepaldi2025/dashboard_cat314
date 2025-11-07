@@ -1,15 +1,15 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v32)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v37)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io 
 
-# --- INÍCIO DA CORREÇÃO v32 ---
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str, title: str = ""):
     """
     Cria a figura do gráfico de linha interativo de série temporal usando Plotly.
+    (v32) - Aceita um título dinâmico.
     """
     variable_name = variable.split(" (")[0]
     
@@ -28,7 +28,6 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str, title: str 
         template="plotly_white",
         markers=True
     )
-# --- FIM DA CORREÇÃO v32 ---
 
     fig.update_layout(
         xaxis=dict(
@@ -62,13 +61,13 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     return excel_buffer.getvalue()
 
 
-# --- INÍCIO DA CORREÇÃO v32 ---
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title: str = ""):
-# --- FIM DA CORREÇÃO v32 ---
     """
     Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
+    (v37) - Adiciona a exibição do st.dataframe com os dados da série.
     """
     
+    # CSS para diminuir a fonte da métrica (v18)
     st.markdown("""
     <style>
     div[data-testid="stMetricValue"] {
@@ -112,12 +111,10 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title:
     df_clean = df_clean.sort_values('date')
 
     # ======================================================
-    # Geração e exibição do gráfico (Modificado)
+    # Geração e exibição do gráfico (Modificado v32)
     # ======================================================
     try:
-        # --- INÍCIO DA CORREÇÃO v32 ---
         fig = _create_chart_figure(df_clean, variable, unit, title=title)
-        # --- FIM DA CORREÇÃO v32 ---
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao gerar o gráfico Plotly: {e}")
@@ -145,22 +142,29 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title:
     )
     
     # ======================================================
-    # Exportação (Idêntico)
+    # Tabela de Dados e Exportação (Modificado v37)
     # ======================================================
     st.markdown("---")
-    st.subheader("Exportar Dados da Série Temporal")
     
+    # Prepara o DataFrame para exibição e exportação
     variable_name = variable.split(" (")[0]
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
-    df_export['date'] = df_export['date'].dt.tz_localize(None)
+    df_export['date'] = df_export['date'].dt.tz_localize(None) # Remove timezone
+    
+    # --- INÍCIO DA CORREÇÃO v37 (Exibir Tabela) ---
+    st.subheader("Dados da Série Temporal")
+    # Formata a data para exibição na tabela
+    df_display = df_export.copy()
+    df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
+    st.dataframe(df_display, use_container_width=True, height=300)
+    # --- FIM DA CORREÇÃO v37 ---
+
+    st.subheader("Exportar Dados da Série Temporal")
     file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     
-    csv_data = df_export.to_csv(index=False, encoding='utf-8-sig')
-    
-    excel_buffer = io.BytesIO()
-    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-        df_export.to_excel(writer, index=False, sheet_name='Dados')
-    excel_data = excel_buffer.getvalue()
+    # (Usa o df_export, não o df_display, para manter o tipo 'datetime' no Excel)
+    csv_data = df_export.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
+    excel_data = _convert_df_to_excel(df_export)
     
     col_btn_1, col_btn_2 = st.columns(2)
     
