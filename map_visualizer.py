@@ -5,7 +5,8 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v30) - Força os valores da legenda interativa (index) a serem inteiros.
+# (v31) - Corrige a formatação da legenda interativa (colorbar) para
+#         exibir números inteiros, sobrescrevendo os 'tick_labels'.
 # ==================================================================================
 
 import streamlit as st
@@ -58,7 +59,7 @@ def create_interactive_map(ee_image: ee.Image,
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
-    (v30) Função auxiliar interna para adicionar uma legenda (colorbar) 
+    (v31) Função auxiliar interna para adicionar uma legenda (colorbar) 
     DISCRETA e com valores INTEIROS no canto inferior esquerdo.
     """
     from branca.element import Template, MacroElement
@@ -72,10 +73,8 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
     N_STEPS = len(palette) 
     
-    # --- INÍCIO DA CORREÇÃO v30 ---
-    # Gera 11 valores e os converte para inteiro
+    # Gera 11 valores e os converte para inteiro (mantido da v30)
     index = np.linspace(vmin, vmax, N_STEPS + 1).astype(int) 
-    # --- FIM DA CORREÇÃO v30 ---
 
     colormap = StepColormap(
         colors=palette, 
@@ -83,6 +82,12 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         vmin=vmin, 
         vmax=vmax
     )
+
+    # --- INÍCIO DA CORREÇÃO v31 ---
+    # A StepColormap, por padrão, formata os labels como float (ex: "4.0").
+    # Vamos sobrescrever os 'tick_labels' para forçar a formatação como inteiros.
+    colormap.tick_labels = [f'{i:.0f}' for i in colormap.index]
+    # --- FIM DA CORREÇÃO v31 ---
 
     # Formata a etiqueta da legenda
     ul = (unit_label or "").lower()
@@ -147,6 +152,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
     )
         
     cb.set_label(label, fontsize=7)
+    # O formatador ':g' remove zeros decimais desnecessários (ex: 40.0 -> 40)
     cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     
