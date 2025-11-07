@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v27)
+# main.py — Clima-Cast-Crepaldi (Corrigido v28)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -17,7 +17,7 @@ from folium.plugins import Draw
 from streamlit_folium import st_folium
 
 # ==================================================================================
-# FUNÇÕES DE CACHE (Idênticas, sem alteração)
+# FUNÇÕES DE CACHE (Idênticas)
 # ==================================================================================
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
@@ -96,7 +96,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função idêntica à v25)
+# CORREÇÃO v28: Adicionadas linhas separadoras
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -107,11 +107,16 @@ def render_analysis_results():
     
     var_cfg = results["var_cfg"]
 
-    st.markdown("---")
+    st.markdown("---") # Linha 1 (Existente)
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
     if aba == "Mapas":
+        
+        # --- INÍCIO DA CORREÇÃO v28 ---
+        st.markdown("---") # Linha 2 (Separando Resumo do Mapa)
+        # --- FIM DA CORREÇÃO v28 ---
+        
         tipo_mapa = st.session_state.get("map_type", "Interativo")
         if "ee_image" not in results:
             st.warning("Não há dados de imagem para exibir.")
@@ -130,48 +135,18 @@ def render_analysis_results():
                 return
             png_url, jpg_url, colorbar_img = results["static_maps"]
 
-            # --- INÍCIO DA CORREÇÃO v27 (Título dinâmico) ---
-            
-            # 1. Obter os componentes do título
-            variavel = st.session_state.variavel
-            tipo_periodo = st.session_state.tipo_periodo
-            tipo_local = st.session_state.tipo_localizacao.lower() # "município", "estado"
-            
-            # Formatar o período
-            if tipo_periodo == "Personalizado":
-                # As datas exatas já estão no "Resumo dos Filtros"
-                periodo_str = "para o período selecionado" 
-            elif tipo_periodo == "Mensal":
-                periodo_str = f"mensal ({st.session_state.mes_mensal} de {st.session_state.ano_mensal})"
-            elif tipo_periodo == "Anual":
-                periodo_str = f"anual ({st.session_state.ano_anual})"
-            
-            # Formatar o local
-            if tipo_local == "estado":
-                local_str = f"no {tipo_local} de {st.session_state.estado.split(' - ')[0]}"
-            elif tipo_local == "município":
-                local_str = f"no {tipo_local} de {st.session_state.municipio}"
-            elif tipo_local == "polígono":
-                local_str = "para a área desenhada"
-            else: # Círculo
-                local_str = "para o círculo definido"
-                
-            # Montar o título
-            titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-            
-            # 2. Exibir o título
-            st.subheader(titulo_mapa)
-            
-            # 3. Exibir imagem SEM caption
+            # (Mantendo o tamanho 400 da sua v26)
             map_width = 400 
             colorbar_width = 400
 
             if png_url:
-                st.image(png_url, width=map_width) # 'caption' removido
+                st.image(png_url, caption="Mapa Estático", width=map_width) 
             if colorbar_img:
-                st.image(colorbar_img, width=colorbar_width) # 'caption' removido
+                st.image(colorbar_img, caption="Legenda", width=colorbar_width) 
             
-            # --- FIM DA CORREÇÃO v27 ---
+            # --- INÍCIO DA CORREÇÃO v28 ---
+            st.markdown("---") # Linha 3 (Separando Mapa Estático dos Botões)
+            # --- FIM DA CORREÇÃO v28 ---
 
             st.markdown("### Exportar Mapas")
             if png_url:
@@ -179,7 +154,7 @@ def render_analysis_results():
             if jpg_url:
                 st.download_button("Exportar (JPEG)", data=base64.b64decode(jpg_url.split(",")[1]), file_name="mapa.jpeg", mime="image/jpeg", use_container_width=True)
 
-        st.markdown("---")
+        st.markdown("---") # Linha 4 (Separando Mapa/Botões da Tabela)
         st.subheader("Dados Amostrais do Mapa")
 
         if "map_dataframe" not in results or results["map_dataframe"].empty:
