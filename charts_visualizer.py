@@ -1,23 +1,26 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v18)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v32)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io 
 
-def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
+# --- INÍCIO DA CORREÇÃO v32 ---
+def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str, title: str = ""):
     """
     Cria a figura do gráfico de linha interativo de série temporal usando Plotly.
-    (Função interna, indicada pelo underscore no início do nome)
     """
     variable_name = variable.split(" (")[0]
+    
+    # Define o título: usa o título dinâmico se fornecido, senão usa um genérico.
+    final_title = title if title else f"Série Temporal de {variable_name}"
 
     fig = px.line(
         df,
         x='date',
         y='value',
-        title=f"Série Temporal de {variable_name}",
+        title=final_title, # <-- Título dinâmico aplicado aqui
         labels={
             "date": "Data",
             "value": f"{variable_name} ({unit})"
@@ -25,6 +28,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         template="plotly_white",
         markers=True
     )
+# --- FIM DA CORREÇÃO v32 ---
 
     fig.update_layout(
         xaxis=dict(
@@ -48,22 +52,30 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     return fig
 
 
-def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
+def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
+    """
+    Converte um DataFrame para um arquivo Excel (XLSX) em memória.
+    """
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Dados')
+    return excel_buffer.getvalue()
+
+
+# --- INÍCIO DA CORREÇÃO v32 ---
+def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, title: str = ""):
+# --- FIM DA CORREÇÃO v32 ---
     """
     Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
     """
     
-    # --- INÍCIO DA CORREÇÃO v18 (Reduzir fonte da métrica) ---
-    # Injeta CSS para diminuir o tamanho da fonte do st.metric
-    # O padrão do Streamlit é muito grande (cerca de 2.5rem ou 3rem)
     st.markdown("""
     <style>
     div[data-testid="stMetricValue"] {
-        font-size: 1.2rem; /* <-- Ajuste este valor se ainda estiver grande */
+        font-size: 1.2rem;
     }
     </style>
     """, unsafe_allow_html=True)
-    # --- FIM DA CORREÇÃO v18 ---
     
     
     # ======================================================
@@ -100,10 +112,12 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     df_clean = df_clean.sort_values('date')
 
     # ======================================================
-    # Geração e exibição do gráfico (Idêntico)
+    # Geração e exibição do gráfico (Modificado)
     # ======================================================
     try:
-        fig = _create_chart_figure(df_clean, variable, unit)
+        # --- INÍCIO DA CORREÇÃO v32 ---
+        fig = _create_chart_figure(df_clean, variable, unit, title=title)
+        # --- FIM DA CORREÇÃO v32 ---
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao gerar o gráfico Plotly: {e}")
@@ -167,4 +181,3 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-
