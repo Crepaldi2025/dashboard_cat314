@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v32)
+# main.py — Clima-Cast-Crepaldi (Corrigido v33)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -98,7 +98,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função atualizada v32)
+# (Função atualizada v33)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -113,8 +113,7 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # --- Geração do Título Dinâmico (v30/v32) ---
-    # (Movido para cima, para ser usado por Mapas e Séries)
+    # Geração do Título Dinâmico (v30/v32)
     variavel = st.session_state.variavel
     tipo_periodo = st.session_state.tipo_periodo
     tipo_local = st.session_state.tipo_localizacao.lower()
@@ -137,10 +136,9 @@ def render_analysis_results():
     else: # Círculo
         local_str = "para o círculo definido"
         
-    # Título para mapas (ex: "Temperatura... anual (2023) no estado...")
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-    # Título para séries (ex: "Série Temporal de Temperatura... no estado...")
     titulo_serie = f"Série Temporal de {variavel} {local_str}"
+
 
     if aba == "Mapas":
         
@@ -156,13 +154,17 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
+            
+            # --- INÍCIO DA CORREÇÃO v33 ---
+            st.subheader(titulo_mapa) # Exibe o título ANTES do mapa
             map_visualizer.create_interactive_map(
                 ee_image, 
                 feature, 
                 vis_params, 
-                var_cfg["unit"], 
-                title=titulo_mapa 
+                var_cfg["unit"] 
+                # O argumento 'title' foi removido
             ) 
+            # --- FIM DA CORREÇÃO v33 ---
 
         elif tipo_mapa == "Estático":
             if "static_map_png_url" not in results:
@@ -237,14 +239,12 @@ def render_analysis_results():
             
         df = results["time_series_df"]
         
-        # --- INÍCIO DA CORREÇÃO v32 ---
         charts_visualizer.display_time_series_chart(
             df, 
             st.session_state.variavel, 
             var_cfg["unit"], 
-            title=titulo_serie # <-- Passa o novo título
+            title=titulo_serie 
         )
-        # --- FIM DA CORREÇÃO v32 ---
 
 # ----------------------------------------------------------------------------------
 # LÓGICA DE DESENHO (Idêntica, mantida da v25)
