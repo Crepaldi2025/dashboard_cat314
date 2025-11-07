@@ -257,7 +257,7 @@ def render_polygon_drawer():
     # Divide a área em colunas para alinhar a informação e o botão de ajuda
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono. Clique em 'Finish' (na barra superior) para confirmar.")
+        st.info("Use as ferramentas no canto esquerdo do mapa para desenhar um polígono.")
     with col2:
         with st.popover("ℹ️ Ajuda com os Botões"):
             st.markdown("""
@@ -349,3 +349,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
