@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v36)
+# main.py — Clima-Cast-Crepaldi (Corrigido v38)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -98,7 +98,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função atualizada v36)
+# (Função atualizada v38)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -113,7 +113,7 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # Geração do Título Dinâmico (v30/v32)
+    # Geração do Título Dinâmico (Idêntico v36)
     variavel = st.session_state.variavel
     tipo_periodo = st.session_state.tipo_periodo
     tipo_local = st.session_state.tipo_localizacao.lower()
@@ -154,17 +154,13 @@ def render_analysis_results():
         vis_params = copy.deepcopy(var_cfg["vis_params"])
 
         if tipo_mapa == "Interativo":
-            
-            # --- INÍCIO DA CORREÇÃO v36 ---
-            st.subheader(titulo_mapa) # Exibe o título ANTES do mapa
+            st.subheader(titulo_mapa) 
             map_visualizer.create_interactive_map(
                 ee_image, 
                 feature, 
                 vis_params, 
                 var_cfg["unit"] 
-                # O argumento 'title' foi removido da chamada
             ) 
-            # --- FIM DA CORREÇÃO v36 ---
 
         elif tipo_mapa == "Estático":
             if "static_map_png_url" not in results:
@@ -174,8 +170,7 @@ def render_analysis_results():
             jpg_url = results["static_map_jpg_url"]
             colorbar_b64 = results["static_colorbar_b64"]
 
-            st.subheader(titulo_mapa) # Exibe o título
-            
+            st.subheader(titulo_mapa)
             map_width = 400 
             
             if png_url:
@@ -208,7 +203,10 @@ def render_analysis_results():
                 st.download_button("Exportar (PNG - Somente Mapa)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
 
         st.markdown("---") 
-        st.subheader("Dados Amostrais do Mapa")
+        
+        # --- INÍCIO DA CORREÇÃO v38 ---
+        st.subheader("Tabela de Dados") # <-- Título Unificado
+        # --- FIM DA CORREÇÃO v38 ---
 
         if "map_dataframe" not in results or results["map_dataframe"].empty:
             st.warning("Não foi possível extrair dados amostrais para a tabela.")
