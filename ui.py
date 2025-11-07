@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v35)
+# ui.py — (Corrigido v38)
 # ==================================================================================
 
 import streamlit as st
@@ -27,8 +27,18 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES (Idênticas)
+# FUNÇÕES AUXILIARES (Modificada)
 # ==================================================================================
+
+# --- INÍCIO DA CORREÇÃO v38 ---
+# Lista manual de meses para garantir o português,
+# independentemente do locale do servidor.
+NOMES_MESES_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+]
+# --- FIM DA CORREÇÃO v38 ---
+
 
 @st.cache_data
 def _carregar_texto_docx(file_path):
@@ -132,10 +142,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             tipo_periodo = st.session_state.get('tipo_periodo', 'Personalizado')
             ano_atual = datetime.now().year
             
-            # --- INÍCIO DA CORREÇÃO v35 ---
-            # Alterado de 1979 para 1949 (para incluir 1950)
+            # (Mantida a v35, de 1950 em diante)
             lista_anos = list(range(ano_atual, 1949, -1)) 
-            # --- FIM DA CORREÇÃO v35 ---
 
             st.session_state.date_error = False
             if tipo_periodo == "Personalizado":
@@ -155,8 +163,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             elif tipo_periodo == "Mensal":
                 st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
-                nomes_meses = [calendar.month_name[i].capitalize() for i in range(1, 13)]
-                st.selectbox("Mês", nomes_meses, key='mes_mensal', on_change=reset_analysis_state)
+                # --- INÍCIO DA CORREÇÃO v38 ---
+                # Usa a lista manual em PT-BR em vez de 'calendar.month_name'
+                st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
+                # --- FIM DA CORREÇÃO v38 ---
             
             elif tipo_periodo == "Anual":
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
