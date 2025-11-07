@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v47)
+# ui.py — (Corrigido v45)
 # ==================================================================================
 
 import streamlit as st
@@ -27,7 +27,7 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES (Idênticas)
+# FUNÇÕES AUXILIARES
 # ==================================================================================
 
 # Lista manual de meses para garantir o português (v38)
@@ -87,6 +87,9 @@ def reset_analysis_results_only():
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
 # ==================================================================================
 
+def configurar_pagina():
+    st.markdown("---")
+
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
         st.header("Painel de Controle")
@@ -138,6 +141,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
+                # --- INÍCIO DA CORREÇÃO v45 ---
                 with st.popover("ℹ️ Ajuda: Círculo (Lat/Lon/Raio)"):
                     st.markdown("""
                     **Como usar:**
@@ -145,22 +149,26 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     2.  **Longitude:** Insira a longitude do ponto central (em graus decimais). Valores positivos para Leste, negativos para Oeste (ex: `-45.46`).
                     3.  **Raio (km):** Defina o raio em quilômetros ao redor do ponto central.
                     """)
+                # --- FIM DA CORREÇÃO v45 ---
 
             elif tipo_localizacao == "Polígono":
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
-                else: 
-                    # --- INÍCIO DA CORREÇÃO v47 ---
-                    st.info("O mapa de desenho aparecerá na tela principal.")
-                    # --- FIM DA CORREÇÃO v47 ---
+                # --- INÍCIO DA CORREÇÃO v45 ---
+                # Remove st.info desnecessário daqui
+                elif opcao_selecionada != "Mapas": 
+                    st.info("Mude para a aba 'Mapas' para desenhar seu polígono.")
+                # --- FIM DA CORREÇÃO v45 ---
 
+                # --- INÍCIO DA CORREÇÃO v45 ---
                 with st.popover("ℹ️ Ajuda: Polígono"):
                     st.markdown("""
                     **Como usar:**
-                    1.  O mapa de desenho aparecerá na tela principal.
-                    2.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa.
-                    3.  Clique em **"Finish"** na barra de ferramentas do mapa para confirmar.
+                    1.  Certifique-se de que a aba **"Mapas"** está selecionada (no topo da sidebar).
+                    2.  O mapa de desenho aparecerá na tela principal.
+                    3.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa e clique em **"Finish"** para confirmar.
                     """)
+                # --- FIM DA CORREÇÃO v45 ---
             
             st.divider()
 
@@ -169,12 +177,11 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if opcao_selecionada == "Mapas":
                 st.selectbox("Selecione o tipo de período", ["Personalizado", "Mensal", "Anual"], key='tipo_periodo', on_change=reset_analysis_state)
             else:
-                # Na aba "Séries Temporais", força o período Personalizado
                 st.session_state.tipo_periodo = "Personalizado"
             
             tipo_periodo = st.session_state.get('tipo_periodo', 'Personalizado')
             ano_atual = datetime.now().year
-            lista_anos = list(range(ano_atual, 1949, -1)) 
+            lista_anos = list(range(ano_atual, 1949, -1)) # (v35)
 
             st.session_state.date_error = False
             if tipo_periodo == "Personalizado":
@@ -194,7 +201,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             elif tipo_periodo == "Mensal":
                 st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
-                st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
+                st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state) # (v38)
             
             elif tipo_periodo == "Anual":
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
@@ -203,6 +210,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             if opcao_selecionada == "Mapas":
                 st.subheader("5. Tipo de Mapa")
+                # (v41) Usa o callback "leve"
                 st.radio("Selecione o formato", 
                          ["Interativo", "Estático"], 
                          key='map_type', 
@@ -218,9 +226,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if not st.session_state.get('drawn_geometry'):
                     disable_button = True
                     tooltip_message = "Por favor, desenhe um polígono no mapa principal primeiro."
-                # --- INÍCIO DA CORREÇÃO v47 ---
-                # REMOVIDA a restrição que desabilitava o botão na aba "Séries Temporais"
-                # --- FIM DA CORREÇÃO v47 ---
+                if opcao_selecionada != "Mapas":
+                     disable_button = True
+                     tooltip_message = "O desenho de polígono só funciona na aba 'Mapas'."
             
             elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
                 if not (st.session_state.get('latitude') is not None and 
@@ -244,7 +252,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
 # ==================================================================================
 # (O restante do arquivo: renderizar_pagina_principal, 
-#  renderizar_resumo_selecao, renderizar_pagina_sobre é idêntico)
+#  renderizar_resumo_selecao, renderizar_pagina_sobre é idêntico ao v27)
 # ==================================================================================
 
 def renderizar_pagina_principal(opcao_navegacao):
@@ -255,71 +263,4 @@ def renderizar_pagina_principal(opcao_navegacao):
     with col1:
         logo_col, title_col = st.columns([1, 5])
         with logo_col:
-            st.image("logo.png", width=70)
-        with title_col:
-            st.title(f"Clima-Cast-Crepaldi: {opcao_navegacao}")
-
-    with col2:
-        st.write("")
-        st.markdown(f"<p style='text-align: right; color: grey;'>{data_hora_formatada}</p>", unsafe_allow_html=True)
-    
-    st.markdown("---")
-    if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
-        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
-
-
-def renderizar_resumo_selecao():
-    with st.expander("Resumo dos Filtros Utilizados", expanded=False):
-        col_resumo1, col_resumo2 = st.columns(2)
-        
-        try:
-            with col_resumo1:
-                st.markdown(f"**Base de Dados:** `{st.session_state.base_de_dados}`")
-                st.markdown(f"**Variável:** `{st.session_state.variavel}`")
-                st.markdown(f"**Tipo de Localização:** `{st.session_state.tipo_localizacao}`")
-                if st.session_state.tipo_localizacao == "Estado":
-                    st.markdown(f"**Estado:** `{st.session_state.estado}`")
-                elif st.session_state.tipo_localizacao == "Município":
-                    st.markdown(f"**Estado:** `{st.session_state.estado}`")
-                    st.markdown(f"**Município:** `{st.session_state.municipio}`")
-                elif st.session_state.tipo_localizacao == "Círculo (Lat/Lon/Raio)":
-                    st.markdown(f"**Centro:** `Lat: {st.session_state.latitude}, Lon: {st.session_state.longitude}`")
-                    st.markdown(f"**Raio:** `{st.session_state.raio} km`")
-                elif st.session_state.tipo_localizacao == "Polígono":
-                    st.markdown(f"**Área:** `Desenhada no mapa`")
-            with col_resumo2:
-                st.markdown(f"**Tipo de Período:** `{st.session_state.tipo_periodo}`")
-                if st.session_state.tipo_periodo == "Personalizado":
-                    data_inicio_fmt = st.session_state.data_inicio.strftime('%d/%m/%Y')
-                    data_fim_fmt = st.session_state.data_fim.strftime('%d/%m/%Y')
-                    st.markdown(f"**Data de Início:** `{data_inicio_fmt}`")
-                    st.markdown(f"**Data de Fim:** `{data_fim_fmt}`")
-                elif st.session_state.tipo_periodo == "Mensal":
-                    st.markdown(f"**Período:** `{st.session_state.mes_mensal} de {st.session_state.ano_mensal}`")
-                elif st.session_state.tipo_periodo == "Anual":
-                    st.markdown(f"**Período:** `Ano de {st.session_state.ano_anual}`")
-                if st.session_state.get('nav_option') == "Mapas":
-                    st.markdown(f"**Tipo de Mapa:** `{st.session_state.map_type}`")
-            st.info("Por favor, confira suas seleções. A busca pelos dados será iniciada com base nestes parâmetros.")
-        except AttributeError:
-            st.warning("Filtros foram redefinidos. Por favor, selecione novamente.")
-
-
-def renderizar_pagina_sobre():
-    texto_sobre = _carregar_texto_docx("sobre.docx")
-    
-    if texto_sobre is None:
-        st.warning("Arquivo `sobre.docx` não encontrado. Exibindo texto padrão.")
-        st.markdown("""
-        **Objetivo**
-        
-        O sistema tem como principal objetivo proporcionar uma interface intuitiva e interativa para consulta, análise e visualização 
-        de dados meteorológicos históricos dos municípios brasileiros...
-        
-        *(Por favor, crie um arquivo chamado 'sobre.docx' na mesma pasta do 'main.py' com o conteúdo desta página.)*
-        """)
-    else:
-        st.markdown(texto_sobre, unsafe_allow_html=True)
-    
-    st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
+            st.image("logo.png", width
