@@ -262,10 +262,7 @@ def render_analysis_results():
         )
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v44:
-# Lógica de renderização do mapa de desenho foi ajustada para
-# não apagar o polígono quando os resultados já existem.
-# O Popover de ajuda foi movido para o ui.py
+# LÓGICA DE DESENHO (Idêntica, mantida da v41)
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
