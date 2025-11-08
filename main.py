@@ -274,8 +274,6 @@ def render_polygon_drawer():
         * **(⬟) Polígono:** Clique para começar a desenhar uma forma livre.
         * **(■) Retângulo:** Clique para desenhar um retângulo.
         * **(🗑️) Lixeira:** Apaga todos os polígonos.
-        
-        **IMPORTANTE:** Após desenhar, clique em **"Finish"** na barra de ferramentas superior para confirmar.
         """)
     # --- FIM DA CORREÇÃO v47 ---
 
@@ -383,4 +381,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
