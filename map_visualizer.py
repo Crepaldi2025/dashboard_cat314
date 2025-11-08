@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v48)
+# ui.py — (Versão Completa e Corrigida)
 # ==================================================================================
 
 import streamlit as st
@@ -11,7 +11,7 @@ import docx
 import os
 
 # ==================================================================================
-# CONFIGURAÇÃO INICIAL (Idêntica)
+# CONFIGURAÇÃO INICIAL
 # ==================================================================================
 st.set_page_config(
     page_title="Clima-Cast-Crepaldi",
@@ -27,10 +27,10 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES (Idênticas)
+# FUNÇÕES AUXILIARES
 # ==================================================================================
 
-# Lista manual de meses para garantir o português (v38)
+# Lista manual de meses para garantir o português
 NOMES_MESES_PT = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
@@ -40,7 +40,6 @@ NOMES_MESES_PT = [
 def _carregar_texto_docx(file_path):
     """
     Função auxiliar para ler um arquivo .docx e retornar seu texto.
-    (v27) - Versão simplificada e robusta que apenas extrai o texto.
     """
     if not os.path.exists(file_path):
         return None 
@@ -58,7 +57,6 @@ def _carregar_texto_docx(file_path):
 def reset_analysis_state():
     """
     Callback DESTRUTIVO: Limpa TUDO, incluindo a geometria desenhada.
-    Usado quando o usuário muda a Variável, Localização ou Período.
     """
     keys_to_clear = [
         'analysis_triggered',   
@@ -69,11 +67,9 @@ def reset_analysis_state():
         if key in st.session_state:
             del st.session_state[key]
 
-# (Correção v41)
 def reset_analysis_results_only():
     """
     Callback "LEVE": Limpa APENAS os resultados, mantendo a geometria.
-    Usado ao trocar o Tipo de Mapa (Interativo/Estático).
     """
     keys_to_clear = [
         'analysis_triggered',   
@@ -109,12 +105,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.divider()
 
             st.subheader("2. Variável Meteorológica")
-            # --- INÍCIO DA CORREÇÃO v50 ---
             st.selectbox("Selecione a Variável", 
                          ["Temperatura do Ar (2m)", "Precipitação Total", "Umidade Relativa (2m)", "Velocidade do Vento (10m)", "Radiação Solar Incidente"], 
                          key='variavel', 
                          on_change=reset_analysis_state)
-            # --- FIM DA CORREÇÃO v50 ---
             st.divider()
 
             st.subheader("3. Localização")
@@ -155,6 +149,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
                 else: 
+                    # Mensagem genérica que funciona para ambas as abas
                     st.info("O mapa de desenho aparecerá na tela principal.")
 
                 with st.popover("ℹ️ Ajuda: Polígono"):
@@ -220,6 +215,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if not st.session_state.get('drawn_geometry'):
                     disable_button = True
                     tooltip_message = "Por favor, desenhe um polígono no mapa principal primeiro."
+                # Restrição de aba removida (v47)
             
             elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
                 if not (st.session_state.get('latitude') is not None and 
