@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py — (Corrigido v47)
+# ui.py — (Corrigido v48)
 # ==================================================================================
 
 import streamlit as st
@@ -27,17 +27,14 @@ except locale.Error:
         pass 
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES
+# FUNÇÕES AUXILIARES (Idênticas)
 # ==================================================================================
 
-# --- INÍCIO DA CORREÇÃO v47 (Aplicando v38) ---
-# Lista manual de meses para garantir o português
+# Lista manual de meses para garantir o português (v38)
 NOMES_MESES_PT = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ]
-# --- FIM DA CORREÇÃO v47 ---
-
 
 @st.cache_data
 def _carregar_texto_docx(file_path):
@@ -72,7 +69,7 @@ def reset_analysis_state():
         if key in st.session_state:
             del st.session_state[key]
 
-# --- INÍCIO DA CORREÇÃO v47 (Aplicando v41) ---
+# (Correção v41)
 def reset_analysis_results_only():
     """
     Callback "LEVE": Limpa APENAS os resultados, mantendo a geometria.
@@ -85,7 +82,6 @@ def reset_analysis_results_only():
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
-# --- FIM DA CORREÇÃO v47 ---
     
 # ==================================================================================
 # RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
@@ -113,7 +109,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.divider()
 
             st.subheader("2. Variável Meteorológica")
-            st.selectbox("Selecione a Variável", ["Temperatura do Ar (2m)", "Precipitação Total", "Velocidade do Vento (10m)"], key='variavel', on_change=reset_analysis_state)
+            # --- INÍCIO DA CORREÇÃO v48 ---
+            st.selectbox("Selecione a Variável", 
+                         ["Temperatura do Ar (2m)", "Precipitação Total", "Umidade Relativa (2m)", "Velocidade do Vento (10m)"], 
+                         key='variavel', 
+                         on_change=reset_analysis_state)
+            # --- FIM DA CORREÇÃO v48 ---
             st.divider()
 
             st.subheader("3. Localização")
@@ -142,7 +143,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
-                # Ajuda para Círculo (v45)
                 with st.popover("ℹ️ Ajuda: Círculo (Lat/Lon/Raio)"):
                     st.markdown("""
                     **Como usar:**
@@ -155,17 +155,14 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if st.session_state.get('drawn_geometry'):
                     st.success("✅ Polígono desenhado e capturado.")
                 else: 
-                    # --- INÍCIO DA CORREÇÃO v47 ---
-                    # Mensagem genérica que funciona para ambas as abas
                     st.info("O mapa de desenho aparecerá na tela principal.")
-                    # --- FIM DA CORREÇÃO v47 ---
 
-                # Ajuda para Polígono (v45)
                 with st.popover("ℹ️ Ajuda: Polígono"):
                     st.markdown("""
                     **Como usar:**
                     1.  O mapa de desenho aparecerá na tela principal.
                     2.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa.
+                    3.  Clique em **"Finish"** na barra de ferramentas do mapa para confirmar.
                     """)
             
             st.divider()
@@ -175,13 +172,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if opcao_selecionada == "Mapas":
                 st.selectbox("Selecione o tipo de período", ["Personalizado", "Mensal", "Anual"], key='tipo_periodo', on_change=reset_analysis_state)
             else:
-                # Na aba "Séries Temporais", força o período Personalizado
                 st.session_state.tipo_periodo = "Personalizado"
             
             tipo_periodo = st.session_state.get('tipo_periodo', 'Personalizado')
             ano_atual = datetime.now().year
-            
-            # (Correção v35)
             lista_anos = list(range(ano_atual, 1949, -1)) 
 
             st.session_state.date_error = False
@@ -202,7 +196,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             elif tipo_periodo == "Mensal":
                 st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
-                # (Correção v38)
                 st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
             
             elif tipo_periodo == "Anual":
@@ -212,7 +205,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             if opcao_selecionada == "Mapas":
                 st.subheader("5. Tipo de Mapa")
-                # (Correção v41)
                 st.radio("Selecione o formato", 
                          ["Interativo", "Estático"], 
                          key='map_type', 
@@ -228,9 +220,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if not st.session_state.get('drawn_geometry'):
                     disable_button = True
                     tooltip_message = "Por favor, desenhe um polígono no mapa principal primeiro."
-                # --- INÍCIO DA CORREÇÃO v47 ---
-                # REMOVIDA a restrição que desabilitava o botão na aba "Séries Temporais"
-                # --- FIM DA CORREÇÃO v47 ---
             
             elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
                 if not (st.session_state.get('latitude') is not None and 
@@ -274,7 +263,6 @@ def renderizar_pagina_principal(opcao_navegacao):
         st.markdown(f"<p style='text-align: right; color: grey;'>{data_hora_formatada}</p>", unsafe_allow_html=True)
     
     st.markdown("---")
-    # (Correção v41)
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
@@ -334,5 +322,3 @@ def renderizar_pagina_sobre():
     
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
-
-
