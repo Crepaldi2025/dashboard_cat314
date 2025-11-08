@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v47)
+# main.py — Clima-Cast-Crepaldi (Corrigido v48)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -67,7 +67,7 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
 
 # ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE (Idêntica) ----------------------
 def run_full_analysis():
-    # (v47) Precisamos da 'aba' aqui para a lógica de cache
+    # (v48) Precisamos da 'aba' aqui para a lógica de cache
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
 
@@ -100,7 +100,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função atualizada v47)
+# (Função atualizada v48)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -261,21 +261,24 @@ def render_analysis_results():
         )
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v47:
+# CORREÇÃO v48:
 # Adicionado popover de ajuda para os botões de *desenho*.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     
-    # --- INÍCIO DA CORREÇÃO v47 ---
+    # --- INÍCIO DA CORREÇÃO v48 ---
     with st.popover("ℹ️ Ajuda: Botões de Desenho"):
         st.markdown("""
         **Como usar os botões do mapa:**
         * **(⬟) Polígono:** Clique para começar a desenhar uma forma livre.
         * **(■) Retângulo:** Clique para desenhar um retângulo.
+        * **(⬟✎) Editar:** Permite mover os pontos de um polígono já desenhado.
         * **(🗑️) Lixeira:** Apaga todos os polígonos.
+        
+        **IMPORTANTE:** Após desenhar, clique em **"Finish"** na barra de ferramentas superior para confirmar.
         """)
-    # --- FIM DA CORREÇÃO v47 ---
+    # --- FIM DA CORREÇÃO v48 ---
 
     mapa_desenho = folium.Map(
         location=[-15.78, -47.93], 
@@ -329,7 +332,7 @@ def render_polygon_drawer():
             st.rerun() 
     
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v47:
+# CORREÇÃO v48 (Aplicando v47):
 # A lógica de renderização do mapa de desenho foi ajustada para
 # funcionar tanto na aba 'Mapas' quanto na 'Séries Temporais'.
 # ----------------------------------------------------------------------------------
@@ -347,7 +350,7 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # --- INÍCIO DA CORREÇÃO v47 ---
+    # --- INÍCIO DA CORREÇÃO v48 ---
     
     # Estamos no modo Polígono? (Independente da aba)
     is_polygon_mode = st.session_state.get('tipo_localizacao') == "Polígono"
@@ -362,13 +365,13 @@ def main():
     has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
 
     # SÓ mostre o mapa de desenho se:
-    # 1. Estamos no modo Polígono
+    # 1. Estamos no modo Polígono (em qualquer aba)
     # 2. A análise NÃO está rodando agora
     # 3. A geometria AINDA NÃO FOI DESENHADA
     # 4. NÃO há resultados para mostrar (caso o usuário troque o tipo de mapa)
     if is_polygon_mode and not is_analysis_running and not has_geometry and not has_results:
         render_polygon_drawer()
-    # --- FIM DA CORREÇÃO v47 ---
+    # --- FIM DA CORREÇÃO v48 ---
 
     # Lógica de Execução
     if is_analysis_running:
@@ -381,5 +384,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
