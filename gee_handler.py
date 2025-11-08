@@ -86,7 +86,7 @@ ERA5_VARS = {
         "aggregation": "mean", # Média dos valores diários de W/m²
         "vis_params": { 
             "min": 0, 
-            "max": 400, 
+            "max": 1000, 
             # Paleta YlOrRd (Amarelo-Laranja-Vermelho)
             "palette": ['#ffffb2', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#b10026']
         }
@@ -475,3 +475,4 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     except Exception as e:
         st.error(f"⚠️ Falha ao processar dados legados do GEE: {e}")
         return None
+
