@@ -1,6 +1,15 @@
 # ==================================================================================
-# map_visualizer.py — (Versão Final Corrigida)
+# map_visualizer.py
+# 
+# Módulo: Clima-Cast-Crepaldi
+# Autor: Paulo C. Crepaldi
+#
+# Descrição:
+# (v46) - Adiciona o rótulo "Umidade Relativa" e "Radiação" à
+#         legenda interativa (função _add_colorbar_bottomleft).
+#       - Mantém as correções de centralização (v34) e fundo branco (v45).
 # ==================================================================================
+
 import streamlit as st
 import geemap.foliumap as geemap
 import ee
@@ -16,7 +25,7 @@ from matplotlib import cm
 import matplotlib.colors as mcolors 
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
-# (st.set_page_config() foi REMOVIDO daqui - Esta era a causa do erro)
+# (st.set_page_config() foi REMOVIDO daqui)
 
 # ==================================================================================
 # MAPA INTERATIVO (Resultado da Análise)
@@ -27,12 +36,11 @@ def create_interactive_map(ee_image: ee.Image,
                            vis_params: dict, 
                            unit_label: str = ""):
     """
-    (v41) Cria e exibe um mapa interativo que se centraliza (fit_bounds)
-    e não recebe mais o 'title' (que agora é tratado no main.py).
+    (v34) Cria e exibe um mapa interativo que se centraliza e 
+    dá zoom automaticamente na área de interesse.
     """
     
     try:
-        # Lógica de centralização (v34)
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -55,12 +63,12 @@ def create_interactive_map(ee_image: ee.Image,
 
 
 # ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS
+# COLORBAR PARA MAPAS INTERATIVOS (Corrigido v46)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
-    (v40/v49) Adiciona legenda discreta com valores inteiros (usando .fmt).
+    (v46) Adiciona legenda discreta com valores inteiros e todos os rótulos.
     """
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
@@ -81,6 +89,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     
     colormap.fmt = '%.0f' # (v40) Força a formatação de inteiros
 
+    # --- INÍCIO DA CORREÇÃO v46 ---
     ul = (unit_label or "").lower()
     if "°" in unit_label or "temp" in ul:
         label = "Temperatura (°C)"
@@ -89,11 +98,12 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     elif "m/s" in ul or "vento" in ul:
         label = "Vento (m/s)"
     elif "%" in ul: 
-        label = "Umidade Relativa (%)" # (v49)
+        label = "Umidade Relativa (%)"
     elif "w/m" in ul:
-        label = "Radiação (W/m²)" # (v50)
+        label = "Radiação (W/m²)"
     else:
         label = str(unit_label) if unit_label else ""
+    # --- FIM DA CORREÇÃO v46 ---
 
     colormap.caption = label
     
@@ -113,7 +123,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 
 # ==================================================================================
-# COLORBAR COMPACTA (MAPA ESTÁTICO)
+# COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico v29)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
@@ -145,6 +155,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
     )
         
     cb.set_label(label, fontsize=7)
+    # (v40) :g remove zeros decimais desnecessários
     cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     
@@ -158,7 +169,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
 
 
 # ==================================================================================
-# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS
+# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico v46)
 # ==================================================================================
 
 def create_static_map(ee_image: ee.Image, 
@@ -179,7 +190,7 @@ def create_static_map(ee_image: ee.Image,
         visualized_outline = outline.visualize(palette='000000')
         final_image_with_outline = visualized_data.blend(visualized_outline)
 
-        # (v46) Adiciona buffer para evitar cortes
+        # (v46) Adiciona buffer
         try:
             bounds_geojson = feature.geometry().bounds().getInfo()
             coords = bounds_geojson['coordinates'][0]
@@ -195,7 +206,7 @@ def create_static_map(ee_image: ee.Image,
             region = feature.geometry() # Fallback
 
         url = final_image_with_outline.getThumbURL({
-            "region": region, # Usa a geometria com buffer
+            "region": region,
             "dimensions": 800,
             "format": "png" 
         })
@@ -242,7 +253,7 @@ def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
         fig_width = width / dpi
         fig_height = height / dpi
         fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
-        fig.patch.set_facecolor('white') # Fundo branco
+        fig.patch.set_facecolor('white')
         plt.text(0.5, 0.5, title_text, 
                  ha='center', va='center', 
                  fontsize=14, 
