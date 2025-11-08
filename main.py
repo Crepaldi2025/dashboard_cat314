@@ -273,7 +273,6 @@ def render_polygon_drawer():
         **Como usar os botões do mapa:**
         * **(⬟) Polígono:** Clique para começar a desenhar uma forma livre.
         * **(■) Retângulo:** Clique para desenhar um retângulo.
-        * **(⬟✎) Editar:** Permite mover os pontos de um polígono já desenhado.
         * **(🗑️) Lixeira:** Apaga todos os polígonos.
         
         **IMPORTANTE:** Após desenhar, clique em **"Finish"** na barra de ferramentas superior para confirmar.
@@ -384,3 +383,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
