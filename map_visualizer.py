@@ -87,8 +87,9 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         vmin=vmin, 
         vmax=vmax
     )
-    
-    #colormap.fmt = '%.0f' # (v40) Força a formatação de inteiros
+    colormap = colormap.to_step(index=index)
+
+    colormap.fmt = '%.0f' # (v40) Força a formatação de inteiros
 
     # --- INÍCIO DA CORREÇÃO v46 ---
     ul = (unit_label or "").lower()
@@ -313,6 +314,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
     except Exception as e:
         st.error(f"Erro ao costurar imagens: {e}")
         return None
+
 
 
 
