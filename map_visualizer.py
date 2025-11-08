@@ -5,8 +5,8 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v45) - Corrige o fundo preto na exportação de imagens.
-#         As imagens agora são coladas sobre um fundo branco.
+# (v46) - Adiciona um buffer (margem) à geometria ao gerar mapas estáticos 
+#         para evitar o corte da imagem nas bordas.
 # ==================================================================================
 
 import streamlit as st
@@ -27,7 +27,7 @@ from branca.element import Template, MacroElement
 
 
 # ==================================================================================
-# MAPA INTERATIVO (Resultado da Análise)
+# MAPA INTERATIVO (Resultado da Análise) (Idêntico v34)
 # ==================================================================================
 
 def create_interactive_map(ee_image: ee.Image, 
@@ -95,6 +95,8 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         label = "Precipitação (mm)"
     elif "m/s" in ul or "vento" in ul:
         label = "Vento (m/s)"
+    elif "%" in ul: # Adicionando UR (v48)
+        label = "Umidade Relativa (%)"
     else:
         label = str(unit_label) if unit_label else ""
 
@@ -162,7 +164,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
 
 
 # ==================================================================================
-# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico v17)
+# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Corrigido v46)
 # ==================================================================================
 
 def create_static_map(ee_image: ee.Image, 
@@ -171,6 +173,7 @@ def create_static_map(ee_image: ee.Image,
                       unit_label: str = "") -> tuple[str, str, str]:
     """
     Gera o mapa estático (PNG/JPG) e a legenda (colorbar) discreta.
+    (v46) - Adiciona um buffer à geometria para evitar cortes.
     """
     try:
         visualized_data = ee_image.visualize(
@@ -182,16 +185,37 @@ def create_static_map(ee_image: ee.Image,
         visualized_outline = outline.visualize(palette='000000')
         final_image_with_outline = visualized_data.blend(visualized_outline)
 
-        # Solicita um PNG (que suporta transparência)
+        # --- INÍCIO DA CORREÇÃO v46 ---
+        # Adiciona um buffer à geometria (por exemplo, 2% da largura/altura)
+        # para que o GEE renderize uma área ligeiramente maior.
+        # buffer_metres = 20000 # 20km, valor fixo
+        
+        # Buffer percentual (ajusta ao tamanho da feature)
+        # Calcula o tamanho da geometria para determinar um buffer relativo
+        bounds_geojson = feature.geometry().bounds().getInfo()
+        # Calcula o delta de longitude/latitude para ter uma ideia do "tamanho"
+        min_lon, min_lat = bounds_geojson['coordinates'][0][0]
+        max_lon, max_lat = bounds_geojson['coordinates'][0][2]
+
+        # Considera a diferença maior entre largura e altura para o buffer
+        delta_lon = abs(max_lon - min_lon)
+        delta_lat = abs(max_lat - min_lat)
+        
+        # Converte a diferença em graus para metros (aproximadamente 111km/grau na latitude)
+        # e pega 5% da maior dimensão. Ajuste este percentual se necessário.
+        approx_dim_in_metres = max(delta_lon, delta_lat) * 111000 
+        buffer_metres = approx_dim_in_metres * 0.05 # 5% de margem
+
+        buffered_geometry = feature.geometry().buffer(buffer_metres)
+
         url = final_image_with_outline.getThumbURL({
-            "region": feature.geometry(),
+            "region": buffered_geometry, # Usa a geometria com buffer AQUI
             "dimensions": 800,
             "format": "png" 
         })
+        # --- FIM DA CORREÇÃO v46 ---
 
         img_bytes = requests.get(url).content
-        
-        # --- INÍCIO DA CORREÇÃO v45 (Fundo Preto) ---
         
         # Carrega a imagem PNG (que pode ser RGBA - com transparência)
         img_png = Image.open(io.BytesIO(img_bytes))
@@ -212,8 +236,6 @@ def create_static_map(ee_image: ee.Image,
         b64_png = base64.b64encode(img_bytes).decode("ascii")
         png_url = f"data:image/png;base64,{b64_png}"
         
-        # --- FIM DA CORREÇÃO v45 ---
-
         palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
         vmin = vis_params.get("min", 0)
         vmax = vis_params.get("max", 1)
@@ -228,7 +250,7 @@ def create_static_map(ee_image: ee.Image,
         return None, None, None
 
 # ==================================================================================
-# FUNÇÕES DE COSTURA DE IMAGEM (Corrigido v45)
+# FUNÇÕES DE COSTURA DE IMAGEM (Idêntico v45)
 # ==================================================================================
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
@@ -283,7 +305,6 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
 
         total_height = title_img.height + map_img.height + colorbar_img.height
         
-        # --- INÍCIO DA CORREÇÃO v45 ---
         # Cria a tela final COM canal alfa, e define o fundo como BRANCO
         final_img_rgba = Image.new('RGBA', (width, total_height), (255, 255, 255, 255))
 
@@ -299,7 +320,6 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
             final_img_rgb.save(final_buffer, format='JPEG', quality=95)
         else:
             final_img_rgba.save(final_buffer, format='PNG')
-        # --- FIM DA CORREÇÃO v45 ---
         
         return final_buffer.getvalue()
         
