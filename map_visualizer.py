@@ -1,320 +1,303 @@
 # ==================================================================================
-# ui.py — (Versão Completa e Corrigida)
+# map_visualizer.py — (Versão Final Corrigida)
 # ==================================================================================
-
 import streamlit as st
-from datetime import datetime
-import calendar
-from dateutil.relativedelta import relativedelta
-import locale
-import docx
-import os
+import geemap.foliumap as geemap
+import ee
+import io
+import base64
+import requests
+from PIL import Image
+import numpy as np 
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
+from matplotlib.colorbar import ColorbarBase
+from matplotlib import cm
+import matplotlib.colors as mcolors 
+from branca.colormap import StepColormap 
+from branca.element import Template, MacroElement 
+# (st.set_page_config() foi REMOVIDO daqui - Esta era a causa do erro)
 
 # ==================================================================================
-# CONFIGURAÇÃO INICIAL
+# MAPA INTERATIVO (Resultado da Análise)
 # ==================================================================================
-st.set_page_config(
-    page_title="Clima-Cast-Crepaldi",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-try:
-    locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
-except locale.Error:
+
+def create_interactive_map(ee_image: ee.Image, 
+                           feature: ee.Feature, 
+                           vis_params: dict, 
+                           unit_label: str = ""):
+    """
+    (v41) Cria e exibe um mapa interativo que se centraliza (fit_bounds)
+    e não recebe mais o 'title' (que agora é tratado no main.py).
+    """
+    
     try:
-        locale.setlocale(locale.LC_TIME, "C") # Fallback
+        # Lógica de centralização (v34)
+        coords = feature.geometry().bounds().getInfo()['coordinates'][0]
+        lon_min = coords[0][0]
+        lat_min = coords[0][1]
+        lon_max = coords[2][0]
+        lat_max = coords[2][1]
+        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
     except Exception:
-        pass 
+        bounds = None
+
+    mapa = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="HYBRID")
+    mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
+    mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
+    
+    _add_colorbar_bottomleft(mapa, vis_params, unit_label)
+
+    if bounds:
+        mapa.fit_bounds(bounds)
+    
+    mapa.to_streamlit(height=500, use_container_width=True)
+
 
 # ==================================================================================
-# FUNÇÕES AUXILIARES
+# COLORBAR PARA MAPAS INTERATIVOS
 # ==================================================================================
 
-# Lista manual de meses para garantir o português
-NOMES_MESES_PT = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-]
-
-@st.cache_data
-def _carregar_texto_docx(file_path):
+def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
-    Função auxiliar para ler um arquivo .docx e retornar seu texto.
+    (v40/v49) Adiciona legenda discreta com valores inteiros (usando .fmt).
     """
-    if not os.path.exists(file_path):
-        return None 
+    palette = vis_params.get("palette", None)
+    vmin = vis_params.get("min", 0)
+    vmax = vis_params.get("max", 1)
+    
+    if not palette or len(palette) == 0:
+        return 
 
+    N_STEPS = len(palette) 
+    index = np.linspace(vmin, vmax, N_STEPS + 1).astype(int) 
+
+    colormap = StepColormap(
+        colors=palette, 
+        index=index, 
+        vmin=vmin, 
+        vmax=vmax
+    )
+    
+    colormap.fmt = '%.0f' # (v40) Força a formatação de inteiros
+
+    ul = (unit_label or "").lower()
+    if "°" in unit_label or "temp" in ul:
+        label = "Temperatura (°C)"
+    elif "mm" in ul:
+        label = "Precipitação (mm)"
+    elif "m/s" in ul or "vento" in ul:
+        label = "Vento (m/s)"
+    elif "%" in ul: 
+        label = "Umidade Relativa (%)" # (v49)
+    elif "w/m" in ul:
+        label = "Radiação (W/m²)" # (v50)
+    else:
+        label = str(unit_label) if unit_label else ""
+
+    colormap.caption = label
+    
+    html = colormap._repr_html_()
+    template = Template(f"""
+    {{% macro html(this, kwargs) %}}
+    <div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999;
+                background: rgba(255,255,255,0.85); padding: 6px 8px;
+                border-radius: 6px; box_shadow: 0 1px 4px rgba(0,0,0,0.3);">
+        {html}
+    </div>
+    {{% endmacro %}}
+    """)
+    macro = MacroElement()
+    macro._template = template
+    mapa.get_root().add_child(macro)
+
+
+# ==================================================================================
+# COLORBAR COMPACTA (MAPA ESTÁTICO)
+# ==================================================================================
+
+def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
+                           label: str) -> str:
+    """
+    (v29) Gera legenda horizontal discreta (Matplotlib).
+    """
+    fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
+    ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
+    
     try:
-        doc = docx.Document(file_path)
-        full_text = []
-        for para in doc.paragraphs:
-            full_text.append(para.text)
-        return "\n\n".join(full_text)
+        N_STEPS = len(palette)
+        boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
+        cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
+        norm = mcolors.BoundaryNorm(boundaries, cmap.N)
     except Exception as e:
-        st.error(f"Erro ao ler o arquivo {file_path}: {e}")
+        st.error(f"Erro ao criar colormap: {e}")
+        plt.close(fig)
         return None
 
-def reset_analysis_state():
-    """
-    Callback DESTRUTIVO: Limpa TUDO, incluindo a geometria desenhada.
-    """
-    keys_to_clear = [
-        'analysis_triggered',   
-        'analysis_results',     
-        'drawn_geometry'        
-    ]
-    for key in keys_to_clear:
-        if key in st.session_state:
-            del st.session_state[key]
-
-def reset_analysis_results_only():
-    """
-    Callback "LEVE": Limpa APENAS os resultados, mantendo a geometria.
-    """
-    keys_to_clear = [
-        'analysis_triggered',   
-        'analysis_results',     
-    ]
-    for key in keys_to_clear:
-        if key in st.session_state:
-            del st.session_state[key]
+    cb = ColorbarBase(
+        ax, 
+        cmap=cmap, 
+        norm=norm, 
+        boundaries=boundaries,
+        ticks=boundaries,
+        spacing='proportional',
+        orientation="horizontal"
+    )
+        
+    cb.set_label(label, fontsize=7)
+    cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
+    cb.ax.tick_params(labelsize=6, length=2, pad=1)
     
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
+    plt.close(fig)
+    buf.seek(0)
+    
+    b64 = base64.b64encode(buf.read()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
 # ==================================================================================
-# RENDERIZAÇÃO DOS COMPONENTES PRINCIPAIS
+# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS
 # ==================================================================================
 
-def renderizar_sidebar(dados_geo, mapa_nomes_uf):
-    with st.sidebar:
-        st.header("Painel de Controle")
-
-        st.radio(
-            "Navegação",
-            ["Mapas", "Séries Temporais", "Sobre o Aplicativo"],
-            label_visibility="collapsed",
-            key='nav_option',
-            on_change=reset_analysis_state 
+def create_static_map(ee_image: ee.Image, 
+                      feature: ee.Feature, 
+                      vis_params: dict, 
+                      unit_label: str = "") -> tuple[str, str, str]:
+    """
+    Gera o mapa estático (PNG/JPG) e a legenda (colorbar) discreta.
+    (v46) - Adiciona um buffer à geometria para evitar cortes.
+    """
+    try:
+        visualized_data = ee_image.visualize(
+            min=vis_params["min"],
+            max=vis_params["max"],
+            palette=vis_params["palette"]
         )
-        st.markdown("---")
-        opcao_selecionada = st.session_state.get('nav_option', 'Mapas')
+        outline = ee.Image().paint(featureCollection=feature, color=0, width=2)
+        visualized_outline = outline.visualize(palette='000000')
+        final_image_with_outline = visualized_data.blend(visualized_outline)
 
-        if opcao_selecionada in ["Mapas", "Séries Temporais"]:
-            st.markdown("<p style='text-align: center;'>Selecione os filtros abaixo para gerar os dados.</p>", unsafe_allow_html=True)
-            
-            st.subheader("1. Base de Dados")
-            st.selectbox("Selecione a Base de Dados", ["ERA5-LAND"], key='base_de_dados', on_change=reset_analysis_state)
-            st.divider()
-
-            st.subheader("2. Variável Meteorológica")
-            st.selectbox("Selecione a Variável", 
-                         ["Temperatura do Ar (2m)", "Precipitação Total", "Umidade Relativa (2m)", "Velocidade do Vento (10m)", "Radiação Solar Incidente"], 
-                         key='variavel', 
-                         on_change=reset_analysis_state)
-            st.divider()
-
-            st.subheader("3. Localização")
-            st.selectbox("Selecione o tipo de área de interesse", 
-                         ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], 
-                         key='tipo_localizacao', 
-                         on_change=reset_analysis_state) 
-            
-            tipo_localizacao = st.session_state.get('tipo_localizacao', 'Estado')
-            lista_estados_formatada = ["Selecione..."] + [f"{mapa_nomes_uf[uf]} - {uf}" for uf in sorted(mapa_nomes_uf)]
-
-            if tipo_localizacao == "Estado":
-                st.selectbox("Selecione o Estado", lista_estados_formatada, key='estado', on_change=reset_analysis_state)
-            
-            elif tipo_localizacao == "Município":
-                st.selectbox("Selecione o Estado", lista_estados_formatada, key='estado', on_change=reset_analysis_state)
-                estado_selecionado_str = st.session_state.get('estado', 'Selecione...')
-                lista_municipios = ["Selecione um estado primeiro"]
-                if estado_selecionado_str and estado_selecionado_str != "Selecione...":
-                    uf_selecionada = estado_selecionado_str.split(' - ')[-1]
-                    lista_municipios = ["Selecione..."] + dados_geo.get(uf_selecionada, [])
-                st.selectbox("Selecione o Município", lista_municipios, key='municipio', on_change=reset_analysis_state)
-            
-            elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
-                st.number_input("Latitude", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
-                st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
-                st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
-                
-                with st.popover("ℹ️ Ajuda: Círculo (Lat/Lon/Raio)"):
-                    st.markdown("""
-                    **Como usar:**
-                    1.  **Latitude:** Insira a latitude do ponto central (em graus decimais).
-                    2.  **Longitude:** Insira a longitude do ponto central (em graus decimais).
-                    3.  **Raio (km):** Defina o raio em quilômetros ao redor do ponto central.
-                    """)
-
-            elif tipo_localizacao == "Polígono":
-                if st.session_state.get('drawn_geometry'):
-                    st.success("✅ Polígono desenhado e capturado.")
-                else: 
-                    # Mensagem genérica que funciona para ambas as abas
-                    st.info("O mapa de desenho aparecerá na tela principal.")
-
-                with st.popover("ℹ️ Ajuda: Polígono"):
-                    st.markdown("""
-                    **Como usar:**
-                    1.  O mapa de desenho aparecerá na tela principal.
-                    2.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa.
-                    3.  Clique em **"Finish"** na barra de ferramentas do mapa para confirmar.
-                    """)
-            
-            st.divider()
-
-            st.subheader("4. Período de Análise")
-            
-            if opcao_selecionada == "Mapas":
-                st.selectbox("Selecione o tipo de período", ["Personalizado", "Mensal", "Anual"], key='tipo_periodo', on_change=reset_analysis_state)
-            else:
-                st.session_state.tipo_periodo = "Personalizado"
-            
-            tipo_periodo = st.session_state.get('tipo_periodo', 'Personalizado')
-            ano_atual = datetime.now().year
-            lista_anos = list(range(ano_atual, 1949, -1)) 
-
-            st.session_state.date_error = False
-            if tipo_periodo == "Personalizado":
-                hoje = datetime.now()
-                data_padrao_fim = hoje.replace(day=1) - relativedelta(days=1)
-                data_padrao_inicio = data_padrao_fim.replace(day=1)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.date_input("Data de Início", value=data_padrao_inicio, key='data_inicio', on_change=reset_analysis_state)
-                with col2:
-                    st.date_input("Data de Fim", value=data_padrao_fim, key='data_fim', on_change=reset_analysis_state)
-                
-                if st.session_state.data_fim < st.session_state.data_inicio:
-                    st.error("Atenção: A data final é anterior à data inicial.")
-                    st.session_state.date_error = True
-            
-            elif tipo_periodo == "Mensal":
-                st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
-                st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
-            
-            elif tipo_periodo == "Anual":
-                st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
-            
-            st.divider()
-
-            if opcao_selecionada == "Mapas":
-                st.subheader("5. Tipo de Mapa")
-                st.radio("Selecione o formato", 
-                         ["Interativo", "Estático"], 
-                         key='map_type', 
-                         horizontal=True, 
-                         on_change=reset_analysis_results_only 
-                )
-                st.divider()
-
-            disable_button = st.session_state.get('date_error', False)
-            tooltip_message = "Clique para gerar a análise"
-
-            if tipo_localizacao == "Polígono":
-                if not st.session_state.get('drawn_geometry'):
-                    disable_button = True
-                    tooltip_message = "Por favor, desenhe um polígono no mapa principal primeiro."
-                # Restrição de aba removida (v47)
-            
-            elif tipo_localizacao == "Círculo (Lat/Lon/Raio)":
-                if not (st.session_state.get('latitude') is not None and 
-                        st.session_state.get('longitude') is not None and 
-                        st.session_state.get('raio', 0) > 0):
-                    disable_button = True
-                    tooltip_message = "Por favor, insira valores válidos para Latitude, Longitude e Raio (> 0)."
-
-
-            if st.button("Gerar Análise", 
-                          type="primary", 
-                          use_container_width=True, 
-                          disabled=disable_button,
-                          help=tooltip_message):
-                
-                st.session_state.analysis_triggered = True
-                st.rerun()
-
-        
-        return opcao_selecionada
-
-# ==================================================================================
-# (O restante do arquivo: renderizar_pagina_principal, 
-#  renderizar_resumo_selecao, renderizar_pagina_sobre é idêntico)
-# ==================================================================================
-
-def renderizar_pagina_principal(opcao_navegacao):
-    agora = datetime.now()
-    data_hora_formatada = agora.strftime("%d/%m/%Y, %H:%M:%S")
-
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        logo_col, title_col = st.columns([1, 5])
-        with logo_col:
-            st.image("logo.png", width=70)
-        with title_col:
-            st.title(f"Clima-Cast-Crepaldi: {opcao_navegacao}")
-
-    with col2:
-        st.write("")
-        st.markdown(f"<p style='text-align: right; color: grey;'>{data_hora_formatada}</p>", unsafe_allow_html=True)
-    
-    st.markdown("---")
-    if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
-        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
-
-
-def renderizar_resumo_selecao():
-    with st.expander("Resumo dos Filtros Utilizados", expanded=False):
-        col_resumo1, col_resumo2 = st.columns(2)
-        
+        # (v46) Adiciona buffer para evitar cortes
         try:
-            with col_resumo1:
-                st.markdown(f"**Base de Dados:** `{st.session_state.base_de_dados}`")
-                st.markdown(f"**Variável:** `{st.session_state.variavel}`")
-                st.markdown(f"**Tipo de Localização:** `{st.session_state.tipo_localizacao}`")
-                if st.session_state.tipo_localizacao == "Estado":
-                    st.markdown(f"**Estado:** `{st.session_state.estado}`")
-                elif st.session_state.tipo_localizacao == "Município":
-                    st.markdown(f"**Estado:** `{st.session_state.estado}`")
-                    st.markdown(f"**Município:** `{st.session_state.municipio}`")
-                elif st.session_state.tipo_localizacao == "Círculo (Lat/Lon/Raio)":
-                    st.markdown(f"**Centro:** `Lat: {st.session_state.latitude}, Lon: {st.session_state.longitude}`")
-                    st.markdown(f"**Raio:** `{st.session_state.raio} km`")
-                elif st.session_state.tipo_localizacao == "Polígono":
-                    st.markdown(f"**Área:** `Desenhada no mapa`")
-            with col_resumo2:
-                st.markdown(f"**Tipo de Período:** `{st.session_state.tipo_periodo}`")
-                if st.session_state.tipo_periodo == "Personalizado":
-                    data_inicio_fmt = st.session_state.data_inicio.strftime('%d/%m/%Y')
-                    data_fim_fmt = st.session_state.data_fim.strftime('%d/%m/%Y')
-                    st.markdown(f"**Data de Início:** `{data_inicio_fmt}`")
-                    st.markdown(f"**Data de Fim:** `{data_fim_fmt}`")
-                elif st.session_state.tipo_periodo == "Mensal":
-                    st.markdown(f"**Período:** `{st.session_state.mes_mensal} de {st.session_state.ano_mensal}`")
-                elif st.session_state.tipo_periodo == "Anual":
-                    st.markdown(f"**Período:** `Ano de {st.session_state.ano_anual}`")
-                if st.session_state.get('nav_option') == "Mapas":
-                    st.markdown(f"**Tipo de Mapa:** `{st.session_state.map_type}`")
-            st.info("Por favor, confira suas seleções. A busca pelos dados será iniciada com base nestes parâmetros.")
-        except AttributeError:
-            st.warning("Filtros foram redefinidos. Por favor, selecione novamente.")
+            bounds_geojson = feature.geometry().bounds().getInfo()
+            coords = bounds_geojson['coordinates'][0]
+            min_lon, min_lat = coords[0]
+            max_lon, max_lat = coords[2]
+            delta_lon = abs(max_lon - min_lon)
+            delta_lat = abs(max_lat - min_lat)
+            approx_dim_in_metres = max(delta_lon, delta_lat) * 111000 
+            buffer_metres = approx_dim_in_metres * 0.05 # 5% de margem
+            buffered_geometry = feature.geometry().buffer(buffer_metres)
+            region = buffered_geometry
+        except Exception:
+            region = feature.geometry() # Fallback
 
+        url = final_image_with_outline.getThumbURL({
+            "region": region, # Usa a geometria com buffer
+            "dimensions": 800,
+            "format": "png" 
+        })
 
-def renderizar_pagina_sobre():
-    texto_sobre = _carregar_texto_docx("sobre.docx")
-    
-    if texto_sobre is None:
-        st.warning("Arquivo `sobre.docx` não encontrado. Exibindo texto padrão.")
-        st.markdown("""
-        **Objetivo**
+        img_bytes = requests.get(url).content
         
-        O sistema tem como principal objetivo proporcionar uma interface intuitiva e interativa para consulta, análise e visualização 
-        de dados meteorológicos históricos dos municípios brasileiros...
+        # (v45) Corrige fundo preto
+        img_png = Image.open(io.BytesIO(img_bytes))
+        img_com_fundo_branco = Image.new("RGBA", img_png.size, "WHITE")
+        img_com_fundo_branco.paste(img_png, (0, 0), img_png)
         
-        *(Por favor, crie um arquivo chamado 'sobre.docx' na mesma pasta do 'main.py' com o conteúdo desta página.)*
-        """)
-    else:
-        st.markdown(texto_sobre, unsafe_allow_html=True)
-    
-    st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
+        img_rgb_final = img_com_fundo_branco.convert('RGB')
+        jpg_buffer = io.BytesIO()
+        img_rgb_final.save(jpg_buffer, format="JPEG")
+        jpg_b64 = base64.b64encode(jpg_buffer.getvalue()).decode("ascii")
+        jpg_url = f"data:image/jpeg;base64,{jpg_b64}"
+
+        b64_png = base64.b64encode(img_bytes).decode("ascii")
+        png_url = f"data:image/png;base64,{b64_png}"
+        
+        palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
+        vmin = vis_params.get("min", 0)
+        vmax = vis_params.get("max", 1)
+        label = unit_label or ""
+        
+        colorbar_img = _make_compact_colorbar(palette, vmin, vmax, label)
+
+        return png_url, jpg_url, colorbar_img
+
+    except Exception as e:
+        st.error(f"Erro ao gerar mapa estático: {e}")
+        return None, None, None
+
+# ==================================================================================
+# FUNÇÕES DE COSTURA DE IMAGEM (Idêntico v45)
+# ==================================================================================
+
+def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
+    """
+    Cria uma imagem PNG (como bytes) a partir de um texto de título usando Matplotlib.
+    """
+    try:
+        dpi = 100
+        fig_width = width / dpi
+        fig_height = height / dpi
+        fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
+        fig.patch.set_facecolor('white') # Fundo branco
+        plt.text(0.5, 0.5, title_text, 
+                 ha='center', va='center', 
+                 fontsize=14, 
+                 fontweight='bold',
+                 wrap=True)
+        plt.axis('off')
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.05, facecolor='white')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception as e:
+        st.error(f"Erro ao criar imagem do título: {e}")
+        return None
+
+def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, 
+                            colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
+    """
+    (v45) Costura verticalmente três imagens (título, mapa, colorbar) 
+    em uma única imagem com fundo branco.
+    """
+    try:
+        title_img = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
+        map_img = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
+        colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
+
+        width = map_img.width
+        
+        def resize_to_width(img, target_width):
+            if img.width == target_width:
+                return img
+            ratio = target_width / img.width
+            target_height = int(img.height * ratio)
+            return img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+        title_img = resize_to_width(title_img, width)
+        colorbar_img = resize_to_width(colorbar_img, width)
+
+        total_height = title_img.height + map_img.height + colorbar_img.height
+        
+        final_img_rgba = Image.new('RGBA', (width, total_height), (255, 255, 255, 255))
+
+        final_img_rgba.paste(title_img, (0, 0), title_img)
+        final_img_rgba.paste(map_img, (0, title_img.height), map_img)
+        final_img_rgba.paste(colorbar_img, (0, title_img.height + map_img.height), colorbar_img)
+        
+        final_buffer = io.BytesIO()
+        if format.upper() == 'JPEG':
+            final_img_rgb = final_img_rgba.convert('RGB')
+            final_img_rgb.save(final_buffer, format='JPEG', quality=95)
+        else:
+            final_img_rgba.save(final_buffer, format='PNG')
+        
+        return final_buffer.getvalue()
+        
+    except Exception as e:
+        st.error(f"Erro ao costurar imagens: {e}")
+        return None
