@@ -138,7 +138,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
     try:
         N_STEPS = len(palette)
         boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
-        cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
+        cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS + 1)
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
     except Exception as e:
         st.error(f"Erro ao criar colormap: {e}")
@@ -313,6 +313,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
     except Exception as e:
         st.error(f"Erro ao costurar imagens: {e}")
         return None
+
 
 
 
