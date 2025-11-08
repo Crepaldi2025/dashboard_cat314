@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (Corrigido v49)
+# gee_handler.py (Corrigido v50)
 # ==================================================================================
 import streamlit as st
 import json
@@ -39,12 +39,11 @@ def initialize_gee():
     return inicializar_gee()
 
 # ==========================================================
-# DEFINIÇÕES DE VARIÁVEIS (Corrigido v49)
+# DEFINIÇÕES DE VARIÁVEIS (Modificado v50)
 # ==========================================================
 
 ERA5_VARS = {
     "Temperatura do Ar (2m)": {
-        # --- CORREÇÃO v49: Banda é 'temperature_2m', não '..._mean' ---
         "band": "temperature_2m", 
         "result_band": "temperature_2m", 
         "unit": "°C", 
@@ -67,7 +66,6 @@ ERA5_VARS = {
         }
     },
     "Umidade Relativa (2m)": {
-        # --- CORREÇÃO v49: Bandas corretas do log de erro ---
         "bands": ["temperature_2m", "dewpoint_temperature_2m"], 
         "result_band": "relative_humidity", 
         "unit": "%", 
@@ -78,8 +76,23 @@ ERA5_VARS = {
             "palette": ['#8B4513', '#FFA500', '#FFFF00', '#90EE90', '#87CEEB', '#0000FF', '#00008B']
         }
     },
+    # --- INÍCIO DA CORREÇÃO v50 ---
+    "Radiação Solar Incidente": {
+        # Banda original é J/m² por dia
+        "band": "surface_solar_radiation_downwards_sum", 
+        # Vamos calcular a média em W/m²
+        "result_band": "radiation_wm2", 
+        "unit": "W/m²", 
+        "aggregation": "mean", # Média dos valores diários de W/m²
+        "vis_params": { 
+            "min": 0, 
+            "max": 400, 
+            # Paleta YlOrRd (Amarelo-Laranja-Vermelho)
+            "palette": ['#ffffb2', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#b10026']
+        }
+    },
+    # --- FIM DA CORREÇÃO v50 ---
     "Velocidade do Vento (10m)": {
-         # --- CORREÇÃO v49: Bandas corretas do log de erro ---
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], 
         "result_band": "wind_speed", 
         "unit": "m/s", 
@@ -237,33 +250,36 @@ def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Featur
 # PROCESSAMENTO DE DADOS GEE (MAPAS E SÉRIES)
 # ==========================================================
 
-# --- INÍCIO DA CORREÇÃO v49 (Função helper de UR) ---
 def _calculate_rh(image):
     """
     Função GEE (server-side) para calcular a Umidade Relativa (%) a 
     partir de T e Td (em Kelvin). Usa a fórmula August-Roche-Magnus.
     """
-    # Seleciona as bandas com os nomes corretos
-    T = image.select('temperature_2m').subtract(273.15) # K -> C
-    Td = image.select('dewpoint_temperature_2m').subtract(273.15) # K -> C
-    
-    # e_s = 6.11 * exp((17.625 * T_C) / (243.04 + T_C))
+    T = image.select('temperature_2m').subtract(273.15) 
+    Td = image.select('dewpoint_temperature_2m').subtract(273.15)
     es = T.multiply(17.625).divide(T.add(243.04)).exp().multiply(6.11)
-    # e = 6.11 * exp((17.625 * Td_C) / (243.04 + Td_C))
     e = Td.multiply(17.625).divide(Td.add(243.04)).exp().multiply(6.11)
-    
-    # RH = (e / e_s) * 100
     rh = e.divide(es).multiply(100).rename('relative_humidity')
-    
-    # Garante que RH não passe de 100
     return image.addBands(rh.min(ee.Image.constant(100)))
-# --- FIM DA CORREÇÃO v49 ---
+
+# --- INÍCIO DA CORREÇÃO v50 ---
+def _calculate_radiation(image):
+    """
+    Função GEE (server-side) para converter Radiação Solar (J/m²/dia) 
+    para a média de (W/m²).
+    """
+    # J/m²/dia -> J/m²/s (W/m²)
+    # Divide pelo número de segundos em um dia (24 * 60 * 60 = 86400)
+    w_m2 = image.select('surface_solar_radiation_downwards_sum').divide(86400).rename('radiation_wm2')
+    return image.addBands(w_m2)
+# --- FIM DA CORREÇÃO v50 ---
+
 
 def get_era5_image(variable: str, start_date: date, end_date: date, 
                    geometry: ee.Geometry) -> ee.Image:
     """
     Busca, processa e agrega dados do ERA5-Land para geração de mapas.
-    (v49) - Adiciona lógica para calcular UR se solicitado.
+    (v50) - Adiciona lógica para calcular Radiação Solar.
     """
     if variable not in ERA5_VARS: return None
     config = ERA5_VARS[variable]
@@ -280,8 +296,7 @@ def get_era5_image(variable: str, start_date: date, end_date: date,
             st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
             return None
 
-        # --- INÍCIO DA CORREÇÃO v49 ---
-        # Cálculo especial para Vento ou Umidade Relativa
+        # --- INÍCIO DA CORREÇÃO v50 ---
         if variable == "Velocidade do Vento (10m)":
             def calculate_wind_speed(image):
                 wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
@@ -290,9 +305,11 @@ def get_era5_image(variable: str, start_date: date, end_date: date,
         
         elif variable == "Umidade Relativa (2m)":
             image_collection = image_collection.map(_calculate_rh)
-        # --- FIM DA CORREÇÃO v49 ---
+
+        elif variable == "Radiação Solar Incidente":
+            image_collection = image_collection.map(_calculate_radiation)
+        # --- FIM DA CORREÇÃO v50 ---
             
-        # Agregação temporal (Média ou Soma)
         if config['aggregation'] == 'mean':
             aggregated_image = image_collection.select(config['result_band']).mean()
         elif config['aggregation'] == 'sum':
@@ -303,7 +320,7 @@ def get_era5_image(variable: str, start_date: date, end_date: date,
         if aggregated_image:
             final_image = aggregated_image.clip(geometry).float()
             
-            # Correção de unidades (só para T e P, UR já está em %)
+            # Correção de unidades (T e P). UR e Radiação já estão corretas.
             if config['unit'] == "°C": final_image = final_image.subtract(273.15)
             if config['unit'] == "mm": final_image = final_image.multiply(1000)
             
@@ -358,7 +375,7 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
                          geometry: ee.Geometry) -> pd.DataFrame:
     """
     Extrai a série temporal diária (média espacial) para uma dada geometria.
-    (v49) - Adiciona lógica para calcular UR se solicitado.
+    (v50) - Adiciona lógica para calcular Radiação.
     """
     if variable not in ERA5_VARS:
         return pd.DataFrame()
@@ -377,9 +394,9 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
             st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
             return pd.DataFrame()
 
-        band_name_for_reduction = config["result_band"] # Nome padrão
+        band_name_for_reduction = config["result_band"] 
         
-        # --- INÍCIO DA CORREÇÃO v49 ---
+        # --- INÍCIO DA CORREÇÃO v50 ---
         if variable == "Velocidade do Vento (10m)":
             def calculate_wind_speed(image):
                 wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
@@ -389,10 +406,12 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
         elif variable == "Umidade Relativa (2m)":
             collection = collection.map(_calculate_rh)
         
+        elif variable == "Radiação Solar Incidente":
+            collection = collection.map(_calculate_radiation)
+
         else:
-            # Renomeia a banda (lógica antiga)
             collection = collection.map(lambda img: img.rename(band_name_for_reduction))
-        # --- FIM DA CORREÇÃO v49 ---
+        # --- FIM DA CORREÇÃO v50 ---
             
         def extract_value(image):
             stats = image.select(band_name_for_reduction).reduceRegion(
@@ -404,7 +423,7 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
             )
             mean_value = stats.get(band_name_for_reduction)
 
-            # Correção de unidades (só para T e P, UR já está em %)
+            # Correção de unidades (só para T e P)
             value = ee.Number(mean_value)
             if config["unit"] == "°C":
                 value = value.subtract(273.15)
@@ -441,15 +460,15 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     """(Função legada) Mantém compatibilidade com versões antigas do main.py."""
     try:
         geometry = feature.geometry()
-        # Determina a variável automaticamente (com base no nome da banda)
         if band == "temperature_2m":
             variable = "Temperatura do Ar (2m)"
         elif band == "total_precipitation_sum":
             variable = "Precipitação Total"
         elif band in ["u_component_of_wind_10m", "v_component_of_wind_10m"]:
             variable = "Velocidade do Vento (10m)"
+        # (Não adiciona UR ou Radiação aqui, pois é código legado)
         else:
-            variable = "Temperatura do Ar (2m)"  # padrão de segurança
+            variable = "Temperatura do Ar (2m)"
         
         return get_era5_image(variable, start_date, end_date, geometry)
     
