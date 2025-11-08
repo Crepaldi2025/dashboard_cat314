@@ -71,9 +71,10 @@ ERA5_VARS = {
         "unit": "%", 
         "aggregation": "mean", 
         "vis_params": { 
-            "min": 30, 
+            "min": 0, 
             "max": 100, 
-            "palette": ['#8B4513', '#FFA500', '#FFFF00', '#90EE90', '#87CEEB', '#0000FF', '#00008B']
+            # Paleta YlOrRd (Amarelo-Laranja-Vermelho) com 8 cores
+            "palette": ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#b10026']
         }
     },
     # --- INÍCIO DA CORREÇÃO v51 ---
@@ -462,3 +463,4 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     except Exception as e:
         st.error(f"⚠️ Falha ao processar dados legados do GEE: {e}")
         return None
+
