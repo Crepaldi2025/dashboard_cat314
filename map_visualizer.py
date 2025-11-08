@@ -80,7 +80,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     N_STEPS = len(palette) 
     #index = np.linspace(vmin, vmax, N_STEPS).astype(int)
 
-    step = round((vmax - vmin) / N_STEPS)
+    step = round((vmax - vmin) / N_STEPS + 1)
     index = np.arange(vmin, vmax + step, step, dtype=int)
 
     colormap = StepColormap(
@@ -315,5 +315,6 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
     except Exception as e:
         st.error(f"Erro ao costurar imagens: {e}")
         return None
+
 
 
