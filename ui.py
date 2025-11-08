@@ -159,8 +159,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 with st.popover("ℹ️ Ajuda: Polígono"):
                     st.markdown("""
                     **Como usar:**
-                    1.  O mapa de desenho aparecerá na tela principal.
-                    2.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa.
+                    1.  Use as ferramentas de desenho (⬟ ou ■) no canto esquerdo do mapa.
                     """)
             
             st.divider()
@@ -321,4 +320,5 @@ def renderizar_pagina_sobre():
     
     st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
+
 
