@@ -5,8 +5,8 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v40) - Altera a formatação da legenda interativa (colorbar)
-#         para usar `colormap.fmt` em vez de `tick_labels`.
+# (v45) - Corrige o fundo preto na exportação de imagens.
+#         As imagens agora são coladas sobre um fundo branco.
 # ==================================================================================
 
 import streamlit as st
@@ -35,7 +35,7 @@ def create_interactive_map(ee_image: ee.Image,
                            vis_params: dict, 
                            unit_label: str = ""):
     """
-    (v36) Cria e exibe um mapa interativo que se centraliza e 
+    (v34) Cria e exibe um mapa interativo que se centraliza e 
     dá zoom automaticamente na área de interesse.
     """
     
@@ -62,13 +62,12 @@ def create_interactive_map(ee_image: ee.Image,
 
 
 # ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS (Modificado)
+# COLORBAR PARA MAPAS INTERATIVOS (Idêntico v40)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
-    (v40) Função auxiliar interna para adicionar uma legenda (colorbar) 
-    DISCRETA e com valores INTEIROS no canto inferior esquerdo.
+    (v40) Adiciona legenda discreta com valores inteiros.
     """
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
@@ -87,14 +86,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         vmax=vmax
     )
     
-    # --- INÍCIO DA CORREÇÃO v40 ---
-    # Remove a tentativa anterior:
-    # colormap.tick_labels = [f'{i:.0f}' for i in colormap.index]
-    
-    # Adiciona a nova tentativa:
-    # Define o formato de string para os números da legenda (float com 0 casas decimais)
-    colormap.fmt = '%.0f'
-    # --- FIM DA CORREÇÃO v40 ---
+    colormap.fmt = '%.0f' # Força a formatação de inteiros
 
     ul = (unit_label or "").lower()
     if "°" in unit_label or "temp" in ul:
@@ -126,7 +118,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 # ==================================================================================
 # COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico v29)
 # ==================================================================================
-# (Nenhuma alteração nesta seção)
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
                            label: str) -> str:
@@ -161,6 +152,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     
     buf = io.BytesIO()
+    # Salva com fundo transparente, para ser colado no fundo branco depois
     plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
     plt.close(fig)
     buf.seek(0)
@@ -172,7 +164,6 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
 # ==================================================================================
 # MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico v17)
 # ==================================================================================
-# (Nenhuma alteração nesta seção)
 
 def create_static_map(ee_image: ee.Image, 
                       feature: ee.Feature, 
@@ -191,21 +182,37 @@ def create_static_map(ee_image: ee.Image,
         visualized_outline = outline.visualize(palette='000000')
         final_image_with_outline = visualized_data.blend(visualized_outline)
 
+        # Solicita um PNG (que suporta transparência)
         url = final_image_with_outline.getThumbURL({
             "region": feature.geometry(),
             "dimensions": 800,
-            "format": "png"
+            "format": "png" 
         })
 
         img_bytes = requests.get(url).content
-        b64_png = base64.b64encode(img_bytes).decode("ascii")
-        png_url = f"data:image/png;base64,{b64_png}"
+        
+        # --- INÍCIO DA CORREÇÃO v45 (Fundo Preto) ---
+        
+        # Carrega a imagem PNG (que pode ser RGBA - com transparência)
+        img_png = Image.open(io.BytesIO(img_bytes))
 
-        img = Image.open(io.BytesIO(img_bytes))
+        # Cria uma nova imagem com fundo branco (modo RGBA)
+        img_com_fundo_branco = Image.new("RGBA", img_png.size, "WHITE")
+        # Cola a imagem PNG (usando seu próprio canal alfa como máscara) sobre o fundo branco
+        img_com_fundo_branco.paste(img_png, (0, 0), img_png)
+        
+        # Para o JPEG, converte o resultado para 'RGB'
+        img_rgb_final = img_com_fundo_branco.convert('RGB')
         jpg_buffer = io.BytesIO()
-        img.convert("RGB").save(jpg_buffer, format="JPEG")
+        img_rgb_final.save(jpg_buffer, format="JPEG")
         jpg_b64 = base64.b64encode(jpg_buffer.getvalue()).decode("ascii")
         jpg_url = f"data:image/jpeg;base64,{jpg_b64}"
+
+        # Para o PNG, apenas codifica os bytes originais (que serão usados no st.image)
+        b64_png = base64.b64encode(img_bytes).decode("ascii")
+        png_url = f"data:image/png;base64,{b64_png}"
+        
+        # --- FIM DA CORREÇÃO v45 ---
 
         palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
         vmin = vis_params.get("min", 0)
@@ -219,10 +226,10 @@ def create_static_map(ee_image: ee.Image,
     except Exception as e:
         st.error(f"Erro ao gerar mapa estático: {e}")
         return None, None, None
+
 # ==================================================================================
-# FUNÇÕES DE COSTURA DE IMAGEM (Idênticas v31)
+# FUNÇÕES DE COSTURA DE IMAGEM (Corrigido v45)
 # ==================================================================================
-# (Nenhuma alteração nesta seção)
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
     """
@@ -233,7 +240,7 @@ def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
         fig_width = width / dpi
         fig_height = height / dpi
         fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
-        fig.patch.set_facecolor('white')
+        fig.patch.set_facecolor('white') # Fundo branco
         plt.text(0.5, 0.5, title_text, 
                  ha='center', va='center', 
                  fontsize=14, 
@@ -252,13 +259,16 @@ def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
 def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, 
                             colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
     """
-    Costura verticalmente três imagens (título, mapa, colorbar) em uma única imagem.
+    (v45) Costura verticalmente três imagens (título, mapa, colorbar) 
+    em uma única imagem com fundo branco.
     """
     try:
-        title_img = Image.open(io.BytesIO(title_bytes))
-        map_img = Image.open(io.BytesIO(map_bytes))
-        colorbar_img = Image.open(io.BytesIO(colorbar_bytes))
+        # Abre todas as imagens e garante que estão em modo RGBA para colar
+        title_img = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
+        map_img = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
+        colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
 
+        # Usa a largura do mapa (800px) como referência
         width = map_img.width
         
         def resize_to_width(img, target_width):
@@ -272,15 +282,24 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
         colorbar_img = resize_to_width(colorbar_img, width)
 
         total_height = title_img.height + map_img.height + colorbar_img.height
-        final_img = Image.new('RGB', (width, total_height), 'white')
+        
+        # --- INÍCIO DA CORREÇÃO v45 ---
+        # Cria a tela final COM canal alfa, e define o fundo como BRANCO
+        final_img_rgba = Image.new('RGBA', (width, total_height), (255, 255, 255, 255))
 
-        final_img.paste(title_img, (0, 0))
-        final_img.paste(map_img, (0, title_img.height))
-        final_img.paste(colorbar_img, (0, title_img.height + map_img.height))
-
+        # Cola as imagens usando o canal alfa de cada uma como máscara
+        final_img_rgba.paste(title_img, (0, 0), title_img)
+        final_img_rgba.paste(map_img, (0, title_img.height), map_img)
+        final_img_rgba.paste(colorbar_img, (0, title_img.height + map_img.height), colorbar_img)
+        
         final_buffer = io.BytesIO()
-        save_format = 'JPEG' if format.upper() == 'JPEG' else 'PNG'
-        final_img.save(final_buffer, format=save_format)
+        if format.upper() == 'JPEG':
+            # Converte para 'RGB' (removendo alfa) ANTES de salvar como JPEG
+            final_img_rgb = final_img_rgba.convert('RGB')
+            final_img_rgb.save(final_buffer, format='JPEG', quality=95)
+        else:
+            final_img_rgba.save(final_buffer, format='PNG')
+        # --- FIM DA CORREÇÃO v45 ---
         
         return final_buffer.getvalue()
         
