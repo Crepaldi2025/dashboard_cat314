@@ -1,14 +1,6 @@
 # ==================================================================================
-# gee_handler.py
-# 
-# Módulo: Clima-Cast-Crepaldi
-# Autor: Paulo C. Crepaldi
-#
-# Descrição:
-# (v29) - Atualizadas as paletas de cores em ERA5_VARS para terem 10 cores,
-#         suportando a nova legenda discreta.
+# gee_handler.py (Corrigido v48)
 # ==================================================================================
-
 import streamlit as st
 import json
 from collections import defaultdict
@@ -19,16 +11,11 @@ import pandas as pd
 from datetime import date # Importado para type hinting
 
 # ==========================================================
-# INICIALIZAÇÃO E AUTENTICAÇÃO
+# INICIALIZAÇÃO E AUTENTICAÇÃO (Idêntico)
 # ==========================================================
-
 def inicializar_gee():
     """
     Inicializa a API do Google Earth Engine.
-    
-    Tenta autenticar de duas formas:
-    1. (Nuvem) Usando uma Service Account definida em `st.secrets`.
-    2. (Local) Usando as credenciais padrão salvas localmente.
     """
     try:
         ee.Image.constant(0).getInfo()
@@ -52,19 +39,18 @@ def initialize_gee():
     return inicializar_gee()
 
 # ==========================================================
-# DEFINIÇÕES DE VARIÁVEIS (Paletas Atualizadas)
+# DEFINIÇÕES DE VARIÁVEIS (Modificado v48)
 # ==========================================================
 
 ERA5_VARS = {
     "Temperatura do Ar (2m)": {
-        "band": "temperature_2m", 
-        "result_band": "temperature_2m", 
+        "band": "temperature_2m_mean", # < CORRIGIDO (usava 'temperature_2m' da v17)
+        "result_band": "temperature_2m_mean", 
         "unit": "°C", 
         "aggregation": "mean",
         "vis_params": { 
             "min": 0, 
             "max": 40, 
-            # Paleta expandida para 10 cores (0, 4, 8, ... 40)
             "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'] 
         }
     },
@@ -76,19 +62,32 @@ ERA5_VARS = {
         "vis_params": { 
             "min": 0, 
             "max": 500,
-            # Nova paleta de 10 cores (rampa YlGnBu, 0, 50, ... 500)
             "palette": ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58', '#081040']
         }
     },
+    # --- INÍCIO DA CORREÇÃO v48 ---
+    "Umidade Relativa (2m)": {
+        # Pede a Temperatura (T) e Ponto de Orvalho (Td) médias diárias
+        "bands": ["temperature_2m_mean", "dewpoint_temperature_2m_mean"], 
+        "result_band": "relative_humidity", # Banda que vamos calcular
+        "unit": "%", 
+        "aggregation": "mean", # Vamos calcular a UR média do período
+        "vis_params": { 
+            "min": 30, 
+            "max": 100, 
+            # Paleta clássica (Seco: Marrom/Amarelo -> Úmido: Azul)
+            "palette": ['#8B4513', '#FFA500', '#FFFF00', '#90EE90', '#87CEEB', '#0000FF', '#00008B']
+        }
+    },
+    # --- FIM DA CORREÇÃO v48 ---
     "Velocidade do Vento (10m)": {
-        "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], 
+        "bands": ['u_component_of_wind_10m_mean', 'v_component_of_wind_10m_mean'], # < CORRIGIDO (usava bandas sem '_mean')
         "result_band": "wind_speed", 
         "unit": "m/s", 
         "aggregation": "mean",
         "vis_params": { 
             "min": 0, 
             "max": 30,
-            # Nova paleta de 10 cores (rampa Viridis, 0, 3, ... 30)
             "palette": ['#440154', '#482878', '#3e4989', '#31688e', '#26828e', '#1f9e89', '#35b779', '#6dcd59', '#b4de2c', '#fde725']
         }
     }
@@ -236,13 +235,37 @@ def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Featur
     return None, None
 
 # ==========================================================
-# PROCESSAMENTO DE DADOS GEE (Idêntico)
+# PROCESSAMENTO DE DADOS GEE (MAPAS E SÉRIES)
 # ==========================================================
+
+# --- INÍCIO DA CORREÇÃO v48 (Função helper de UR) ---
+def _calculate_rh(image):
+    """
+    Função GEE (server-side) para calcular a Umidade Relativa (%) a 
+    partir de T_mean e Td_mean (em Kelvin).
+    
+    Usa a fórmula August-Roche-Magnus.
+    """
+    T = image.select('temperature_2m_mean').subtract(273.15) # K -> C
+    Td = image.select('dewpoint_temperature_2m_mean').subtract(273.15) # K -> C
+    
+    # e_s = 6.11 * exp((17.625 * T_C) / (243.04 + T_C))
+    es = T.multiply(17.625).divide(T.add(243.04)).exp().multiply(6.11)
+    # e = 6.11 * exp((17.625 * Td_C) / (243.04 + Td_C))
+    e = Td.multiply(17.625).divide(Td.add(243.04)).exp().multiply(6.11)
+    
+    # RH = (e / e_s) * 100
+    rh = e.divide(es).multiply(100).rename('relative_humidity')
+    
+    # Garante que RH não passe de 100
+    return image.addBands(rh.min(ee.Image.constant(100)))
+# --- FIM DA CORREÇÃO v48 ---
 
 def get_era5_image(variable: str, start_date: date, end_date: date, 
                    geometry: ee.Geometry) -> ee.Image:
     """
     Busca, processa e agrega dados do ERA5-Land para geração de mapas.
+    (v48) - Adiciona lógica para calcular UR se solicitado.
     """
     if variable not in ERA5_VARS: return None
     config = ERA5_VARS[variable]
@@ -259,12 +282,19 @@ def get_era5_image(variable: str, start_date: date, end_date: date,
             st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
             return None
 
+        # --- INÍCIO DA CORREÇÃO v48 ---
+        # Cálculo especial para Vento ou Umidade Relativa
         if variable == "Velocidade do Vento (10m)":
             def calculate_wind_speed(image):
                 wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
                 return image.addBands(wind_speed)
             image_collection = image_collection.map(calculate_wind_speed)
+        
+        elif variable == "Umidade Relativa (2m)":
+            image_collection = image_collection.map(_calculate_rh)
+        # --- FIM DA CORREÇÃO v48 ---
             
+        # Agregação temporal (Média ou Soma)
         if config['aggregation'] == 'mean':
             aggregated_image = image_collection.select(config['result_band']).mean()
         elif config['aggregation'] == 'sum':
@@ -275,6 +305,7 @@ def get_era5_image(variable: str, start_date: date, end_date: date,
         if aggregated_image:
             final_image = aggregated_image.clip(geometry).float()
             
+            # Correção de unidades (só para T e P, UR já está em %)
             if config['unit'] == "°C": final_image = final_image.subtract(273.15)
             if config['unit'] == "mm": final_image = final_image.multiply(1000)
             
@@ -329,6 +360,7 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
                          geometry: ee.Geometry) -> pd.DataFrame:
     """
     Extrai a série temporal diária (média espacial) para uma dada geometria.
+    (v48) - Adiciona lógica para calcular UR se solicitado.
     """
     if variable not in ERA5_VARS:
         return pd.DataFrame()
@@ -341,23 +373,29 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
             ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
             .filterDate(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
             .select(bands_to_select)
-            .map(lambda img: img.clip(geometry))
         )
 
         if collection.size().getInfo() == 0:
             st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
             return pd.DataFrame()
 
+        band_name_for_reduction = config["result_band"] # Nome padrão
+        
+        # --- INÍCIO DA CORREÇÃO v48 ---
         if variable == "Velocidade do Vento (10m)":
             def calculate_wind_speed(image):
-                wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename("wind_speed")
+                wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
                 return image.addBands(wind_speed)
             collection = collection.map(calculate_wind_speed)
-            band_name_for_reduction = config["result_band"]
+        
+        elif variable == "Umidade Relativa (2m)":
+            collection = collection.map(_calculate_rh)
+        
         else:
-            band_name_for_reduction = config["result_band"]
+            # Renomeia a banda (lógica antiga)
             collection = collection.map(lambda img: img.rename(band_name_for_reduction))
-
+        # --- FIM DA CORREÇÃO v48 ---
+            
         def extract_value(image):
             stats = image.select(band_name_for_reduction).reduceRegion(
                 reducer=ee.Reducer.mean(),
@@ -367,11 +405,14 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
                 maxPixels=1e9
             )
             mean_value = stats.get(band_name_for_reduction)
+
+            # Correção de unidades (só para T e P, UR já está em %)
             value = ee.Number(mean_value)
             if config["unit"] == "°C":
                 value = value.subtract(273.15)
             elif config["unit"] == "mm":
                 value = value.multiply(1000)
+
             return image.set("date", image.date().format("YYYY-MM-dd")).set("value", value)
 
         series = collection.map(extract_value)
@@ -402,6 +443,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     """(Função legada) Mantém compatibilidade com versões antigas do main.py."""
     try:
         geometry = feature.geometry()
+        # Determina a variável automaticamente (com base no nome da banda)
         if band == "temperature_2m":
             variable = "Temperatura do Ar (2m)"
         elif band == "total_precipitation_sum":
@@ -409,7 +451,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
         elif band in ["u_component_of_wind_10m", "v_component_of_wind_10m"]:
             variable = "Velocidade do Vento (10m)"
         else:
-            variable = "Temperatura do Ar (2m)"
+            variable = "Temperatura do Ar (2m)"  # padrão de segurança
         
         return get_era5_image(variable, start_date, end_date, geometry)
     
