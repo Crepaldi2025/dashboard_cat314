@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (Corrigido v48)
+# gee_handler.py (Corrigido v49)
 # ==================================================================================
 import streamlit as st
 import json
@@ -8,7 +8,7 @@ import ee
 import os
 import geobr
 import pandas as pd
-from datetime import date # Importado para type hinting
+from datetime import date 
 
 # ==========================================================
 # INICIALIZAÇÃO E AUTENTICAÇÃO (Idêntico)
@@ -39,13 +39,14 @@ def initialize_gee():
     return inicializar_gee()
 
 # ==========================================================
-# DEFINIÇÕES DE VARIÁVEIS (Modificado v48)
+# DEFINIÇÕES DE VARIÁVEIS (Corrigido v49)
 # ==========================================================
 
 ERA5_VARS = {
     "Temperatura do Ar (2m)": {
-        "band": "temperature_2m_mean", # < CORRIGIDO (usava 'temperature_2m' da v17)
-        "result_band": "temperature_2m_mean", 
+        # --- CORREÇÃO v49: Banda é 'temperature_2m', não '..._mean' ---
+        "band": "temperature_2m", 
+        "result_band": "temperature_2m", 
         "unit": "°C", 
         "aggregation": "mean",
         "vis_params": { 
@@ -65,23 +66,21 @@ ERA5_VARS = {
             "palette": ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58', '#081040']
         }
     },
-    # --- INÍCIO DA CORREÇÃO v48 ---
     "Umidade Relativa (2m)": {
-        # Pede a Temperatura (T) e Ponto de Orvalho (Td) médias diárias
-        "bands": ["temperature_2m_mean", "dewpoint_temperature_2m_mean"], 
-        "result_band": "relative_humidity", # Banda que vamos calcular
+        # --- CORREÇÃO v49: Bandas corretas do log de erro ---
+        "bands": ["temperature_2m", "dewpoint_temperature_2m"], 
+        "result_band": "relative_humidity", 
         "unit": "%", 
-        "aggregation": "mean", # Vamos calcular a UR média do período
+        "aggregation": "mean", 
         "vis_params": { 
             "min": 30, 
             "max": 100, 
-            # Paleta clássica (Seco: Marrom/Amarelo -> Úmido: Azul)
             "palette": ['#8B4513', '#FFA500', '#FFFF00', '#90EE90', '#87CEEB', '#0000FF', '#00008B']
         }
     },
-    # --- FIM DA CORREÇÃO v48 ---
     "Velocidade do Vento (10m)": {
-        "bands": ['u_component_of_wind_10m_mean', 'v_component_of_wind_10m_mean'], # < CORRIGIDO (usava bandas sem '_mean')
+         # --- CORREÇÃO v49: Bandas corretas do log de erro ---
+        "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], 
         "result_band": "wind_speed", 
         "unit": "m/s", 
         "aggregation": "mean",
@@ -238,16 +237,15 @@ def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Featur
 # PROCESSAMENTO DE DADOS GEE (MAPAS E SÉRIES)
 # ==========================================================
 
-# --- INÍCIO DA CORREÇÃO v48 (Função helper de UR) ---
+# --- INÍCIO DA CORREÇÃO v49 (Função helper de UR) ---
 def _calculate_rh(image):
     """
     Função GEE (server-side) para calcular a Umidade Relativa (%) a 
-    partir de T_mean e Td_mean (em Kelvin).
-    
-    Usa a fórmula August-Roche-Magnus.
+    partir de T e Td (em Kelvin). Usa a fórmula August-Roche-Magnus.
     """
-    T = image.select('temperature_2m_mean').subtract(273.15) # K -> C
-    Td = image.select('dewpoint_temperature_2m_mean').subtract(273.15) # K -> C
+    # Seleciona as bandas com os nomes corretos
+    T = image.select('temperature_2m').subtract(273.15) # K -> C
+    Td = image.select('dewpoint_temperature_2m').subtract(273.15) # K -> C
     
     # e_s = 6.11 * exp((17.625 * T_C) / (243.04 + T_C))
     es = T.multiply(17.625).divide(T.add(243.04)).exp().multiply(6.11)
@@ -259,13 +257,13 @@ def _calculate_rh(image):
     
     # Garante que RH não passe de 100
     return image.addBands(rh.min(ee.Image.constant(100)))
-# --- FIM DA CORREÇÃO v48 ---
+# --- FIM DA CORREÇÃO v49 ---
 
 def get_era5_image(variable: str, start_date: date, end_date: date, 
                    geometry: ee.Geometry) -> ee.Image:
     """
     Busca, processa e agrega dados do ERA5-Land para geração de mapas.
-    (v48) - Adiciona lógica para calcular UR se solicitado.
+    (v49) - Adiciona lógica para calcular UR se solicitado.
     """
     if variable not in ERA5_VARS: return None
     config = ERA5_VARS[variable]
@@ -282,7 +280,7 @@ def get_era5_image(variable: str, start_date: date, end_date: date,
             st.warning("Não há dados ERA5-Land disponíveis para o período selecionado.")
             return None
 
-        # --- INÍCIO DA CORREÇÃO v48 ---
+        # --- INÍCIO DA CORREÇÃO v49 ---
         # Cálculo especial para Vento ou Umidade Relativa
         if variable == "Velocidade do Vento (10m)":
             def calculate_wind_speed(image):
@@ -292,7 +290,7 @@ def get_era5_image(variable: str, start_date: date, end_date: date,
         
         elif variable == "Umidade Relativa (2m)":
             image_collection = image_collection.map(_calculate_rh)
-        # --- FIM DA CORREÇÃO v48 ---
+        # --- FIM DA CORREÇÃO v49 ---
             
         # Agregação temporal (Média ou Soma)
         if config['aggregation'] == 'mean':
@@ -360,7 +358,7 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
                          geometry: ee.Geometry) -> pd.DataFrame:
     """
     Extrai a série temporal diária (média espacial) para uma dada geometria.
-    (v48) - Adiciona lógica para calcular UR se solicitado.
+    (v49) - Adiciona lógica para calcular UR se solicitado.
     """
     if variable not in ERA5_VARS:
         return pd.DataFrame()
@@ -381,7 +379,7 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
 
         band_name_for_reduction = config["result_band"] # Nome padrão
         
-        # --- INÍCIO DA CORREÇÃO v48 ---
+        # --- INÍCIO DA CORREÇÃO v49 ---
         if variable == "Velocidade do Vento (10m)":
             def calculate_wind_speed(image):
                 wind_speed = image.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
@@ -394,7 +392,7 @@ def get_time_series_data(variable: str, start_date: date, end_date: date,
         else:
             # Renomeia a banda (lógica antiga)
             collection = collection.map(lambda img: img.rename(band_name_for_reduction))
-        # --- FIM DA CORREÇÃO v48 ---
+        # --- FIM DA CORREÇÃO v49 ---
             
         def extract_value(image):
             stats = image.select(band_name_for_reduction).reduceRegion(
