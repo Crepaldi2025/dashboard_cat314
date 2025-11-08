@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v48)
+# main.py — Clima-Cast-Crepaldi (Corrigido v46)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -34,7 +34,7 @@ def get_geo_caching_key(session_state):
 
 @st.cache_data(ttl=3600)
 def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
-    # (v31)
+    # (Função idêntica à v31)
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     if not geometry: return None 
     var_cfg = gee_handler.ERA5_VARS.get(variavel)
@@ -67,7 +67,7 @@ def cached_run_analysis(variavel, start_date, end_date, geo_caching_key, aba):
 
 # ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE (Idêntica) ----------------------
 def run_full_analysis():
-    # (v48) Precisamos da 'aba' aqui para a lógica de cache
+    # (Função idêntica à v31)
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
 
@@ -100,7 +100,7 @@ def run_full_analysis():
 
 
 # ----------------------------------------------------------------------------------
-# (Função atualizada v48)
+# (Função idêntica à v45)
 # ----------------------------------------------------------------------------------
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -139,7 +139,7 @@ def render_analysis_results():
         local_str = "para o círculo definido"
         
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-    titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}" # (v39)
+    titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
 
 
     if aba == "Mapas":
@@ -159,7 +159,6 @@ def render_analysis_results():
             
             st.subheader(titulo_mapa) 
             
-            # (v45) Adiciona ajuda para botões do mapa de *resultado*
             with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
                 st.markdown("""
                 **Como usar os botões do mapa:**
@@ -261,13 +260,12 @@ def render_analysis_results():
         )
 
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v48:
-# Adicionado popover de ajuda para os botões de *desenho*.
+# CORREÇÃO v46:
+# Removida a linha "IMPORTANTE..." do popover de ajuda.
 # ----------------------------------------------------------------------------------
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     
-    # --- INÍCIO DA CORREÇÃO v48 ---
     with st.popover("ℹ️ Ajuda: Botões de Desenho"):
         st.markdown("""
         **Como usar os botões do mapa:**
@@ -276,8 +274,7 @@ def render_polygon_drawer():
         * **(⬟✎) Editar:** Permite mover os pontos de um polígono já desenhado.
         * **(🗑️) Lixeira:** Apaga todos os polígonos.
         """)
-    # --- FIM DA CORREÇÃO v48 ---
-
+    
     mapa_desenho = folium.Map(
         location=[-15.78, -47.93], 
         zoom_start=4,
@@ -330,9 +327,7 @@ def render_polygon_drawer():
             st.rerun() 
     
 # ----------------------------------------------------------------------------------
-# CORREÇÃO v48 (Aplicando v47):
-# A lógica de renderização do mapa de desenho foi ajustada para
-# funcionar tanto na aba 'Mapas' quanto na 'Séries Temporais'.
+# (Função main idêntica à v41)
 # ----------------------------------------------------------------------------------
 def main():
     if 'gee_initialized' not in st.session_state:
@@ -348,38 +343,24 @@ def main():
 
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # --- INÍCIO DA CORREÇÃO v48 ---
-    
-    # Estamos no modo Polígono? (Independente da aba)
-    is_polygon_mode = st.session_state.get('tipo_localizacao') == "Polígono"
-    
-    # A análise já foi disparada?
+    is_polygon_mode = (
+        opcao_menu == "Mapas" and 
+        st.session_state.get('tipo_localizacao') == "Polígono"
+    )
     is_analysis_running = st.session_state.get("analysis_triggered", False)
-    
-    # Já temos uma geometria desenhada?
     has_geometry = 'drawn_geometry' in st.session_state
-    
-    # Já temos resultados para mostrar?
     has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
 
-    # SÓ mostre o mapa de desenho se:
-    # 1. Estamos no modo Polígono (em qualquer aba)
-    # 2. A análise NÃO está rodando agora
-    # 3. A geometria AINDA NÃO FOI DESENHADA
-    # 4. NÃO há resultados para mostrar (caso o usuário troque o tipo de mapa)
+    # (Lógica v41)
     if is_polygon_mode and not is_analysis_running and not has_geometry and not has_results:
         render_polygon_drawer()
-    # --- FIM DA CORREÇÃO v48 ---
 
-    # Lógica de Execução
     if is_analysis_running:
         st.session_state.analysis_triggered = False 
         run_full_analysis() 
 
-    # Lógica de Renderização de Resultados
     render_analysis_results()
 
 
 if __name__ == "__main__":
     main()
-
