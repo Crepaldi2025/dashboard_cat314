@@ -9,6 +9,9 @@ from dateutil.relativedelta import relativedelta
 import locale
 import docx
 import os
+import requests
+import pypandoc
+import tempfile
 
 # ==================================================================================
 # CONFIGURAÇÃO INICIAL
@@ -303,22 +306,46 @@ def renderizar_resumo_selecao():
 
 
 def renderizar_pagina_sobre():
-    texto_sobre = _carregar_texto_docx("sobre.docx")
-    
-    if texto_sobre is None:
-        st.warning("Arquivo `sobre.docx` não encontrado. Exibindo texto padrão.")
-        st.markdown("""
-        **Objetivo**
-        
-        O sistema tem como principal objetivo proporcionar uma interface intuitiva e interativa para consulta, análise e visualização 
-        de dados meteorológicos históricos dos municípios brasileiros...
-        
-        *(Por favor, crie um arquivo chamado 'sobre.docx' na mesma pasta do 'main.py' com o conteúdo desta página.)*
-        """)
-    else:
-        st.markdown(texto_sobre, unsafe_allow_html=True)
-    
-    st.markdown("<hr class='divisor'>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;color:gray;font-size:12px;'>Desenvolvido por Paulo C. Crepaldi – CAT314 / UNIFEI</p>", unsafe_allow_html=True)
+    """
+    Exibe automaticamente o conteúdo mais recente do arquivo sobre.docx hospedado no GitHub,
+    convertendo-o para HTML com preservação de imagens e formatação.
+    """
+
+    st.title("Sobre o Clima-Cast-Crepaldi")
+    st.markdown("---")
+
+    # URL do arquivo no GitHub (modo RAW)
+    url_docx = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
+
+    try:
+        # === 1. Faz o download temporário do arquivo DOCX ===
+        response = requests.get(url_docx)
+        response.raise_for_status()
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_docx:
+            tmp_docx.write(response.content)
+            temp_path = tmp_docx.name
+
+        # === 2. Converte DOCX → HTML preservando imagens ===
+        html = pypandoc.convert_file(
+            source_file=temp_path,
+            to="html",
+            format="docx",
+            extra_args=["--standalone"]
+        )
+
+        # === 3. Exibe o conteúdo no Streamlit ===
+        st.markdown(html, unsafe_allow_html=True)
+
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar o arquivo sobre.docx: {e}")
+
+    finally:
+        # Remove o arquivo temporário (boas práticas)
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
+
 
 
