@@ -14,4 +14,5 @@ geobr==0.2.2
 openpyxl
 pyproj
 python-docx
-
+pypandoc
+pandoc
