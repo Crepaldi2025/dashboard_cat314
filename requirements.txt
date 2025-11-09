@@ -15,4 +15,6 @@ openpyxl
 pyproj
 python-docx
 pypandoc
-pandoc
+requests
+python-docx
+
