@@ -304,21 +304,20 @@ def renderizar_resumo_selecao():
         except AttributeError:
             st.warning("Filtros foram redefinidos. Por favor, selecione novamente.")
 
-
 def renderizar_pagina_sobre():
     """
-    Exibe automaticamente o conteúdo mais recente do arquivo sobre.docx hospedado no GitHub,
-    convertendo-o para HTML com preservação de imagens e formatação.
+    Exibe o conteúdo atualizado do arquivo sobre.docx hospedado no GitHub,
+    convertendo-o em HTML com imagens e formatação preservadas.
+    Faz download automático do Pandoc, se não estiver instalado.
     """
 
     st.title("Sobre o Clima-Cast-Crepaldi")
     st.markdown("---")
 
-    # URL do arquivo no GitHub (modo RAW)
     url_docx = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
 
     try:
-        # === 1. Faz o download temporário do arquivo DOCX ===
+        # 1️⃣ Download do DOCX temporário
         response = requests.get(url_docx)
         response.raise_for_status()
 
@@ -326,7 +325,14 @@ def renderizar_pagina_sobre():
             tmp_docx.write(response.content)
             temp_path = tmp_docx.name
 
-        # === 2. Converte DOCX → HTML preservando imagens ===
+        # 2️⃣ Garantir que o Pandoc está disponível
+        try:
+            pypandoc.get_pandoc_version()
+        except OSError:
+            with st.spinner("🔧 Instalando Pandoc..."):
+                pypandoc.download_pandoc()
+
+        # 3️⃣ Converter DOCX → HTML
         html = pypandoc.convert_file(
             source_file=temp_path,
             to="html",
@@ -334,18 +340,20 @@ def renderizar_pagina_sobre():
             extra_args=["--standalone"]
         )
 
-        # === 3. Exibe o conteúdo no Streamlit ===
+        # 4️⃣ Exibir o conteúdo renderizado
         st.markdown(html, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"❌ Erro ao carregar o arquivo sobre.docx: {e}")
 
     finally:
-        # Remove o arquivo temporário (boas práticas)
+        # Limpeza
         try:
             os.remove(temp_path)
         except Exception:
             pass
+
+
 
 
 
