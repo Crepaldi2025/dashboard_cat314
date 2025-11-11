@@ -316,10 +316,17 @@ import tempfile
 import os
 import re
 
+import streamlit as st
+import requests
+import pypandoc
+import tempfile
+import os
+import re
+
 def renderizar_pagina_sobre():
     """
     Exibe o conteúdo do arquivo sobre.docx hospedado no GitHub,
-    convertendo-o em HTML com as imagens embutidas e centralizadas.
+    convertendo-o em HTML com as imagens embutidas (Base64) e centralizadas.
     """
 
     st.title("Sobre o Clima-Cast-Crepaldi")
@@ -330,33 +337,38 @@ def renderizar_pagina_sobre():
 
     try:
         # 1️⃣ Download temporário do arquivo DOCX
-        response = requests.get(url_docx)
-        response.raise_for_status()
+        with st.spinner("Carregando documento..."):
+            response = requests.get(url_docx)
+            response.raise_for_status()
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_docx:
-            tmp_docx.write(response.content)
-            temp_path = tmp_docx.name
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_docx:
+                tmp_docx.write(response.content)
+                temp_path = tmp_docx.name
 
         # 2️⃣ Garantir que o Pandoc está disponível
         try:
             pypandoc.get_pandoc_version()
         except OSError:
-            with st.spinner("🔧 Instalando Pandoc..."):
+            with st.spinner("🔧 Configurando o renderizador de documentos (Pandoc)..."):
                 pypandoc.download_pandoc()
 
-        # 3️⃣ Converter DOCX → HTML extraindo as imagens
-        media_dir = tempfile.mkdtemp()
+        # 3️⃣ Converter DOCX → HTML com imagens embutidas (Base64)
+        #    A MUDANÇA PRINCIPAL: Usar "--embed-resources"
         html = pypandoc.convert_file(
             source_file=temp_path,
             to="html",
             format="docx",
-            extra_args=["--standalone", f"--extract-media={media_dir}"]
+            extra_args=[
+                "--standalone",       # Gera um documento HTML completo
+                "--embed-resources"   # <-- CORREÇÃO: Converte imagens para Base64
+            ]
         )
 
-        # 4️⃣ Corrigir caminhos de imagem e centralizar
+        # 4️⃣ Centralizar imagens (que agora estão em Base64)
+        #    Este RegEx envolve qualquer tag <img> em um parágrafo centralizado.
         html = re.sub(
-            r'<img src="([^"]+)"',
-            lambda m: f'<p style="text-align:center;"><img src="file://{media_dir}/{os.path.basename(m.group(1))}" width="600"></p>',
+            r'(<img [^>]+>)',  # Captura a tag <img ... > inteira
+            r'<p style="text-align:center;">\1</p>', # Envolve a tag
             html
         )
 
@@ -367,10 +379,8 @@ def renderizar_pagina_sobre():
         st.error(f"❌ Erro ao carregar o arquivo sobre.docx: {e}")
 
     finally:
+        # Limpa o arquivo temporário
         try:
             os.remove(temp_path)
         except Exception:
             pass
-
-        
-       
