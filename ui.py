@@ -304,33 +304,19 @@ def renderizar_resumo_selecao():
         except AttributeError:
             st.warning("Filtros foram redefinidos. Por favor, selecione novamente.")
 
-import streamlit as st
-import requests
-import pypandoc
-import tempfile
-import os
-import re
-
-import streamlit as st
-import requests
-import pypandoc
-import tempfile
-import os
 import re
 
 def renderizar_pagina_sobre():
     """
     Exibe o conteúdo do arquivo sobre.docx hospedado no GitHub,
-    convertendo-o em HTML com as imagens embutidas (Base64) e centralizadas.
+    convertendo-o em HTML com as imagens embutidas (Base64), centralizadas
+    e com tamanho controlado.
     """
 
     st.title("Sobre o Clima-Cast-Crepaldi")
     st.markdown("---")
 
-    # URL do arquivo sobre.docx (modo RAW)
     url_docx = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
-
-    # Define o caminho do arquivo temporário fora do try/except
     temp_path = None
     
     try:
@@ -351,7 +337,6 @@ def renderizar_pagina_sobre():
                 pypandoc.download_pandoc()
 
         # 3️⃣ Converter DOCX → HTML com imagens embutidas (Base64)
-        #    CORREÇÃO: Removido "--standalone" para gerar apenas o fragmento HTML
         html = pypandoc.convert_file(
             source_file=temp_path,
             to="html",
@@ -361,13 +346,26 @@ def renderizar_pagina_sobre():
             ]
         )
 
-        # 4️⃣ Centralizar imagens (que agora estão em Base64)
-        #    Este RegEx envolve qualquer tag <img> em um parágrafo centralizado.
+        # =====================================================================
+        # 4️⃣ (AQUI ESTÁ A MUDANÇA) Centralizar e Redimensionar Imagens
+        # =====================================================================
+        # Esta expressão regular captura o SRC (grupo 1) e o ALT (grupo 2)
+        # e descarta qualquer estilo de tamanho original do Word/Pandoc.
         html = re.sub(
-            r'(<img [^>]+>)',  # Captura a tag <img ... > inteira
-            r'<p style="text-align:center;">\1</p>', # Envolve a tag
+            r'<img src="([^"]+)" alt="([^"]*)"[^>]*>', 
+            # Em seguida, recria a tag <img> com nosso próprio style:
+            # 1. Envolve em um <p> para centralizar.
+            # 2. Define a largura máxima (max-width) para 700px.
+            # 3. Define a largura (width) para 100% (para ser responsiva).
+            # 4. Define a altura (height) para 'auto' (para manter a proporção).
+            r"""
+            <p style="text-align:center;">
+                <img src="\1" alt="\2" style="max-width: 700px; width: 100%; height: auto;">
+            </p>
+            """,
             html
         )
+        # =====================================================================
 
         # 5️⃣ Exibir conteúdo renderizado
         st.markdown(html, unsafe_allow_html=True)
@@ -381,4 +379,4 @@ def renderizar_pagina_sobre():
             try:
                 os.remove(temp_path)
             except Exception:
-                pass # Não falha se não conseguir remover
+                pass
