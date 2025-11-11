@@ -309,11 +309,6 @@ import requests
 import pypandoc
 import tempfile
 import os
-import streamlit as st
-import requests
-import pypandoc
-import tempfile
-import os
 import re
 
 import streamlit as st
@@ -335,6 +330,9 @@ def renderizar_pagina_sobre():
     # URL do arquivo sobre.docx (modo RAW)
     url_docx = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
 
+    # Define o caminho do arquivo temporário fora do try/except
+    temp_path = None
+    
     try:
         # 1️⃣ Download temporário do arquivo DOCX
         with st.spinner("Carregando documento..."):
@@ -353,14 +351,13 @@ def renderizar_pagina_sobre():
                 pypandoc.download_pandoc()
 
         # 3️⃣ Converter DOCX → HTML com imagens embutidas (Base64)
-        #    A MUDANÇA PRINCIPAL: Usar "--embed-resources"
+        #    CORREÇÃO: Removido "--standalone" para gerar apenas o fragmento HTML
         html = pypandoc.convert_file(
             source_file=temp_path,
             to="html",
             format="docx",
             extra_args=[
-                "--standalone",       # Gera um documento HTML completo
-                "--embed-resources"   # <-- CORREÇÃO: Converte imagens para Base64
+                "--embed-resources"   # Converte imagens para Base64
             ]
         )
 
@@ -379,8 +376,9 @@ def renderizar_pagina_sobre():
         st.error(f"❌ Erro ao carregar o arquivo sobre.docx: {e}")
 
     finally:
-        # Limpa o arquivo temporário
-        try:
-            os.remove(temp_path)
-        except Exception:
-            pass
+        # Limpa o arquivo temporário se ele foi criado
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass # Não falha se não conseguir remover
