@@ -304,20 +304,26 @@ def renderizar_resumo_selecao():
         except AttributeError:
             st.warning("Filtros foram redefinidos. Por favor, selecione novamente.")
 
+import streamlit as st
+import requests
+import pypandoc
+import tempfile
+import os
+
 def renderizar_pagina_sobre():
     """
-    Exibe o conteúdo atualizado do arquivo sobre.docx hospedado no GitHub,
-    convertendo-o em HTML com imagens e formatação preservadas.
-    Faz download automático do Pandoc, se não estiver instalado.
+    Exibe o conteúdo mais recente do arquivo sobre.docx hospedado no GitHub,
+    convertendo-o em HTML com preservação de formatação e exibindo figuras complementares.
     """
 
     st.title("Sobre o Clima-Cast-Crepaldi")
     st.markdown("---")
 
+    # URL do arquivo sobre.docx (modo RAW do GitHub)
     url_docx = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
 
     try:
-        # 1️⃣ Download do DOCX temporário
+        # 1️⃣ Download temporário do arquivo DOCX
         response = requests.get(url_docx)
         response.raise_for_status()
 
@@ -343,17 +349,44 @@ def renderizar_pagina_sobre():
         # 4️⃣ Exibir o conteúdo renderizado
         st.markdown(html, unsafe_allow_html=True)
 
+        # 5️⃣ Inserir imagens complementares
+        st.markdown("---")
+        st.subheader("Figuras Complementares")
+
+        # Figura 1 – Fluxograma metodológico
+        st.image(
+            "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/fluxo.png",
+            caption="Figura 1 – Fluxograma metodológico do processamento de dados no Clima-Cast-Crepaldi",
+            use_column_width=True
+        )
+
+        # Figura 2 – Mapa Interativo
+        st.image(
+            "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/mapa_interativo.png",
+            caption="Figura 2 – Mapa interativo gerado pela plataforma Clima-Cast-Crepaldi",
+            use_column_width=True
+        )
+
+        # Figura 3 – Mapa Estático
+        st.image(
+            "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/mapa_estatico.png",
+            caption="Figura 3 – Mapa estático exportado pela plataforma Clima-Cast-Crepaldi",
+            use_column_width=True
+        )
+
+        # Figura 4 – Série Temporal
+        st.image(
+            "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/serie_temporal.png",
+            caption="Figura 4 – Série temporal gerada pela plataforma Clima-Cast-Crepaldi",
+            use_column_width=True
+        )
+
     except Exception as e:
         st.error(f"❌ Erro ao carregar o arquivo sobre.docx: {e}")
 
     finally:
-        # Limpeza
+        # 6️⃣ Remover o arquivo temporário
         try:
             os.remove(temp_path)
         except Exception:
             pass
-
-
-
-
-
