@@ -346,11 +346,6 @@ def renderizar_pagina_sobre():
             ]
         )
 
-        # =====================================================================
-        # 4️⃣ (AQUI ESTÁ A MUDANÇA) Centralizar e Redimensionar Imagens
-        # =====================================================================
-        # Esta expressão regular captura o SRC (grupo 1) e o ALT (grupo 2)
-        # e descarta qualquer estilo de tamanho original do Word/Pandoc.
         html = re.sub(
             r'<img src="([^"]+)" alt="([^"]*)"[^>]*>', 
             # Em seguida, recria a tag <img> com nosso próprio style:
@@ -360,7 +355,7 @@ def renderizar_pagina_sobre():
             # 4. Define a altura (height) para 'auto' (para manter a proporção).
             r"""
             <p style="text-align:center;">
-                <img src="\1" alt="\2" style="max-width: 700px; width: 100%; height: auto;">
+                <img src="\1" alt="\2" style="max-width: 500px; width: 100%; height: auto;">
             </p>
             """,
             html
@@ -380,3 +375,4 @@ def renderizar_pagina_sobre():
                 os.remove(temp_path)
             except Exception:
                 pass
+
