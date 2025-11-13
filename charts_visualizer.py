@@ -124,9 +124,9 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     # ======================================================
     st.markdown("#### Estatísticas do Período")
     col1, col2, col3 = st.columns(3)
-    col1.metric("Média", f"{df_clean['value'].mean():.2f} {unit}")
-    col2.metric("Máxima", f"{df_clean['value'].max():.2f} {unit}")
-    col3.metric("Mínima", f"{df_clean['value'].min():.2f} {unit}")
+    col1.metric("Média", f"{df_clean['value'].mean():.1f} {unit}")
+    col2.metric("Máxima", f"{df_clean['value'].max():.1f} {unit}")
+    col3.metric("Mínima", f"{df_clean['value'].min():.1f} {unit}")
 
     # ======================================================
     # Caixa de instruções (Idêntico)
@@ -180,3 +180,4 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
