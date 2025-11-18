@@ -22,7 +22,7 @@ import streamlit as st
 # =================================================
 def set_background():
     # URL direta da sua imagem no GitHub
-    image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/atm.png"
+    image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/atm.jpg"
     
     # Ajuste de opacidade
     opacity = 0.6  
@@ -393,6 +393,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
