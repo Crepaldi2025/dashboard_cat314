@@ -194,7 +194,7 @@ def render_analysis_results():
         local_str = "para o círculo definido"
         
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-    titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
+    titulo_serie = f"Série Temporal (média diária) de {variavel} {periodo_str} {local_str}"
 
 
     if aba == "Mapas":
@@ -419,6 +419,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
