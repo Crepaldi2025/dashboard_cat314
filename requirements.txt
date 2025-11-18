@@ -18,5 +18,7 @@ pypandoc
 pandoc
 requests
 python-docx
+pytz
+
 
 
