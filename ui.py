@@ -12,6 +12,7 @@ import os
 import requests
 import pypandoc
 import tempfile
+import pytz
 
 # ==================================================================================
 # CONFIGURAÇÃO INICIAL
@@ -248,25 +249,53 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 # ==================================================================================
 
 def renderizar_pagina_principal(opcao_navegacao):
-    agora = datetime.now()
-    data_hora_formatada = agora.strftime("%d/%m/%Y, %H:%M:%S")
+    # 1. Configurar os fusos horários
+    fuso_utc = pytz.utc
+    fuso_br = pytz.timezone('America/Sao_Paulo')
+    
+    agora_utc = datetime.now(fuso_utc)
+    agora_br = agora_utc.astimezone(fuso_br)
+    
+    # 2. Formatar as strings
+    fmt = "%d/%m/%Y %H:%M"
+    str_br = agora_br.strftime(fmt)
+    str_utc = agora_utc.strftime(fmt)
 
-    col1, col2 = st.columns([3, 1])
+    # 3. Layout das colunas
+    col1, col2 = st.columns([3, 1.5]) # Aumentei um pouco a col2 para caber a caixa
+    
     with col1:
         logo_col, title_col = st.columns([1, 5])
         with logo_col:
-            st.image("logo.png", width=70)
+            # Verifica se a imagem existe para não dar erro
+            if os.path.exists("logo.png"):
+                st.image("logo.png", width=70)
+            else:
+                st.write("🌐") # Placeholder se não tiver logo
         with title_col:
-            st.title(f"Clima-Cast-Crepaldi: {opcao_navegacao}")
+            st.title(f"Clima-Cast: {opcao_navegacao}")
 
     with col2:
-        st.write("")
-        st.markdown(f"<p style='text-align: right; color: grey;'>{data_hora_formatada}</p>", unsafe_allow_html=True)
+        # 4. Criar a caixa HTML com as duas datas
+        # O style define: borda cinza, cantos arredondados, padding e alinhamento
+        html_box = f"""
+        <div style='
+            border: 1px solid #e6e6e6; 
+            border-radius: 5px; 
+            padding: 8px; 
+            text-align: right; 
+            font-family: sans-serif;
+            background-color: rgba(255, 255, 255, 0.1);
+        '>
+            <div><b>🇧🇷 BRT:</b> {str_br}</div>
+            <div style='color: grey; font-size: 0.9em;'><b>🌐 UTC:</b> {str_utc}</div>
+        </div>
+        """
+        st.markdown(html_box, unsafe_allow_html=True)
     
     st.markdown("---")
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
-
 
 def renderizar_resumo_selecao():
     with st.expander("Resumo dos Filtros Utilizados", expanded=False):
@@ -375,4 +404,5 @@ def renderizar_pagina_sobre():
                 os.remove(temp_path)
             except Exception:
                 pass
+
 
