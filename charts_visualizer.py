@@ -6,19 +6,19 @@ import pandas as pd
 import plotly.express as px
 import io 
 
-# --- INÍCIO DA CORREÇÃO v29 ---
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
-    Cria a figura do gráfico de linha interativo de série temporal usando Plotly.
-    (v29) - Título removido, pois agora é gerenciado pelo main.py.
+    Cria a figura do gráfico de linha interativo com estilo detalhado.
+    (v30) - Fontes maiores, eixos marcados e visual profissional.
     """
     variable_name = variable.split(" (")[0]
     
+    # Criação básica do gráfico
     fig = px.line(
         df,
         x='date',
         y='value',
-        title=None, # <-- Título removido daqui
+        title=None, 
         labels={
             "date": "Data",
             "value": f"{variable_name} ({unit})"
@@ -26,30 +26,84 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         template="plotly_white",
         markers=True
     )
-# --- FIM DA CORREÇÃO v29 ---
 
+    # =========================================================
+    # CUSTOMIZAÇÃO DETALHADA DO VISUAL
+    # =========================================================
     fig.update_layout(
-        xaxis=dict(
-            rangeselector=dict(
-                buttons=list([
-                    dict(count=1, label="1m", step="month", stepmode="backward"),
-                    dict(count=6, label="6m", step="month", stepmode="backward"),
-                    dict(count=1, label="1a", step="year", stepmode="backward"),
-                    dict(step="all", label="Tudo")
-                ])
-            ),
-            rangeslider=dict(visible=True),
-            type="date"
+        # Aumenta a margem para não cortar textos grandes
+        margin=dict(l=20, r=20, t=30, b=20),
+        
+        # Fundo do gráfico
+        plot_bgcolor="rgba(255, 255, 255, 1)",
+        paper_bgcolor="rgba(255, 255, 255, 0)", # Transparente para fundir com o app
+        
+        # Estilo da Fonte Global
+        font=dict(
+            family="Arial, sans-serif",
+            size=14,  # Tamanho base da fonte aumentado
+            color="black"
         ),
-        margin=dict(l=10, r=10, t=20, b=10), # <-- Margem do topo diminuída
-        height=420
+        
+        # Caixa de informação ao passar o mouse
+        hovermode="x unified",
     )
-    
-    fig.update_traces(hovertemplate="<b>Data:</b> %{x|%d/%m/%Y}<br><b>Valor:</b> %{y:.2f} " + f"{unit}")
+
+    # Configuração do Eixo X (Datas)
+    fig.update_xaxes(
+        showgrid=True, 
+        gridwidth=1, 
+        gridcolor='#E0E0E0', # Cinza claro
+        showline=True, 
+        linewidth=2, 
+        linecolor='black', # Linha do eixo bem visível
+        mirror=True,       # Cria uma borda em volta de todo o gráfico
+        ticks="outside",   # Coloca os "risquinhos" para fora
+        ticklen=8,         # Comprimento do tick
+        tickwidth=2,       # Grossura do tick
+        title_font=dict(size=16, family='Arial', color='black'), # Título do eixo maior
+        tickfont=dict(size=13), # Data maior
+        
+        # Botões de Zoom (Mantidos e melhorados)
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode=\"backward\"),
+                dict(count=1, label="1a", step="year", stepmode="backward"),
+                dict(step="all", label="Tudo")
+            ]),
+            bgcolor="#f0f0f0",
+            activecolor="#dcdcdc"
+        )
+    )
+
+    # Configuração do Eixo Y (Valores)
+    fig.update_yaxes(
+        showgrid=True, 
+        gridwidth=1, 
+        gridcolor='#E0E0E0',
+        showline=True, 
+        linewidth=2, 
+        linecolor='black',
+        mirror=True,     # Fecha a caixa do gráfico
+        ticks="outside", # Risquinhos no eixo Y também
+        ticklen=8,
+        tickwidth=2,
+        title_font=dict(size=16, family='Arial', color='black'), # Título do eixo maior
+        tickfont=dict(size=13), # Números maiores
+        zeroline=True,
+        zerolinewidth=1,
+        zerolinecolor='#E0E0E0'
+    )
+
+    # Personalização da Linha do Gráfico
+    fig.update_traces(
+        line=dict(width=3),     # Linha mais grossa
+        marker=dict(size=6)     # Bolinhas dos dados um pouco maiores
+    )
 
     return fig
 
-# --- INÍCIO DA CORREÇÃO v29 (Adicionando helper) ---
 def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     """
     Converte um DataFrame para um arquivo Excel (XLSX) em memória.
@@ -58,8 +112,6 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Dados')
     return excel_buffer.getvalue()
-# --- FIM DA CORREÇÃO v29 ---
-
 
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     """
@@ -180,4 +232,5 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
 
