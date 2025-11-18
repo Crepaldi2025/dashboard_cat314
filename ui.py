@@ -288,7 +288,7 @@ def renderizar_pagina_principal(opcao_navegacao):
             background-color: rgba(255, 255, 255, 0.1);
         '>
             <div><b>🇧🇷 BRT:</b> {str_br}</div>
-            <div style='color: grey; font-size: 0.9em;'><b>🌐 UTC:</b> {str_utc}</div>
+            <div style='color:black; font-size: 0.9em;'><b>🌐 UTC:</b> {str_utc}</div>
         </div>
         """
         st.markdown(html_box, unsafe_allow_html=True)
@@ -404,6 +404,7 @@ def renderizar_pagina_sobre():
                 os.remove(temp_path)
             except Exception:
                 pass
+
 
 
 
