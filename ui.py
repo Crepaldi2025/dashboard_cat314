@@ -283,7 +283,7 @@ def renderizar_pagina_principal(opcao_navegacao):
             border: 1px solid #e6e6e6; 
             border-radius: 5px; 
             padding: 8px; 
-            text-align: right; 
+            text-align: center; 
             font-family: sans-serif;
             background-color: rgba(255, 255, 255, 0.1);
         '>
@@ -404,5 +404,6 @@ def renderizar_pagina_sobre():
                 os.remove(temp_path)
             except Exception:
                 pass
+
 
 
