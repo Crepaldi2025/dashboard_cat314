@@ -20,6 +20,7 @@ import streamlit as st
 # =================================================
 # Configuração da Imagem de Fundo com Transparência
 # =================================================
+
 def set_background():
     # URL direta da sua imagem no GitHub
     image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
@@ -417,6 +418,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
