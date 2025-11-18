@@ -187,7 +187,6 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         """
         **Dica:** Utilize os controles interativos do gráfico:
         - **Botões de Período (1m, 6m, 1a, Tudo):** Aplique zoom rápido em períodos pré-definidos.  
-        - **Controle Deslizante Inferior:** Ajuste manualmente o intervalo de datas.  
         - **Passe o Mouse:** Veja a data e o valor exatos para cada ponto da série.
         """
     )
@@ -238,3 +237,4 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
