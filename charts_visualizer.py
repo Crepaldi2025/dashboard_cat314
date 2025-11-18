@@ -174,11 +174,39 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     # ======================================================
     # Estatísticas
     # ======================================================
+
     st.markdown("#### Estatísticas do Período")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Média", f"{df_clean['value'].mean():.1f} {unit}")
-    col2.metric("Máxima", f"{df_clean['value'].max():.1f} {unit}")
-    col3.metric("Mínima", f"{df_clean['value'].min():.1f} {unit}")
+    
+    # Cálculos
+    media = df_clean['value'].mean()
+    maximo = df_clean['value'].max()
+    minimo = df_clean['value'].min()
+    amplitude = maximo - minimo
+    desvio = df_clean['value'].std()
+    soma = df_clean['value'].sum()
+    mediana = df_clean['value'].median()
+
+    # Layout das métricas principais
+    # Se for Precipitação (mm), o Acumulado é o mais importante
+    if "mm" in unit:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("🌧️ Acumulado Total", f"{soma:.1f} {unit}", help="Soma de toda a chuva no período")
+        c2.metric("Máxima Diária", f"{maximo:.1f} {unit}")
+        c3.metric("Média Diária", f"{media:.1f} {unit}")
+        c4.metric("Dias com Chuva", f"{(df_clean['value'] > 0.1).sum()} dias")
+        
+    else:
+        # Para Temperatura, Vento, Umidade, Radiação
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Média", f"{media:.1f} {unit}")
+        c2.metric("Máxima", f"{maximo:.1f} {unit}")
+        c3.metric("Mínima", f"{minimo:.1f} {unit}")
+        c4.metric("Amplitude", f"{amplitude:.1f} {unit}", help="Diferença entre Máx e Mín")
+        c5.metric("Desvio Padrão", f"±{desvio:.1f}", help="Variação em relação à média")
+
+    # ======================================================
+
+    
 
     # ======================================================
     # Caixa de instruções
@@ -237,4 +265,5 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
 
