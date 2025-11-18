@@ -1,5 +1,5 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v31)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v32)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
@@ -9,7 +9,7 @@ import io
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
     Cria a figura do gráfico de linha interativo com estilo detalhado.
-    (v31) - Fontes maiores, eixos marcados e SEM erros de sintaxe.
+    (v32) - Fontes maiores, eixos marcados e visual profissional.
     """
     variable_name = variable.split(" (")[0]
     
@@ -64,11 +64,11 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         title_font=dict(size=16, family='Arial', color='black'), # Título do eixo maior
         tickfont=dict(size=13), # Data maior
         
-        # Botões de Zoom (CORRIGIDO AGORA)
+        # Botões de Zoom
         rangeselector=dict(
             buttons=list([
                 dict(count=1, label="1m", step="month", stepmode="backward"),
-                dict(count=6, label="6m", step="month", stepmode="backward"), # <--- Barra removida aqui!
+                dict(count=6, label="6m", step="month", stepmode="backward"),
                 dict(count=1, label="1a", step="year", stepmode="backward"),
                 dict(step="all", label="Tudo")
             ]),
@@ -129,7 +129,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     
     
     # ======================================================
-    # Pré-processamento seguro do DataFrame (Idêntico)
+    # Pré-processamento seguro do DataFrame
     # ======================================================
     if df is None or df.empty:
         st.warning("Não há dados disponíveis para gerar o gráfico para o período selecionado.")
@@ -172,7 +172,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         return
 
     # ======================================================
-    # Estatísticas (Idêntico)
+    # Estatísticas
     # ======================================================
     st.markdown("#### Estatísticas do Período")
     col1, col2, col3 = st.columns(3)
@@ -181,7 +181,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     col3.metric("Mínima", f"{df_clean['value'].min():.1f} {unit}")
 
     # ======================================================
-    # Caixa de instruções (Idêntico)
+    # Caixa de instruções
     # ======================================================
     st.info(
         """
@@ -193,17 +193,23 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     )
     
     # ======================================================
-    # Tabela de Dados e Exportação (Adicionado v29)
+    # Tabela de Dados e Exportação (CORRIGIDO AQUI)
     # ======================================================
     st.markdown("---")
     
     variable_name = variable.split(" (")[0]
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
-    df_export['date'] = df_export['date'].dt.tz_localize(None) 
+    
+    # Remove fuso horário se existir (para exportar limpo)
+    if df_export['date'].dt.tz is not None:
+        df_export['date'] = df_export['date'].dt.tz_localize(None) 
     
     st.subheader("Tabela de Dados") 
     df_display = df_export.copy()
-    df_display['date'] = df_display['date'].strftime('%d/%m/%Y')
+    
+    # --- A CORREÇÃO ESTÁ NESTA LINHA ABAIXO (adicionado .dt) ---
+    df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
+    
     st.dataframe(df_display, use_container_width=True, height=300)
 
     st.subheader("Exportar Tabela")
