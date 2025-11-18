@@ -25,7 +25,7 @@ def set_background():
     image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/atm.jpg"
     
     # Ajuste a opacidade aqui!
-    opacity = 0.5  
+    opacity = 0.6  
     
     page_bg_img = f"""
     <style>
@@ -393,6 +393,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
