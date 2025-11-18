@@ -205,10 +205,6 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         c5.metric("Desvio Padrão", f"±{desvio:.1f}", help="Variação em relação à média")
 
     # ======================================================
-
-    
-
-    # ======================================================
     # Caixa de instruções
     # ======================================================
     st.info(
@@ -220,7 +216,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     )
     
     # ======================================================
-    # Tabela de Dados e Exportação (CORRIGIDO AQUI)
+    # Tabela de Dados e Exportação
     # ======================================================
     st.markdown("---")
     
@@ -265,5 +261,6 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
 
 
