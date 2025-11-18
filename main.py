@@ -25,7 +25,7 @@ def set_background():
     image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
     
     # Ajuste de opacidade
-    opacity = 0.6  
+    opacity = 0.5  
     
     page_bg_img = f"""
     <style>
@@ -48,9 +48,7 @@ def set_background():
     .stApp {{
         background-image: linear-gradient(rgba(255, 255, 255, {opacity}), rgba(255, 255, 255, {opacity})), 
                           url("{image_url}");
-        
-        /* O SEGREDO ESTÁ NAS 3 LINHAS ABAIXO: */
-        
+                
         /* 1. cover: Garante que a imagem cubra tudo SEM distorcer (pode cortar bordas) */
         background-size: cover; 
         
@@ -418,6 +416,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
