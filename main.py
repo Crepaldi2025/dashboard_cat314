@@ -42,6 +42,31 @@ def set_background():
     """
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
+
+    page_bg_img = f"""
+    <style>
+    .stApp {{
+        background-image: linear-gradient(rgba(255, 255, 255, {opacity}), rgba(255, 255, 255, {opacity})), 
+                          url("{image_url}");
+        
+        /* O SEGREDO ESTÁ NAS 3 LINHAS ABAIXO: */
+        
+        /* 1. cover: Garante que a imagem cubra tudo SEM distorcer (pode cortar bordas) */
+        background-size: cover; 
+        
+        /* 2. center center: Centraliza a imagem (foca no meio) */
+        background-position: center center;
+        
+        /* 3. no-repeat: Não deixa a imagem repetir se a tela for gigante */
+        background-repeat: no-repeat;
+        
+        /* 4. fixed: A imagem fica parada enquanto você rola o texto */
+        background-attachment: fixed;
+    }}
+    </style>
+    """
+    st.markdown(page_bg_img, unsafe_allow_html=True)
+
 # Chama a função logo no início
 set_background()
 
@@ -393,6 +418,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
