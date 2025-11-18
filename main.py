@@ -23,7 +23,7 @@ import streamlit as st
 
 def set_background():
     image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
-    opacity = 0.8
+    opacity = 0.5
     sidebar_color = "rgba(240, 248, 255, 0.85)" 
 
     page_bg_img = f"""
@@ -416,6 +416,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
