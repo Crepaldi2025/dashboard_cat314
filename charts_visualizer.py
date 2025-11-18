@@ -1,5 +1,5 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v29)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v31)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
@@ -9,7 +9,7 @@ import io
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
     Cria a figura do gráfico de linha interativo com estilo detalhado.
-    (v30) - Fontes maiores, eixos marcados e visual profissional.
+    (v31) - Fontes maiores, eixos marcados e SEM erros de sintaxe.
     """
     variable_name = variable.split(" (")[0]
     
@@ -64,11 +64,11 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         title_font=dict(size=16, family='Arial', color='black'), # Título do eixo maior
         tickfont=dict(size=13), # Data maior
         
-        # Botões de Zoom (Mantidos e melhorados)
+        # Botões de Zoom (CORRIGIDO AGORA)
         rangeselector=dict(
             buttons=list([
                 dict(count=1, label="1m", step="month", stepmode="backward"),
-                dict(count=6, label="6m", step="month", stepmode=\"backward\"),
+                dict(count=6, label="6m", step="month", stepmode="backward"), # <--- Barra removida aqui!
                 dict(count=1, label="1a", step="year", stepmode="backward"),
                 dict(step="all", label="Tudo")
             ]),
@@ -203,7 +203,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     
     st.subheader("Tabela de Dados") 
     df_display = df_export.copy()
-    df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
+    df_display['date'] = df_display['date'].strftime('%d/%m/%Y')
     st.dataframe(df_display, use_container_width=True, height=300)
 
     st.subheader("Exportar Tabela")
@@ -232,5 +232,3 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-
-
