@@ -15,6 +15,38 @@ import pandas as pd
 import folium
 from folium.plugins import Draw 
 from streamlit_folium import st_folium
+import streamlit as st
+
+# =================================================
+# Configuração da Imagem de Fundo com Transparência
+# =================================================
+def set_background():
+    # URL direta da sua imagem no GitHub
+    image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/atm.jpg"
+    
+    # Ajuste a opacidade aqui!
+    # 0.0 = Imagem pura (sem transparência)
+    # 0.9 = Quase tudo branco (imagem muito suave)
+    # 0.5 = Meio termo (recomendado)
+    opacity = 0.8  
+    
+    page_bg_img = f"""
+    <style>
+    .stApp {{
+        /* Cria uma camada branca (rgba 255,255,255) com a opacidade definida acima da imagem */
+        background-image: linear-gradient(rgba(255, 255, 255, {opacity}), rgba(255, 255, 255, {opacity})), 
+                          url("{image_url}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    </style>
+    """
+    st.markdown(page_bg_img, unsafe_allow_html=True)
+
+# Chama a função logo no início
+set_background()
 
 # ==================================================================================
 # FUNÇÕES DE CACHE (Idênticas)
@@ -364,3 +396,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
