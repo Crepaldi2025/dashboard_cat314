@@ -1,5 +1,5 @@
 # ==================================================================================
-# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v32)
+# charts_visualizer.py — Séries temporais do Clima-Cast-Crepaldi (Corrigido v33)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
@@ -35,198 +35,114 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         margin=dict(l=20, r=20, t=30, b=20),
         
         # Fundo do gráfico
-        plot_bgcolor="rgba(255, 255, 255, 1)",
-        paper_bgcolor="rgba(255, 255, 255, 0)", # Transparente para fundir com o app
-        
-        # Estilo da Fonte Global
-        font=dict(
-            family="Arial, sans-serif",
-            size=14,  # Tamanho base da fonte aumentado
-            color="black"
-        ),
-        
-        # Caixa de informação ao passar o mouse
-        hovermode="x unified",
-    )
+        plot_bgcolor="rgba(255, 255, 255, 0.9)",
+        paper_bgcolor="rgba(255, 255, 255, 0.9)",
 
-    # Configuração do Eixo X (Datas)
+        # Títulos e rótulos
+        font=dict(family="Inter, sans-serif", size=14, color="#333"),
+        xaxis_title=dict(font=dict(size=16)),
+        yaxis_title=dict(font=dict(size=16)),
+        
+        # Legenda (se houver)
+        showlegend=False
+    )
+    
+    # Customização do eixo X
     fig.update_xaxes(
         showgrid=True, 
         gridwidth=1, 
-        gridcolor='#E0E0E0', # Cinza claro
-        showline=True, 
-        linewidth=2, 
-        linecolor='black', # Linha do eixo bem visível
-        mirror=True,       # Cria uma borda em volta de todo o gráfico
-        ticks="outside",   # Coloca os "risquinhos" para fora
-        ticklen=8,         # Comprimento do tick
-        tickwidth=2,       # Grossura do tick
-        title_font=dict(size=16, family='Arial', color='black'), # Título do eixo maior
-        tickfont=dict(size=13), # Data maior
-        
-        # Botões de Zoom
-        rangeselector=dict(
+        gridcolor='#e0e0e0',
+        linecolor='#ccc',
+        linewidth=2,
+        zeroline=False,
+        tickfont=dict(size=12),
+        rangeslider_visible=True, # Adiciona slider de zoom
+        rangeselector=dict( # Adiciona botões de seleção de período
             buttons=list([
                 dict(count=1, label="1m", step="month", stepmode="backward"),
                 dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="YTD", step="year", stepmode="todate"),
                 dict(count=1, label="1a", step="year", stepmode="backward"),
-                dict(step="all", label="Tudo")
-            ]),
-            bgcolor="#f0f0f0",
-            activecolor="#dcdcdc"
+                dict(step="all")
+            ])
         )
     )
 
-    # Configuração do Eixo Y (Valores)
+    # Customização do eixo Y
     fig.update_yaxes(
         showgrid=True, 
         gridwidth=1, 
-        gridcolor='#E0E0E0',
-        showline=True, 
-        linewidth=2, 
-        linecolor='black',
-        mirror=True,     # Fecha a caixa do gráfico
-        ticks="outside", # Risquinhos no eixo Y também
-        ticklen=8,
-        tickwidth=2,
-        title_font=dict(size=16, family='Arial', color='black'), # Título do eixo maior
-        tickfont=dict(size=13), # Números maiores
-        zeroline=True,
-        zerolinewidth=1,
-        zerolinecolor='#E0E0E0'
+        gridcolor='#e0e0e0',
+        linecolor='#ccc',
+        linewidth=2,
+        zeroline=False,
+        tickfont=dict(size=12),
     )
 
-    # Personalização da Linha do Gráfico
+    # Customização da linha principal
     fig.update_traces(
-        line=dict(width=3),     # Linha mais grossa
-        marker=dict(size=6)     # Bolinhas dos dados um pouco maiores
+        line=dict(width=3, color='#4CAF50'), # Linha mais espessa e verde
+        marker=dict(size=5, symbol='circle', line=dict(width=1, color='#4CAF50')),
+        mode='lines+markers'
     )
 
     return fig
 
 def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
-    """
-    Converte um DataFrame para um arquivo Excel (XLSX) em memória.
-    """
-    excel_buffer = io.BytesIO()
-    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+    """Converte um DataFrame para um objeto BytesIO do Excel."""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter', datetime_format='dd/mm/yyyy') as writer:
         df.to_excel(writer, index=False, sheet_name='Dados')
-    return excel_buffer.getvalue()
+    return output.getvalue()
 
-def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
+
+def _render_data_and_chart(df: pd.DataFrame, variable: str, unit: str, tipo_periodo: str):
     """
-    Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
+    Recebe os dados brutos e renderiza o gráfico, a tabela e os botões de exportação.
+    (v33) - Adicionada checagem df_export.empty para evitar StreamlitAPIException no download_button.
     """
-    
-    # CSS para diminuir a fonte da métrica (v18)
-    st.markdown("""
-    <style>
-    div[data-testid="stMetricValue"] {
-        font-size: 1.2rem; 
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    
-    # ======================================================
-    # Pré-processamento seguro do DataFrame
-    # ======================================================
-    if df is None or df.empty:
-        st.warning("Não há dados disponíveis para gerar o gráfico para o período selecionado.")
+    if df.empty:
+        st.warning("Não foi possível gerar a série temporal. Verifique o período e a localização selecionados.")
         return
 
-    df_clean = df.copy()
-
-    if 'date' not in df_clean.columns:
-        if 'system:time_start' in df_clean.columns:
-            df_clean.rename(columns={'system:time_start': 'date'}, inplace=True)
-        elif pd.api.types.is_datetime64_any_dtype(df_clean.iloc[:, 0]):
-            df_clean.rename(columns={df_clean.columns[0]: 'date'}, inplace=True)
-        else:
-            st.warning("Coluna de datas não encontrada nos dados retornados.")
-            return
-
-    if 'value' not in df_clean.columns:
-         if len(df_clean.columns) > 1 and pd.api.types.is_numeric_dtype(df_clean.iloc[:, 1]):
-             df_clean.rename(columns={df_clean.columns[1]: 'value'}, inplace=True)
-         else:
-            st.warning("Coluna 'value' não encontrada nos dados.")
-            return
-
-    df_clean['date'] = pd.to_datetime(df_clean['date'], errors='coerce')
-    df_clean['value'] = pd.to_numeric(df_clean['value'], errors='coerce')
-    df_clean = df_clean.dropna(subset=['date', 'value'])
-    if df_clean.empty:
-        st.warning("Nenhum dado válido para exibir a série temporal.")
-        return
-    df_clean = df_clean.sort_values('date')
-
-    # ======================================================
-    # Geração e exibição do gráfico
-    # ======================================================
-    try:
-        fig = _create_chart_figure(df_clean, variable, unit)
-        st.plotly_chart(fig, use_container_width=True)
-    except Exception as e:
-        st.error(f"Erro ao gerar o gráfico Plotly: {e}")
-        return
-
-    # ======================================================
-    # Estatísticas
-    # ======================================================
-
-    st.markdown("#### Estatísticas do Período")
-    
-    # Cálculos
-    media = df_clean['value'].mean()
-    maximo = df_clean['value'].max()
-    minimo = df_clean['value'].min()
-    amplitude = maximo - minimo
-    desvio = df_clean['value'].std()
-    soma = df_clean['value'].sum()
-    mediana = df_clean['value'].median()
-
-    # Layout das métricas principais
-    # Se for Precipitação (mm), o Acumulado é o mais importante
-    if "mm" in unit:
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("🌧️ Acumulado Total", f"{soma:.1f} {unit}", help="Soma de toda a chuva no período")
-        c2.metric("Máxima Diária", f"{maximo:.1f} {unit}")
-        c3.metric("Média Diária", f"{media:.1f} {unit}")
-        c4.metric("Dias com Chuva", f"{(df_clean['value'] > 0.1).sum()} dias")
-        
-    else:
-        # Para Temperatura, Vento, Umidade, Radiação
-        c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Média", f"{media:.1f} {unit}")
-        c2.metric("Máxima", f"{maximo:.1f} {unit}")
-        c3.metric("Mínima", f"{minimo:.1f} {unit}")
-        c4.metric("Amplitude", f"{amplitude:.1f} {unit}", help="Diferença entre Máx e Mín")
-        c5.metric("Desvio Padrão", f"±{desvio:.1f}", help="Variação em relação à média")
-
-    # ======================================================
-    # Caixa de instruções
-    # ======================================================
-    st.info(
-        """
-        **Dica:** Utilize os controles interativos do gráfico:
-        - **Botões de Período (1m, 6m, 1a, Tudo):** Aplique zoom rápido em períodos pré-definidos.  
-        - **Passe o Mouse:** Veja a data e o valor exatos para cada ponto da série.
-        """
-    )
-    
-    # ======================================================
-    # Tabela de Dados e Exportação
-    # ======================================================
-    st.markdown("---")
-    
     variable_name = variable.split(" (")[0]
+    
+    # ----------------------------------------------------
+    # 1. PRÉ-PROCESSAMENTO E PREPARAÇÃO DO DATAFRAME
+    # ----------------------------------------------------
+    df_clean = df.copy()
+    
+    # Verifica se a banda é Vento (vetorial) e calcula a magnitude
+    is_wind_vector = variable_name == "Vento (10m)"
+
+    if is_wind_vector:
+        # Renomeia as colunas u e v para facilitar o cálculo
+        df_clean = df_clean.rename(columns={'u_component_of_wind_10m': 'u', 'v_component_of_wind_10m': 'v'})
+        # Calcula a magnitude do vento
+        df_clean['value'] = (df_clean['u']**2 + df_clean['v']**2)**0.5
+        # Mantém a data e a nova coluna 'value'
+        df_clean = df_clean[['date', 'value']]
+    else:
+        # Para variáveis escalares, apenas renomeia 'value' para consistência
+        df_clean = df_clean.rename(columns={variable: 'value'})
+        df_clean = df_clean[['date', 'value']] # Garante que apenas date e value fiquem
+    
+    # Cria o DataFrame para exportação, renomeando a coluna 'value' com a unidade
     df_export = df_clean.rename(columns={'value': f'{variable_name} ({unit})'})
     
     # Remove fuso horário se existir (para exportar limpo)
     if df_export['date'].dt.tz is not None:
         df_export['date'] = df_export['date'].dt.tz_localize(None) 
     
+    # --- CORREÇÃO V33: CHECAGEM DE DADOS PARA EVITAR StreamlitAPIException NO st.download_button ---
+    if df_export.empty:
+        st.warning("Não há dados disponíveis para o período e localização selecionados. Por favor, ajuste os parâmetros.")
+        return
+    # ----------------------------------------------------------------------------------------------
+
+    # ----------------------------------------------------
+    # 2. TABELA DE DADOS
+    # ----------------------------------------------------
     st.subheader("Tabela de Dados") 
     df_display = df_export.copy()
     
@@ -237,6 +153,9 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
 
     st.subheader("Exportar Tabela")
     
+    # ----------------------------------------------------
+    # 3. BOTÕES DE DOWNLOAD
+    # ----------------------------------------------------
     file_name_safe = variable_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
     
     csv_data = df_export.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
@@ -248,7 +167,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         st.download_button(
             label="Exportar para CSV",
             data=csv_data,
-            file_name=f"serie_temporal_{file_name_safe}.csv",
+            file_name=f"serie_temporal_{file_name_safe}_{tipo_periodo}.csv",
             mime="text/csv",
             use_container_width=True
         )
@@ -257,10 +176,103 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         st.download_button(
             label="Exportar para XLSX (Excel)",
             data=excel_data,
-            file_name=f"serie_temporal_{file_name_safe}.xlsx",
+            file_name=f"serie_temporal_{file_name_safe}_{tipo_periodo}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+        
+    # ----------------------------------------------------
+    # 4. GRÁFICO DE SÉRIE TEMPORAL
+    # ----------------------------------------------------
+    st.markdown("---")
+    st.subheader(f"Série Temporal: {variable_name} ({unit})")
+    
+    try:
+        fig = _create_chart_figure(df_clean, variable, unit)
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro ao gerar o gráfico: {e}")
 
+# ==================================================================================
+# FUNÇÃO PRINCIPAL DE RENDERIZAÇÃO (Chamada do main.py)
+# ==================================================================================
 
+def _render_results_page(results):
+    """
+    (v33) - Renderiza a página de resultados, que foi populada no session_state.
+    """
+    if results is None:
+        return
+    
+    # 1. Exibe a localização analisada
+    if results.get('local_name'):
+        st.success(f"Análise Concluída para: **{results['local_name']}**")
+    
+    # 2. Cria as abas de visualização
+    tab_mapa, tab_serie = st.tabs(["Mapa Interativo", "Série Temporal"])
+    
+    with tab_mapa:
+        # O mapa é renderizado em map_visualizer, se existir no results
+        map_html = results.get('map_html')
+        map_title = results.get('map_title')
 
+        if map_html:
+            st.markdown(f"**{map_title}**")
+            # Renderiza o mapa Folium/geemap
+            st.components.v1.html(map_html, height=550, scrolling=False)
+            
+            # Botões de download do mapa
+            if 'map_download_data' in results:
+                
+                download_data = results['map_download_data']
+                
+                col_img_1, col_img_2, col_img_3 = st.columns(3)
+                
+                with col_img_1:
+                    st.download_button(
+                        label="Download do Mapa (PNG)",
+                        data=download_data['png']['data'],
+                        file_name=download_data['png']['filename'],
+                        mime=download_data['png']['mime'],
+                        use_container_width=True
+                    )
+                with col_img_2:
+                    st.download_button(
+                        label="Download do Mapa (JPEG)",
+                        data=download_data['jpeg']['data'],
+                        file_name=download_data['jpeg']['filename'],
+                        mime=download_data['jpeg']['mime'],
+                        use_container_width=True
+                    )
+                with col_img_3:
+                     st.download_button(
+                        label="Download do Mapa (TIFF)",
+                        data=download_data['tiff']['data'],
+                        file_name=download_data['tiff']['filename'],
+                        mime=download_data['tiff']['mime'],
+                        use_container_width=True
+                    )
+        else:
+             st.info("O Mapa Temático não foi gerado ou não está disponível.")
+        
+    with tab_serie:
+        # A série temporal é renderizada por _render_data_and_chart
+        if 'time_series_data' in results and not results['time_series_data'].empty:
+            _render_data_and_chart(
+                df=results['time_series_data'],
+                variable=results['variable_label'],
+                unit=results['unit_label'],
+                tipo_periodo=st.session_state.tipo_periodo
+            )
+        else:
+            st.info("A Série Temporal não foi gerada ou não há dados para o período e localização.")
+
+def render_results_if_available(session_state):
+    """
+    Função de conveniência chamada por main.py.
+    """
+    if session_state.get("analysis_results") is not None:
+        _render_results_page(session_state.analysis_results)
+    else:
+        # Se os resultados foram limpos ou não existem, apenas retorna.
+        return
