@@ -5,9 +5,8 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v53) - Atualizado para suportar "Temperatura do Ponto de Orvalho".
-#       - Recebe 'variable_label' explicitamente para decidir o título da legenda.
-#       - Mantém correções de buffer, fundo branco e centralização.
+# (v58) - Corrigido erro "Invalid type" no Image.paint.
+#         Agora converte explicitamente a Feature em FeatureCollection antes de pintar.
 # ==================================================================================
 
 import streamlit as st
@@ -34,7 +33,7 @@ def create_interactive_map(ee_image: ee.Image,
                            feature: ee.Feature, 
                            vis_params: dict, 
                            unit_label: str = "",
-                           variable_label: str = ""): # Adicionado variable_label para compatibilidade com main.py
+                           variable_label: str = ""):
     """
     Cria e exibe um mapa interativo que se centraliza e 
     dá zoom automaticamente na área de interesse.
@@ -57,8 +56,11 @@ def create_interactive_map(ee_image: ee.Image,
     # Adiciona a camada de dados climáticos
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     
-    # Adiciona o contorno da região
-    mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
+    # --- CORREÇÃO AQUI ---
+    # O método paint exige uma FeatureCollection, não uma Feature isolada.
+    # Convertemos a feature única em uma coleção ([feature])
+    outline_image = ee.Image().paint(ee.FeatureCollection([feature]), 0, 2)
+    mapa.addLayer(outline_image, {"palette": "black"}, "Contorno da Área")
     
     # Adiciona a legenda (colorbar) ajustada
     _add_colorbar_bottomleft(mapa, vis_params, unit_label, variable_label)
@@ -67,21 +69,10 @@ def create_interactive_map(ee_image: ee.Image,
     if bounds:
         mapa.fit_bounds(bounds)
     
-    # Retorna os componentes para renderização e download (compatibilidade com main.py)
-    # Nota: O main.py espera (html, title, download_data). 
-    # Aqui geramos o HTML e retornamos None para os downloads por enquanto, 
-    # pois o download do mapa interativo é feito via botão do próprio folium ou print,
-    # mas o create_static_map cuida dos arquivos estáticos.
-    
-    # Para manter a estrutura do main.py simples, retornamos os dados necessários:
     map_html = mapa.to_streamlit(height=500, width=None, use_container_width=True, return_html=True)
     
-    # Geramos os dados estáticos em background para os botões de download
+    # Gera estáticos para download
     png_url, jpg_url, colorbar_img = create_static_map(ee_image, feature, vis_params, unit_label)
-    
-    # Prepara dicionário de download (simulado via base64 gerado no static_map)
-    # Pequeno ajuste: create_static_map retorna URLs data:image...
-    # Precisamos separar para o botão de download funcionar corretamente no streamlit
     
     download_data = {}
     if png_url:
@@ -95,14 +86,13 @@ def create_interactive_map(ee_image: ee.Image,
              'filename': 'mapa_analise.jpg',
              'mime': 'image/jpeg'
         }
-        # TIFF não é gerado aqui, mas mantemos a estrutura
         download_data['tiff'] = {'data': b'', 'filename': 'mapa.tif', 'mime': 'image/tiff'}
 
     return map_html, f"Mapa de {variable_label}", download_data
 
 
 # ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS (Corrigido v53)
+# COLORBAR PARA MAPAS INTERATIVOS
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str, variable_label: str = ""):
@@ -119,7 +109,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     N_STEPS = len(palette) 
     step = round((vmax - vmin) / N_STEPS + 1)
     
-    # Proteção contra step zero
     if step == 0: step = 1
     
     index = np.arange(vmin, vmax + step, step, dtype=int)
@@ -131,9 +120,8 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         vmax=vmax
     )
   
-    colormap.fmt = '%.0f' # Força a formatação de inteiros
+    colormap.fmt = '%.0f' 
 
-    # --- LÓGICA DE ROTULAGEM INTELIGENTE ---
     ul = (unit_label or "").lower()
     vl = (variable_label or "").lower()
 
@@ -170,52 +158,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 
 # ==================================================================================
-# COLORBAR COMPACTA (MAPA ESTÁTICO)
-# ==================================================================================
-
-def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
-                           label: str) -> str:
-    """
-    Gera legenda horizontal discreta (Matplotlib) para uso no PDF/Imagem estática.
-    """
-    fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
-    ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
-    
-    try:
-        N_STEPS = len(palette)
-        boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
-        cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
-        norm = mcolors.BoundaryNorm(boundaries, cmap.N)
-    except Exception as e:
-        st.error(f"Erro ao criar colormap: {e}")
-        plt.close(fig)
-        return None
-
-    cb = ColorbarBase(
-        ax, 
-        cmap=cmap, 
-        norm=norm, 
-        boundaries=boundaries,
-        ticks=boundaries,
-        spacing='proportional',
-        orientation="horizontal"
-    )
-        
-    cb.set_label(label, fontsize=7)
-    # :g remove zeros decimais desnecessários
-    cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
-    cb.ax.tick_params(labelsize=6, length=2, pad=1)
-    
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
-    plt.close(fig)
-    buf.seek(0)
-    
-    b64 = base64.b64encode(buf.read()).decode("ascii")
-    return f"data:image/png;base64,{b64}"
-
-
-# ==================================================================================
 # MAPA ESTÁTICO — GERAÇÃO DE IMAGENS
 # ==================================================================================
 
@@ -232,11 +174,14 @@ def create_static_map(ee_image: ee.Image,
             max=vis_params["max"],
             palette=vis_params["palette"]
         )
-        outline = ee.Image().paint(featureCollection=feature, color=0, width=2)
+        
+        # --- CORREÇÃO AQUI ---
+        # Convertemos a Feature única para FeatureCollection antes de passar para paint()
+        # para evitar erro de tipo.
+        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         visualized_outline = outline.visualize(palette='000000')
         final_image_with_outline = visualized_data.blend(visualized_outline)
 
-        # Adiciona buffer para evitar cortes
         try:
             bounds_geojson = feature.geometry().bounds().getInfo()
             coords = bounds_geojson['coordinates'][0]
@@ -245,11 +190,11 @@ def create_static_map(ee_image: ee.Image,
             delta_lon = abs(max_lon - min_lon)
             delta_lat = abs(max_lat - min_lat)
             approx_dim_in_metres = max(delta_lon, delta_lat) * 111000 
-            buffer_metres = approx_dim_in_metres * 0.05 # 5% de margem
+            buffer_metres = approx_dim_in_metres * 0.05 
             buffered_geometry = feature.geometry().buffer(buffer_metres)
             region = buffered_geometry
         except Exception:
-            region = feature.geometry() # Fallback
+            region = feature.geometry() 
 
         url = final_image_with_outline.getThumbURL({
             "region": region,
@@ -259,7 +204,6 @@ def create_static_map(ee_image: ee.Image,
 
         img_bytes = requests.get(url).content
         
-        # Corrige fundo preto (transparência vira branco)
         img_png = Image.open(io.BytesIO(img_bytes))
         img_com_fundo_branco = Image.new("RGBA", img_png.size, "WHITE")
         img_com_fundo_branco.paste(img_png, (0, 0), img_png)
@@ -277,7 +221,6 @@ def create_static_map(ee_image: ee.Image,
         vmin = vis_params.get("min", 0)
         vmax = vis_params.get("max", 1)
         
-        # Gera legenda estática
         colorbar_img = _make_compact_colorbar(palette, vmin, vmax, unit_label)
 
         return png_url, jpg_url, colorbar_img
@@ -287,40 +230,55 @@ def create_static_map(ee_image: ee.Image,
         return None, None, None
 
 # ==================================================================================
-# FUNÇÕES DE COSTURA DE IMAGEM
+# COLORBAR COMPACTA E UTILITÁRIOS
 # ==================================================================================
 
+def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
+    fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
+    ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
+    
+    try:
+        N_STEPS = len(palette)
+        boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
+        cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
+        norm = mcolors.BoundaryNorm(boundaries, cmap.N)
+    except Exception as e:
+        plt.close(fig)
+        return None
+
+    cb = ColorbarBase(
+        ax, cmap=cmap, norm=norm, boundaries=boundaries, ticks=boundaries,
+        spacing='proportional', orientation="horizontal"
+    )
+        
+    cb.set_label(label, fontsize=7)
+    cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
+    cb.ax.tick_params(labelsize=6, length=2, pad=1)
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
+    plt.close(fig)
+    buf.seek(0)
+    
+    b64 = base64.b64encode(buf.read()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
-    """
-    Cria uma imagem PNG (como bytes) a partir de um texto de título.
-    """
     try:
         dpi = 100
-        fig_width = width / dpi
-        fig_height = height / dpi
-        fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
+        fig = plt.figure(figsize=(width/dpi, height/dpi), dpi=dpi)
         fig.patch.set_facecolor('white')
-        plt.text(0.5, 0.5, title_text, 
-                 ha='center', va='center', 
-                 fontsize=14, 
-                 fontweight='bold',
-                 wrap=True)
+        plt.text(0.5, 0.5, title_text, ha='center', va='center', fontsize=14, fontweight='bold', wrap=True)
         plt.axis('off')
         buf = io.BytesIO()
         plt.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.05, facecolor='white')
         plt.close(fig)
         buf.seek(0)
         return buf.getvalue()
-    except Exception as e:
-        st.error(f"Erro ao criar imagem do título: {e}")
+    except Exception:
         return None
 
-def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, 
-                            colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
-    """
-    Costura verticalmente três imagens (título, mapa, colorbar) 
-    em uma única imagem com fundo branco.
-    """
+def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
     try:
         title_img = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
         map_img = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
@@ -329,8 +287,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
         width = map_img.width
         
         def resize_to_width(img, target_width):
-            if img.width == target_width:
-                return img
+            if img.width == target_width: return img
             ratio = target_width / img.width
             target_height = int(img.height * ratio)
             return img.resize((target_width, target_height), Image.Resampling.LANCZOS)
@@ -339,7 +296,6 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
         colorbar_img = resize_to_width(colorbar_img, width)
 
         total_height = title_img.height + map_img.height + colorbar_img.height
-        
         final_img_rgba = Image.new('RGBA', (width, total_height), (255, 255, 255, 255))
 
         final_img_rgba.paste(title_img, (0, 0), title_img)
@@ -348,13 +304,9 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
         
         final_buffer = io.BytesIO()
         if format.upper() == 'JPEG':
-            final_img_rgb = final_img_rgba.convert('RGB')
-            final_img_rgb.save(final_buffer, format='JPEG', quality=95)
+            final_img_rgba.convert('RGB').save(final_buffer, format='JPEG', quality=95)
         else:
             final_img_rgba.save(final_buffer, format='PNG')
-        
         return final_buffer.getvalue()
-        
-    except Exception as e:
-        st.error(f"Erro ao costurar imagens: {e}")
+    except Exception:
         return None
