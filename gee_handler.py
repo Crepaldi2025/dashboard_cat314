@@ -43,6 +43,18 @@ def initialize_gee():
 # ==========================================================
 
 ERA5_VARS = {
+    "Temperatura do Ponto de Orvalho (2m)": {
+        "band": "dewpoint_temperature_2m", 
+        "result_band": "dewpoint_temperature_2m", 
+        "unit": "°C", 
+        "aggregation": "mean",
+        "vis_params": { 
+            "min": 5, 
+            "max": 35, 
+            "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'],
+            "caption": "Ponto de Orvalho (°C)" # Usaremos isso para forçar o nome correto na legenda
+        }
+    },
     "Temperatura do Ar (2m)": {
         "band": "temperature_2m", 
         "result_band": "temperature_2m", 
@@ -360,3 +372,4 @@ def get_time_series_data(variable_key, start_date, end_date, geometry):
     df["date"] = pd.to_datetime(df["date"])
     df["value"] = pd.to_numeric(df["value"], errors='coerce')
     return df.dropna().sort_values("date")
+
