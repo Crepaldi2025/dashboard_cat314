@@ -113,8 +113,16 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.divider()
 
             st.subheader("2. Variável Meteorológica")
+            st.subheader("2. Variável Meteorológica")
             st.selectbox("Selecione a Variável", 
-                         [ "Precipitação Total", "Radiação Solar Incidente", "Temperatura do Ar (2m)", "Temperatura do Ponto de Orvalho (2m)", "Umidade Relativa (2m)", "Velocidade do Vento (10m)"], 
+                         [
+                             "Temperatura do Ar (2m)", 
+                             "Temperatura do Ponto de Orvalho (2m)", # <--- ADICIONADO AQUI
+                             "Precipitação Total", 
+                             "Umidade Relativa (2m)", 
+                             "Velocidade do Vento (10m)", 
+                             "Radiação Solar Incidente"
+                         ], 
                          key='variavel', 
                          on_change=reset_analysis_state)
             st.divider()
@@ -399,6 +407,7 @@ def renderizar_pagina_sobre():
                 os.remove(temp_path)
             except Exception:
                 pass
+
 
 
 
