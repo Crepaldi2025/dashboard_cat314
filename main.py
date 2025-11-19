@@ -228,6 +228,18 @@ def main():
 
     # Renderiza o corpo principal da página (onde o mapa pode ser exibido)
     ui.renderizar_pagina_principal(opcao_menu)
+
+    # ==================================================================
+    # [CORREÇÃO] TRECHO QUE FALTAVA
+    # Verifica se o botão foi clicado e executa a função de análise
+    # ==================================================================
+    if st.session_state.get("analysis_triggered"):
+        with st.spinner("🔄 Processando dados climáticos... Por favor, aguarde."):
+            run_analysis_callback()
+    # ==================================================================
+
+    # Renderiza o corpo principal da página (onde o mapa pode ser exibido)
+    ui.renderizar_pagina_principal(opcao_menu)
     
     # --------------------------------------------------------------------------
     # LÓGICA DE EXIBIÇÃO DA ANÁLISE E DO MAPA PARA POLÍGONO
@@ -303,3 +315,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
