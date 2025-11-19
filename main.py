@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v63 - Estável)
+# main.py — Clima-Cast-Crepaldi (Corrigido v64 - Títulos Restaurados)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -122,7 +122,7 @@ def run_full_analysis():
 
 
 # ==================================================================================
-# RENDERIZAÇÃO (PADRONIZADA)
+# RENDERIZAÇÃO (PADRONIZADA E CORRIGIDA)
 # ==================================================================================
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -135,7 +135,7 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # Geração do Título Dinâmico
+    # --- CORREÇÃO: Restauração da Geração de Títulos ---
     variavel = st.session_state.variavel
     tipo_periodo = st.session_state.tipo_periodo
     tipo_local = st.session_state.tipo_localizacao.lower()
@@ -161,6 +161,7 @@ def render_analysis_results():
         
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
     titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
+    # ---------------------------------------------------
 
     if aba == "Mapas":
         st.markdown("---") 
@@ -216,6 +217,7 @@ def render_analysis_results():
             st.markdown("### Exportar Mapas")
             
             try:
+                # Uso da variável titulo_mapa (que agora existe!)
                 title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
                 map_png_bytes = base64.b64decode(png_url.split(",")[1])
                 map_jpg_bytes = base64.b64decode(jpg_url.split(",")[1])
@@ -228,7 +230,6 @@ def render_analysis_results():
                     title_bytes, map_jpg_bytes, colorbar_bytes, format='JPEG'
                 )
 
-                # --- BOTÕES PADRONIZADOS (MAPA) ---
                 col_exp1, col_exp2 = st.columns(2)
                 if final_png_data:
                     with col_exp1:
@@ -248,7 +249,6 @@ def render_analysis_results():
                             mime="image/jpeg", 
                             use_container_width=True
                         )
-                # ----------------------------------
 
             except Exception as e:
                 st.error(f"Erro na exportação: {e}")
@@ -264,7 +264,6 @@ def render_analysis_results():
             df_map = results["map_dataframe"]
             st.dataframe(df_map, use_container_width=True)
             
-            # --- BOTÕES PADRONIZADOS (DADOS MAPA) ---
             col_d1, col_d2 = st.columns(2)
             
             csv = df_map.to_csv(index=False).encode('utf-8')
@@ -287,15 +286,15 @@ def render_analysis_results():
                         label="Exportar XLSX (Dados)", 
                         data=excel_data, 
                         file_name="dados_mapa.xlsx", 
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", # CORREÇÃO AQUI
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
                         use_container_width=True
                     )
             except Exception as e:
                 st.warning("Biblioteca openpyxl não encontrada.")
-            # ----------------------------------------
 
     elif aba == "Séries Temporais":
         st.markdown("---")
+        # Uso da variável titulo_serie (que agora existe!)
         st.subheader(titulo_serie)
         
         if "time_series_df" not in results:
