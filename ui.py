@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Atualizado v55 - CSS Compacto)
+# ui.py (Atualizado v56 - Ajuda Círculo Detalhada)
 # ==================================================================================
 
 import streamlit as st
@@ -83,11 +83,26 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 estado_str = st.session_state.get('estado', 'Selecione...')
                 lista_muns = ["Selecione..."] + dados_geo.get(estado_str.split(' - ')[-1], []) if estado_str != "Selecione..." else ["Selecione um estado primeiro"]
                 st.selectbox("Selecione o Município", lista_muns, key='municipio', on_change=reset_analysis_state)
+            
             elif tipo_loc == "Círculo (Lat/Lon/Raio)":
                 st.number_input("Latitude", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
-                with st.popover("ℹ️ Ajuda: Círculo"): st.markdown("Insira Lat, Lon e Raio.")
+                
+                # --- ATUALIZAÇÃO AQUI: Ajuda Detalhada ---
+                with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
+                    st.markdown("""
+                    **Como preencher as coordenadas:**
+                    
+                    * **Latitude:** Coordenada em **graus decimais**. 
+                        * *Para o Brasil:* Use valores negativos (Hemisfério Sul). Ex: `-22.42`.
+                    * **Longitude:** Coordenada em **graus decimais**.
+                        * *Para o Brasil:* Use valores negativos (Oeste de Greenwich). Ex: `-45.46`.
+                    * **Raio (km):** Distância do centro até a borda da área de análise.
+                    
+                    💡 **Dica:** Abra o Google Maps, clique com o botão direito no local desejado e copie os números que aparecem no topo (ex: `-22.42, -45.46`).
+                    """)
+                # -----------------------------------------
             
             elif tipo_loc == "Polígono":
                 if st.session_state.get('drawn_geometry'): 
@@ -158,7 +173,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 def renderizar_pagina_principal(opcao):
-    # --- CSS PARA REMOVER ESPAÇO EM BRANCO SUPERIOR ---
+    # CSS PARA REMOVER ESPAÇO EM BRANCO SUPERIOR
     st.markdown("""
         <style>
             .block-container {
@@ -171,7 +186,6 @@ def renderizar_pagina_principal(opcao):
             }
         </style>
     """, unsafe_allow_html=True)
-    # --------------------------------------------------
 
     fuso_br = pytz.timezone('America/Sao_Paulo')
     agora = datetime.now(fuso_br)
