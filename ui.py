@@ -114,7 +114,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             st.subheader("2. Variável Meteorológica")
             st.selectbox("Selecione a Variável", 
-                         ["Temperatura do Ar (2m)", "Precipitação Total", "Umidade Relativa (2m)", "Velocidade do Vento (10m)", "Radiação Solar Incidente"], 
+                         [ "Precipitação Total", "Radiação Solar Incidente", "Temperatura do Ar (2m)", "Temperatura do Ponto de Orvalho (2m)", "Umidade Relativa (2m)", "Velocidade do Vento (10m)"], 
                          key='variavel', 
                          on_change=reset_analysis_state)
             st.divider()
@@ -242,11 +242,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
         
         return opcao_selecionada
-
-# ==================================================================================
-# (O restante do arquivo: renderizar_pagina_principal, 
-#  renderizar_resumo_selecao, renderizar_pagina_sobre é idêntico)
-# ==================================================================================
 
 def renderizar_pagina_principal(opcao_navegacao):
     # 1. Configurar os fusos horários
@@ -404,6 +399,7 @@ def renderizar_pagina_sobre():
                 os.remove(temp_path)
             except Exception:
                 pass
+
 
 
 
