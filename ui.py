@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Atualizado para Ponto de Orvalho)
+# ui.py (Atualizado v52 - Melhoria UX Polígono)
 # ==================================================================================
 
 import streamlit as st
@@ -16,6 +16,8 @@ import pytz
 import re
 
 st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide", initial_sidebar_state="expanded")
+
+# Tenta configurar locale, fallback silencioso se falhar
 try:
     locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
 except:
@@ -59,7 +61,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.selectbox("Selecione a Variável", 
                          [
                              "Temperatura do Ar (2m)", 
-                             "Temperatura do Ponto de Orvalho (2m)", # <--- ADICIONADO
+                             "Temperatura do Ponto de Orvalho (2m)",
                              "Precipitação Total", 
                              "Umidade Relativa (2m)", 
                              "Velocidade do Vento (10m)", 
@@ -87,10 +89,38 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 with st.popover("ℹ️ Ajuda: Círculo"): st.markdown("Insira Lat, Lon e Raio.")
+            
+            # --- ATUALIZAÇÃO AQUI: Instruções mais claras e Ícones ---
             elif tipo_loc == "Polígono":
-                if st.session_state.get('drawn_geometry'): st.success("✅ Polígono capturado.")
-                else: st.info("Desenhe no mapa principal.")
-                with st.popover("ℹ️ Ajuda: Polígono"): st.markdown("Use as ferramentas de desenho no mapa.")
+                if st.session_state.get('drawn_geometry'): 
+                    st.success("✅ Polígono capturado com sucesso!")
+                else: 
+                    st.markdown("""
+                    <div style="background-color: #e0f7fa; padding: 10px; border-radius: 5px; border-left: 5px solid #00acc1;">
+                        <h4 style="margin:0; color: #006064;">👉 Desenhe no Mapa</h4>
+                        <p style="font-size: 0.9em; margin-top: 5px;">
+                        Utilize as ferramentas na <b>lateral esquerda do mapa principal</b> (lado direito da tela) para desenhar sua área.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with st.popover("ℹ️ Ajuda: Ferramentas de Desenho"): 
+                    st.markdown("""
+                    **Guia das Ferramentas:**
+                    
+                    ⬟ **Polígono:**
+                    Clique neste ícone para desenhar formas livres (ex: contorno exato de uma fazenda). Clique ponto a ponto e feche o desenho no ponto inicial.
+                    
+                    ⬛ **Retângulo:**
+                    Clique e arraste para criar uma área retangular rápida.
+                    
+                    📝 **Editar:**
+                    Permite arrastar os pontos de um desenho existente para ajustá-lo.
+                    
+                    🗑️ **Lixeira:**
+                    Clique na lixeira e depois no desenho para apagá-lo. Em seguida, clique em "Save" ou "Clear All".
+                    """)
+            # ---------------------------------------------------------
             
             st.divider()
 
