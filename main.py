@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v66 - Função main restaurada)
+# main.py — Clima-Cast-Crepaldi (v67 - Tabela Padronizada)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -122,7 +122,7 @@ def run_full_analysis():
 
 
 # ==================================================================================
-# RENDERIZAÇÃO (PADRONIZADA E CORRIGIDA)
+# RENDERIZAÇÃO (PADRONIZADA)
 # ==================================================================================
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -135,7 +135,7 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # --- INICIALIZAÇÃO SEGURA DE VARIÁVEIS ---
+    # Variáveis de Título
     variavel = st.session_state.get('variavel', '')
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     tipo_local = st.session_state.get('tipo_localizacao', '').lower()
@@ -143,7 +143,6 @@ def render_analysis_results():
     periodo_str = ""
     local_str = ""
     
-    # Define String de Período
     if tipo_periodo == "Personalizado":
         inicio = st.session_state.get('data_inicio')
         fim = st.session_state.get('data_fim')
@@ -157,7 +156,6 @@ def render_analysis_results():
         ano = st.session_state.get('ano_anual', '')
         periodo_str = f"anual ({ano})"
     
-    # Define String de Local
     if tipo_local == "estado":
         estado_raw = st.session_state.get('estado', '')
         val = estado_raw.split(' - ')[0] if estado_raw else ""
@@ -172,7 +170,6 @@ def render_analysis_results():
         
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
     titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
-    # ---------------------------------------------------
 
     if aba == "Mapas":
         st.markdown("---") 
@@ -194,7 +191,7 @@ def render_analysis_results():
                 * **Zoom (+/-):** Aproxima ou afasta a visualização do mapa.
                 * **Tela Cheia (⛶):** Expande o mapa para ocupar toda a tela.
                 * **Camadas (🗂️):** Alterna entre Satélite e Mapa de Ruas.
-
+                
                 **Ferramentas de Desenho (Barra Esquerda):**
                 * **Linha (╱):** Desenhar rotas.
                 * **Polígono (⬟):** Desenhar áreas irregulares.
@@ -272,7 +269,32 @@ def render_analysis_results():
             st.warning("Não foi possível extrair dados amostrais.")
         else:
             df_map = results["map_dataframe"]
-            st.dataframe(df_map, use_container_width=True)
+            
+            # --- CONFIGURAÇÃO DE TABELA PROFISSIONAL PARA O MAPA ---
+            # Identifica dinamicamente a coluna de valor (que não é Lat/Lon)
+            cols = df_map.columns.tolist()
+            val_col = [c for c in cols if c not in ['Latitude', 'Longitude']][0]
+            unit = var_cfg["unit"]
+            
+            st.dataframe(
+                df_map, 
+                use_container_width=True,
+                hide_index=True, # Esconde o índice numérico
+                column_config={
+                    "Latitude": st.column_config.NumberColumn(
+                        "Latitude", format="%.4f", width="small"
+                    ),
+                    "Longitude": st.column_config.NumberColumn(
+                        "Longitude", format="%.4f", width="small"
+                    ),
+                    val_col: st.column_config.NumberColumn(
+                        val_col,
+                        format=f"%.2f {unit}", # Adiciona a unidade (ex: 25.00 °C)
+                        width="medium"
+                    )
+                }
+            )
+            # -------------------------------------------------------
             
             col_d1, col_d2 = st.columns(2)
             
@@ -296,7 +318,7 @@ def render_analysis_results():
                         label="Exportar XLSX (Dados)", 
                         data=excel_data, 
                         file_name="dados_mapa.xlsx", 
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
                         use_container_width=True
                     )
             except Exception as e:
@@ -345,37 +367,6 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
-
-# ==================================================================================
-# MAIN EXECUTION - AQUI ESTÁ A FUNÇÃO QUE FALTAVA!
-# ==================================================================================
-def main():
-    if 'gee_initialized' not in st.session_state:
-        gee_handler.inicializar_gee()
-        st.session_state.gee_initialized = True
-
-    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
-    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
-
-    if opcao_menu == "Sobre o Aplicativo":
-        ui.renderizar_pagina_sobre()
-        return
-
-    ui.renderizar_pagina_principal(opcao_menu)
-    
-    is_polygon = (opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono")
-    is_running = st.session_state.get("analysis_triggered", False)
-    has_geom = 'drawn_geometry' in st.session_state
-    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
-
-    if is_polygon and not is_running and not has_geom and not has_res:
-        render_polygon_drawer()
-
-    if is_running:
-        st.session_state.analysis_triggered = False 
-        run_full_analysis() 
-
-    render_analysis_results()
 
 if __name__ == "__main__":
     main()
