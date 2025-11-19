@@ -1,5 +1,5 @@
 # ==================================================================================
-# charts_visualizer.py — Visualização Científica com Exportação de Imagem (v61)
+# charts_visualizer.py — Visualização Científica e Tabela Profissional (v64)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
@@ -8,10 +8,7 @@ import io
 
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     """
-    Cria um gráfico de linha estilo científico com:
-    - Crosshairs (linhas guia horizontal e vertical).
-    - Eixos emoldurados.
-    - Fundo branco.
+    Cria um gráfico de linha estilo científico.
     """
     variable_name = variable.split(" (")[0]
     
@@ -27,34 +24,13 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         markers=True
     )
 
-    # ==========================================================
-    # ESTILIZAÇÃO CIENTÍFICA + CROSSHAIRS
-    # ==========================================================
+    # Estilização Científica
     fig.update_layout(
-        # Configuração do Eixo X (Tempo)
         xaxis=dict(
-            showline=True,          
-            linecolor='black',      
-            linewidth=1,            
-            ticks='outside',        
-            ticklen=6,              
-            tickcolor='black',      
-            showgrid=True,          
-            gridcolor='#E5E5E5',    
-            mirror=True,            
-            
-            # --- Configuração da Linha Guia (Spike/Crosshair) ---
-            showspikes=True,
-            spikemode='across', 
-            spikesnap='cursor',
-            spikethickness=1,
-            spikecolor='#555555',
-            spikedash='solid',
-            # ----------------------------------------------------
-
-            rangeslider=dict(visible=False), # Sem slider inferior
-            
-            # Botões de Zoom
+            showline=True, linecolor='black', linewidth=1, ticks='outside', ticklen=6, tickcolor='black',
+            showgrid=True, gridcolor='#E5E5E5', mirror=True,
+            showspikes=True, spikemode='across', spikesnap='cursor', spikethickness=1, spikecolor='#555555', spikedash='solid',
+            rangeslider=dict(visible=False),
             rangeselector=dict(
                 buttons=list([
                     dict(count=1, label="1m", step="month", stepmode="backward"),
@@ -62,41 +38,18 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
                     dict(count=1, label="1a", step="year", stepmode="backward"),
                     dict(step="all", label="Tudo")
                 ]),
-                bgcolor="white",
-                bordercolor="#cccccc",
-                borderwidth=1,
-                x=0, y=1.1
+                bgcolor="white", bordercolor="#cccccc", borderwidth=1, x=0, y=1.1
             )
         ),
-        
-        # Configuração do Eixo Y (Valor)
         yaxis=dict(
-            showline=True,
-            linecolor='black',
-            linewidth=1,
-            ticks='outside',
-            ticklen=6,
-            tickcolor='black',
-            showgrid=True,
-            gridcolor='#E5E5E5',
-            mirror=True,  
-            zeroline=False,
-            
-            # --- Configuração da Linha Horizontal (Crosshair) ---
-            showspikes=True,
-            spikemode='across', 
-            spikethickness=1,
-            spikecolor='#555555',
-            spikedash='solid'
-            # ----------------------------------------------------
+            showline=True, linecolor='black', linewidth=1, ticks='outside', ticklen=6, tickcolor='black',
+            showgrid=True, gridcolor='#E5E5E5', mirror=True, zeroline=False,
+            showspikes=True, spikemode='across', spikethickness=1, spikecolor='#555555', spikedash='solid'
         ),
-        
-        plot_bgcolor='white',   
-        paper_bgcolor='white',  
+        plot_bgcolor='white', paper_bgcolor='white',
         font=dict(family="Arial, sans-serif", size=14, color="black"),
         margin=dict(l=60, r=30, t=50, b=60),
-        height=450,
-        hovermode="x" 
+        height=450, hovermode="x"
     )
     
     fig.update_traces(
@@ -114,12 +67,7 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     return excel_buffer.getvalue()
 
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
-    # CSS para ajustar métricas
-    st.markdown("""
-    <style>
-    div[data-testid="stMetricValue"] { font-size: 1.1rem; }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown("""<style>div[data-testid="stMetricValue"] { font-size: 1.1rem; }</style>""", unsafe_allow_html=True)
     
     if df is None or df.empty:
         st.warning("Nenhum dado válido encontrado.")
@@ -142,96 +90,88 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     df_clean['value'] = pd.to_numeric(df_clean['value'], errors='coerce')
     df_clean = df_clean.dropna(subset=['date', 'value']).sort_values('date')
 
-    # 1. Gera a Figura
+    # 1. Gráfico
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
+        st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
-        st.error(f"Erro ao criar figura: {e}")
+        st.error(f"Erro ao plotar gráfico: {e}")
         return
 
-    # 2. Exibe o Gráfico
-    st.plotly_chart(fig, use_container_width=True)
-
-    # 3. Botões de Exportação do Gráfico (PNG/JPG)
-    # Nota: Requer 'kaleido' instalado (pip install kaleido)
+    # 2. Download Imagem
     variable_clean = variable.split(" (")[0].lower().replace(" ", "_")
-    
-    col_img1, col_img2, col_void = st.columns([1, 1, 2])
-    
+    col_img1, col_img2, _ = st.columns([1, 1, 2])
     try:
-        # Gera imagem em memória para evitar salvar em disco
         img_png = fig.to_image(format="png", width=1200, height=800, scale=2)
         img_jpg = fig.to_image(format="jpeg", width=1200, height=800, scale=2)
-        
-        with col_img1:
-            st.download_button(
-                label="📷 Baixar Gráfico (PNG)",
-                data=img_png,
-                file_name=f"grafico_{variable_clean}.png",
-                mime="image/png",
-                use_container_width=True
-            )
-        with col_img2:
-            st.download_button(
-                label="📷 Baixar Gráfico (JPG)",
-                data=img_jpg,
-                file_name=f"grafico_{variable_clean}.jpg",
-                mime="image/jpeg",
-                use_container_width=True
-            )
-            
+        with col_img1: st.download_button("📷 Baixar Gráfico (PNG)", data=img_png, file_name=f"grafico_{variable_clean}.png", mime="image/png", use_container_width=True)
+        with col_img2: st.download_button("📷 Baixar Gráfico (JPG)", data=img_jpg, file_name=f"grafico_{variable_clean}.jpg", mime="image/jpeg", use_container_width=True)
     except ValueError:
-        # Fallback caso o engine kaleido não esteja instalado
-        with col_img1:
-            st.warning("Instale a biblioteca `kaleido` para habilitar downloads de imagem.")
+        with col_img1: st.warning("Instale `kaleido` para baixar imagens.")
 
-    # 4. Legenda Explicativa
+    # 3. Legenda
     st.markdown(
         """
         <div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #ddd; font-size: 0.9em; color: #555; margin-top: 10px; margin-bottom: 20px;">
-            <b>🖱️ Interação:</b> Passe o mouse sobre o gráfico para ver o valor exato e as linhas de referência.<br>
-            <b>🔎 Zoom Rápido:</b> <code>1m</code> = Mês | <code>6m</code> = Semestre | <code>1a</code> = Ano | <code>Tudo</code> = Total.
+            <b>🖱️ Interação:</b> Passe o mouse sobre o gráfico para ver o valor exato.<br>
+            <b>🔎 Zoom:</b> <code>1m</code> = Mês | <code>6m</code> = Semestre | <code>1a</code> = Ano | <code>Tudo</code> = Total.
         </div>
-        """, 
-        unsafe_allow_html=True
+        """, unsafe_allow_html=True
     )
 
-    # 5. Estatísticas
+    # 4. Estatísticas
     st.markdown("#### Estatísticas do Período")
-    
-    media = df_clean['value'].mean()
-    maximo = df_clean['value'].max()
-    minimo = df_clean['value'].min()
-    amplitude = maximo - minimo
-    desvio_padrao = df_clean['value'].std()
+    media, maximo, minimo = df_clean['value'].mean(), df_clean['value'].max(), df_clean['value'].min()
+    amplitude, desvio = maximo - minimo, df_clean['value'].std()
 
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Média", f"{media:.1f} {unit}")
     c2.metric("Máxima", f"{maximo:.1f} {unit}")
     c3.metric("Mínima", f"{minimo:.1f} {unit}")
     c4.metric("Amplitude", f"{amplitude:.1f} {unit}", help="Diferença entre Máximo e Mínimo.")
-    c5.metric("Desvio Padrão", f"{desvio_padrao:.1f}", help="Dispersão dos dados em relação à média.")
+    c5.metric("Desvio Padrão", f"{desvio:.1f}", help="Dispersão dos dados em relação à média.")
     
-    # 6. Tabela e Exportação de Dados
+    # 5. Tabela Profissional
     st.markdown("---")
-    df_export = df_clean.rename(columns={'value': f'{variable.split(" (")[0]} ({unit})'})
-    
-    if pd.api.types.is_datetime64tz_dtype(df_export['date']):
-        df_export['date'] = df_export['date'].dt.tz_localize(None)
-    
     st.subheader("Tabela de Dados") 
-    df_display = df_export.copy()
-    df_display['date'] = df_display['date'].dt.strftime('%d/%m/%Y')
-    st.dataframe(df_display, use_container_width=True, height=300)
-
-    st.subheader("Exportar Tabela")
     
-    file_name_safe = variable_clean
+    # Prepara DataFrame para exibição e exportação
+    variable_label = variable.split(" (")[0]
+    col_name_display = f"{variable_label} ({unit})"
+    
+    df_export = df_clean.rename(columns={'date': 'Data', 'value': col_name_display})
+    
+    # Remove fuso horário para evitar erros no Excel e na Tabela
+    if pd.api.types.is_datetime64tz_dtype(df_export['Data']):
+        df_export['Data'] = df_export['Data'].dt.tz_localize(None)
+    
+    # --- CONFIGURAÇÃO DA TABELA PROFISSIONAL ---
+    st.dataframe(
+        df_export,
+        use_container_width=True,
+        height=400,
+        hide_index=True, # Remove a coluna de índice numérico
+        column_config={
+            "Data": st.column_config.DateColumn(
+                "Data da Leitura",
+                format="DD/MM/YYYY", # Formato brasileiro nativo
+                width="medium"
+            ),
+            col_name_display: st.column_config.NumberColumn(
+                col_name_display,
+                format="%.2f " + unit, # Adiciona a unidade automaticamente (ex: 25.40 °C)
+                width="medium"
+            )
+        }
+    )
+    # -------------------------------------------
+
+    st.subheader("Exportar Dados")
     csv_data = df_export.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
     try: excel_data = _convert_df_to_excel(df_export)
     except: excel_data = None
     
     cex1, cex2 = st.columns(2)
-    with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{file_name_safe}.csv", mime="text/csv", use_container_width=True)
+    with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
-        if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{file_name_safe}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
