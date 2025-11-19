@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v56 - Estável)
+# main.py — Clima-Cast-Crepaldi (Padronizado v62)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -41,7 +41,7 @@ def set_background():
 set_background()
 
 # ==================================================================================
-# LÓGICA DE ANÁLISE
+# FUNÇÕES DE CACHE E LÓGICA
 # ==================================================================================
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
@@ -122,7 +122,7 @@ def run_full_analysis():
 
 
 # ==================================================================================
-# RENDERIZAÇÃO
+# RENDERIZAÇÃO (PADRONIZADA)
 # ==================================================================================
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -228,17 +228,31 @@ def render_analysis_results():
                     title_bytes, map_jpg_bytes, colorbar_bytes, format='JPEG'
                 )
 
+                # --- BOTÕES PADRONIZADOS (MAPA) ---
                 col_exp1, col_exp2 = st.columns(2)
                 if final_png_data:
                     with col_exp1:
-                        st.download_button("Exportar (PNG)", data=final_png_data, file_name="mapa_completo.png", mime="image/png", use_container_width=True)
+                        st.download_button(
+                            label="📷 Baixar Mapa (PNG)", 
+                            data=final_png_data, 
+                            file_name="mapa_completo.png", 
+                            mime="image/png", 
+                            use_container_width=True
+                        )
                 if final_jpg_data:
                     with col_exp2:
-                        st.download_button("Exportar (JPEG)", data=final_jpg_data, file_name="mapa_completo.jpeg", mime="image/jpeg", use_container_width=True)
+                        st.download_button(
+                            label="📷 Baixar Mapa (JPEG)", 
+                            data=final_jpg_data, 
+                            file_name="mapa_completo.jpeg", 
+                            mime="image/jpeg", 
+                            use_container_width=True
+                        )
+                # ----------------------------------
 
             except Exception as e:
                 st.error(f"Erro na exportação: {e}")
-                st.download_button("Exportar (Somente Mapa)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
+                st.download_button("📷 Baixar Mapa (Somente Imagem)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
 
         st.markdown("---") 
         st.subheader("Tabela de Dados") 
@@ -249,10 +263,18 @@ def render_analysis_results():
             df_map = results["map_dataframe"]
             st.dataframe(df_map, use_container_width=True)
             
+            # --- BOTÕES PADRONIZADOS (DADOS MAPA) ---
             col_d1, col_d2 = st.columns(2)
+            
             csv = df_map.to_csv(index=False).encode('utf-8')
             with col_d1:
-                st.download_button("Exportar CSV", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
+                st.download_button(
+                    label="Exportar CSV (Dados)", 
+                    data=csv, 
+                    file_name="dados_mapa.csv", 
+                    mime="text/csv", 
+                    use_container_width=True
+                )
             
             try:
                 excel_buffer = io.BytesIO()
@@ -260,9 +282,16 @@ def render_analysis_results():
                     df_map.to_excel(writer, index=False, sheet_name='Dados Amostrais')
                 excel_data = excel_buffer.getvalue()
                 with col_d2:
-                    st.download_button("Exportar XLSX", excel_data, "dados_mapa.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                    st.download_button(
+                        label="Exportar XLSX (Dados)", 
+                        data=excel_data, 
+                        file_name="dados_mapa.xlsx", 
+                        application_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                        use_container_width=True
+                    )
             except Exception as e:
                 st.warning("Biblioteca openpyxl não encontrada.")
+            # ----------------------------------------
 
     elif aba == "Séries Temporais":
         st.markdown("---")
@@ -307,38 +336,6 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
-
-# ==================================================================================
-# MAIN EXECUTION
-# ==================================================================================
-def main():
-    if 'gee_initialized' not in st.session_state:
-        gee_handler.inicializar_gee()
-        st.session_state.gee_initialized = True
-
-    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
-    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
-
-    if opcao_menu == "Sobre o Aplicativo":
-        ui.renderizar_pagina_sobre()
-        return
-
-    ui.renderizar_pagina_principal(opcao_menu)
-    
-    # Definição de variáveis de controle
-    is_polygon = (opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono")
-    is_running = st.session_state.get("analysis_triggered", False)
-    has_geom = 'drawn_geometry' in st.session_state
-    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
-
-    if is_polygon and not is_running and not has_geom and not has_res:
-        render_polygon_drawer()
-
-    if is_running:
-        st.session_state.analysis_triggered = False 
-        run_full_analysis() 
-
-    render_analysis_results()
 
 if __name__ == "__main__":
     main()
