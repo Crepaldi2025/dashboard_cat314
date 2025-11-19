@@ -5,8 +5,9 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v58) - Corrigido erro "Invalid type" no Image.paint.
-#         Agora converte explicitamente a Feature em FeatureCollection antes de pintar.
+# (v59) - CORREÇÃO DEFINITIVA DO ERRO "Invalid type" no Image.paint.
+#       - Aplicada conversão para FeatureCollection tanto no mapa INTERATIVO
+#         quanto no ESTÁTICO.
 # ==================================================================================
 
 import streamlit as st
@@ -56,9 +57,8 @@ def create_interactive_map(ee_image: ee.Image,
     # Adiciona a camada de dados climáticos
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     
-    # --- CORREÇÃO AQUI ---
-    # O método paint exige uma FeatureCollection, não uma Feature isolada.
-    # Convertemos a feature única em uma coleção ([feature])
+    # --- CORREÇÃO AQUI (Interativo) ---
+    # Envolvemos a feature em ee.FeatureCollection([]) para satisfazer o requisito do .paint()
     outline_image = ee.Image().paint(ee.FeatureCollection([feature]), 0, 2)
     mapa.addLayer(outline_image, {"palette": "black"}, "Contorno da Área")
     
@@ -175,10 +175,10 @@ def create_static_map(ee_image: ee.Image,
             palette=vis_params["palette"]
         )
         
-        # --- CORREÇÃO AQUI ---
+        # --- CORREÇÃO AQUI (Estático) ---
         # Convertemos a Feature única para FeatureCollection antes de passar para paint()
-        # para evitar erro de tipo.
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
+        
         visualized_outline = outline.visualize(palette='000000')
         final_image_with_outline = visualized_data.blend(visualized_outline)
 
