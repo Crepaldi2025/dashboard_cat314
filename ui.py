@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Atualizado v54 - Alerta e Resumo Expandido)
+# ui.py (Atualizado v55 - CSS Compacto)
 # ==================================================================================
 
 import streamlit as st
@@ -17,7 +17,6 @@ import re
 
 st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide", initial_sidebar_state="expanded")
 
-# Tenta configurar locale, fallback silencioso se falhar
 try:
     locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
 except:
@@ -154,13 +153,26 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.session_state.analysis_triggered = True
                 st.rerun()
             
-            # --- ATUALIZAÇÃO AQUI: Alerta abaixo do botão ---
             st.warning("⚠️ **Importante:** Confira todas as opções acima (Variável, Local e Data) antes de gerar a análise.")
-            # ------------------------------------------------
         
         return opcao
 
 def renderizar_pagina_principal(opcao):
+    # --- CSS PARA REMOVER ESPAÇO EM BRANCO SUPERIOR ---
+    st.markdown("""
+        <style>
+            .block-container {
+                padding-top: 1rem !important;
+                padding-bottom: 0rem !important;
+            }
+            h1 {
+                padding-top: 0rem !important;
+                margin-top: 0rem !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    # --------------------------------------------------
+
     fuso_br = pytz.timezone('America/Sao_Paulo')
     agora = datetime.now(fuso_br)
     agora_utc = datetime.now(pytz.utc)
@@ -180,7 +192,6 @@ def renderizar_pagina_principal(opcao):
         st.markdown("Configure sua análise no **Painel de Controle**.")
 
 def renderizar_resumo_selecao():
-    # --- ATUALIZAÇÃO AQUI: expanded=True para listar as opções ---
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
         st.write(f"**Variável:** {st.session_state.variavel}")
         
@@ -205,7 +216,6 @@ def renderizar_resumo_selecao():
              st.write(f"{st.session_state.mes_mensal} de {st.session_state.ano_mensal}")
         elif periodo == "Anual":
              st.write(f"Ano de {st.session_state.ano_anual}")
-    # -------------------------------------------------------------
 
 def renderizar_pagina_sobre():
     st.title("Sobre o Clima-Cast-Crepaldi")
