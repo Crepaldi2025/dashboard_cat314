@@ -5,9 +5,9 @@
 # Autor: Paulo C. Crepaldi
 #
 # Descrição:
-# (v46) - Adiciona o rótulo "Umidade Relativa" e "Radiação" à
-#         legenda interativa (função _add_colorbar_bottomleft).
-#       - Mantém as correções de centralização (v34) e fundo branco (v45).
+# (v53) - Atualizado para suportar "Temperatura do Ponto de Orvalho".
+#       - Recebe 'variable_label' explicitamente para decidir o título da legenda.
+#       - Mantém correções de buffer, fundo branco e centralização.
 # ==================================================================================
 
 import streamlit as st
@@ -25,7 +25,6 @@ from matplotlib import cm
 import matplotlib.colors as mcolors 
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
-# (st.set_page_config() foi REMOVIDO daqui)
 
 # ==================================================================================
 # MAPA INTERATIVO (Resultado da Análise)
@@ -34,13 +33,15 @@ from branca.element import Template, MacroElement
 def create_interactive_map(ee_image: ee.Image, 
                            feature: ee.Feature, 
                            vis_params: dict, 
-                           unit_label: str = ""):
+                           unit_label: str = "",
+                           variable_label: str = ""): # Adicionado variable_label para compatibilidade com main.py
     """
-    (v34) Cria e exibe um mapa interativo que se centraliza e 
+    Cria e exibe um mapa interativo que se centraliza e 
     dá zoom automaticamente na área de interesse.
     """
     
     try:
+        # Tenta obter os limites para centralizar o mapa
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -50,25 +51,63 @@ def create_interactive_map(ee_image: ee.Image,
     except Exception:
         bounds = None
 
+    # Cria o mapa base
     mapa = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="HYBRID")
+    
+    # Adiciona a camada de dados climáticos
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
+    
+    # Adiciona o contorno da região
     mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
     
-    _add_colorbar_bottomleft(mapa, vis_params, unit_label)
+    # Adiciona a legenda (colorbar) ajustada
+    _add_colorbar_bottomleft(mapa, vis_params, unit_label, variable_label)
 
+    # Ajusta o zoom
     if bounds:
         mapa.fit_bounds(bounds)
     
-    mapa.to_streamlit(height=500, use_container_width=True)
+    # Retorna os componentes para renderização e download (compatibilidade com main.py)
+    # Nota: O main.py espera (html, title, download_data). 
+    # Aqui geramos o HTML e retornamos None para os downloads por enquanto, 
+    # pois o download do mapa interativo é feito via botão do próprio folium ou print,
+    # mas o create_static_map cuida dos arquivos estáticos.
+    
+    # Para manter a estrutura do main.py simples, retornamos os dados necessários:
+    map_html = mapa.to_streamlit(height=500, width=None, use_container_width=True, return_html=True)
+    
+    # Geramos os dados estáticos em background para os botões de download
+    png_url, jpg_url, colorbar_img = create_static_map(ee_image, feature, vis_params, unit_label)
+    
+    # Prepara dicionário de download (simulado via base64 gerado no static_map)
+    # Pequeno ajuste: create_static_map retorna URLs data:image...
+    # Precisamos separar para o botão de download funcionar corretamente no streamlit
+    
+    download_data = {}
+    if png_url:
+        download_data['png'] = {
+            'data': base64.b64decode(png_url.split(",")[1]),
+            'filename': 'mapa_analise.png',
+            'mime': 'image/png'
+        }
+        download_data['jpeg'] = {
+             'data': base64.b64decode(jpg_url.split(",")[1]),
+             'filename': 'mapa_analise.jpg',
+             'mime': 'image/jpeg'
+        }
+        # TIFF não é gerado aqui, mas mantemos a estrutura
+        download_data['tiff'] = {'data': b'', 'filename': 'mapa.tif', 'mime': 'image/tiff'}
+
+    return map_html, f"Mapa de {variable_label}", download_data
 
 
 # ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS (Corrigido v46)
+# COLORBAR PARA MAPAS INTERATIVOS (Corrigido v53)
 # ==================================================================================
 
-def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
+def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str, variable_label: str = ""):
     """
-    (v46) Adiciona legenda discreta com valores inteiros e todos os rótulos.
+    Adiciona legenda discreta com valores inteiros e rótulos corretos.
     """
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
@@ -79,6 +118,10 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
     N_STEPS = len(palette) 
     step = round((vmax - vmin) / N_STEPS + 1)
+    
+    # Proteção contra step zero
+    if step == 0: step = 1
+    
     index = np.arange(vmin, vmax + step, step, dtype=int)
 
     colormap = StepColormap(
@@ -88,23 +131,26 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         vmax=vmax
     )
   
-    colormap.fmt = '%.0f' # (v40) Força a formatação de inteiros
+    colormap.fmt = '%.0f' # Força a formatação de inteiros
 
-    # --- INÍCIO DA CORREÇÃO v46 ---
+    # --- LÓGICA DE ROTULAGEM INTELIGENTE ---
     ul = (unit_label or "").lower()
-    if "°" in unit_label or "temp" in ul:
-        label = "Temperatura (°C)"
-    elif "mm" in ul:
-        label = "Precipitação (mm)"
-    elif "m/s" in ul or "vento" in ul:
-        label = "Vento (m/s)"
-    elif "%" in ul: 
-        label = "Umidade Relativa (%)"
-    elif "w/m" in ul:
+    vl = (variable_label or "").lower()
+
+    if "orvalho" in vl:
+        label = "Ponto de Orvalho (°C)"
+    elif "radiação" in vl or "w/m" in ul:
         label = "Radiação (W/m²)"
+    elif "umidade" in vl or "%" in ul:
+        label = "Umidade Relativa (%)"
+    elif "vento" in vl or "m/s" in ul:
+        label = "Vento (m/s)"
+    elif "precipitação" in vl or "mm" in ul:
+        label = "Precipitação (mm)"
+    elif "temperatura" in vl or "°" in ul:
+        label = "Temperatura (°C)"
     else:
-        label = str(unit_label) if unit_label else ""
-    # --- FIM DA CORREÇÃO v46 ---
+        label = str(variable_label) if variable_label else str(unit_label)
 
     colormap.caption = label
     
@@ -124,13 +170,13 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 
 # ==================================================================================
-# COLORBAR COMPACTA (MAPA ESTÁTICO) (Idêntico v29)
+# COLORBAR COMPACTA (MAPA ESTÁTICO)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, 
                            label: str) -> str:
     """
-    (v29) Gera legenda horizontal discreta (Matplotlib).
+    Gera legenda horizontal discreta (Matplotlib) para uso no PDF/Imagem estática.
     """
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
@@ -156,7 +202,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
     )
         
     cb.set_label(label, fontsize=7)
-    # (v40) :g remove zeros decimais desnecessários
+    # :g remove zeros decimais desnecessários
     cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     
@@ -170,7 +216,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float,
 
 
 # ==================================================================================
-# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS (Idêntico v46)
+# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS
 # ==================================================================================
 
 def create_static_map(ee_image: ee.Image, 
@@ -179,7 +225,6 @@ def create_static_map(ee_image: ee.Image,
                       unit_label: str = "") -> tuple[str, str, str]:
     """
     Gera o mapa estático (PNG/JPG) e a legenda (colorbar) discreta.
-    (v46) - Adiciona um buffer à geometria para evitar cortes.
     """
     try:
         visualized_data = ee_image.visualize(
@@ -191,7 +236,7 @@ def create_static_map(ee_image: ee.Image,
         visualized_outline = outline.visualize(palette='000000')
         final_image_with_outline = visualized_data.blend(visualized_outline)
 
-        # (v46) Adiciona buffer
+        # Adiciona buffer para evitar cortes
         try:
             bounds_geojson = feature.geometry().bounds().getInfo()
             coords = bounds_geojson['coordinates'][0]
@@ -214,7 +259,7 @@ def create_static_map(ee_image: ee.Image,
 
         img_bytes = requests.get(url).content
         
-        # (v45) Corrige fundo preto
+        # Corrige fundo preto (transparência vira branco)
         img_png = Image.open(io.BytesIO(img_bytes))
         img_com_fundo_branco = Image.new("RGBA", img_png.size, "WHITE")
         img_com_fundo_branco.paste(img_png, (0, 0), img_png)
@@ -231,9 +276,9 @@ def create_static_map(ee_image: ee.Image,
         palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
         vmin = vis_params.get("min", 0)
         vmax = vis_params.get("max", 1)
-        label = unit_label or ""
         
-        colorbar_img = _make_compact_colorbar(palette, vmin, vmax, label)
+        # Gera legenda estática
+        colorbar_img = _make_compact_colorbar(palette, vmin, vmax, unit_label)
 
         return png_url, jpg_url, colorbar_img
 
@@ -242,12 +287,12 @@ def create_static_map(ee_image: ee.Image,
         return None, None, None
 
 # ==================================================================================
-# FUNÇÕES DE COSTURA DE IMAGEM (Idêntico v45)
+# FUNÇÕES DE COSTURA DE IMAGEM
 # ==================================================================================
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
     """
-    Cria uma imagem PNG (como bytes) a partir de um texto de título usando Matplotlib.
+    Cria uma imagem PNG (como bytes) a partir de um texto de título.
     """
     try:
         dpi = 100
@@ -273,7 +318,7 @@ def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
 def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, 
                             colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
     """
-    (v45) Costura verticalmente três imagens (título, mapa, colorbar) 
+    Costura verticalmente três imagens (título, mapa, colorbar) 
     em uma única imagem com fundo branco.
     """
     try:
@@ -313,12 +358,3 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes,
     except Exception as e:
         st.error(f"Erro ao costurar imagens: {e}")
         return None
-
-
-
-
-
-
-
-
-
