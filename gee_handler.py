@@ -54,13 +54,6 @@ ERA5_VARS = {
             "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'] 
         }
     },
-    "Temperatura do Ponto de Orvalho (2m) - Td": {
-        "band": "dewpoint_2m_temperature", 
-        "unit": "°C", 
-        "scale_factor": 1.0, 
-        "offset": -273.15, 
-        "aggregation": "mean"
-    },
     "Precipitação Total": {
         "band": "total_precipitation_sum", 
         "result_band": "total_precipitation_sum", 
@@ -72,20 +65,21 @@ ERA5_VARS = {
             "palette": ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58', '#081040']
         }
     },
-    # V52: Adicionando vis_params e result_band para Ponto de Orvalho
-    "Temperatura do Ponto de Orvalho (2m) - Td": {
+    # --- CORREÇÃO AQUI: Chave unificada e simplificada ---
+    "Temperatura do Ponto de Orvalho (2m)": {
         "band": "dewpoint_2m_temperature", 
-        "result_band": "dewpoint_2m_temperature", # Adicionado (para consistência de agregação/seleção)
+        "result_band": "dewpoint_2m_temperature", 
         "unit": "°C", 
         "scale_factor": 1.0, 
-        "offset": -273.15, # Conversão para Celsius
+        "offset": -273.15, 
         "aggregation": "mean",
-        "vis_params": { # Adicionado (em °C)
+        "vis_params": { 
             "min": 5, 
             "max": 35, 
-            "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'] # Usando a mesma paleta de temperatura
+            "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'] 
         }
     },
+    # -----------------------------------------------------
     "Umidade Relativa (2m)": {
         "bands": ["temperature_2m", "dewpoint_temperature_2m"], 
         "result_band": "relative_humidity", 
@@ -94,11 +88,9 @@ ERA5_VARS = {
         "vis_params": { 
             "min": 0, 
             "max": 100, 
-            # Paleta YlOrRd (Amarelo-Laranja-Vermelho) com 8 cores
             "palette": ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#b10026']
         }
     },
-    # --- INÍCIO DA CORREÇÃO v51 ---
     "Radiação Solar Incidente": {
         "band": "surface_solar_radiation_downwards_sum", 
         "result_band": "radiation_wm2", 
@@ -106,12 +98,10 @@ ERA5_VARS = {
         "aggregation": "mean", 
         "vis_params": { 
             "min": 0, 
-            "max": 1000, # <-- Ajustado para o máximo de 1000
-            # Paleta YlOrRd (Amarelo-Laranja-Vermelho) com 8 cores
+            "max": 1000, 
             "palette": ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#b10026']
         }
     },
-    # --- FIM DA CORREÇÃO v51 ---
     "Velocidade do Vento (10m)": {
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], 
         "result_band": "wind_speed", 
@@ -484,6 +474,7 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     except Exception as e:
         st.error(f"⚠️ Falha ao processar dados legados do GEE: {e}")
         return None
+
 
 
 
