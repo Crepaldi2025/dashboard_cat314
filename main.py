@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (v54 - Layout Compacto)
+# main.py — Clima-Cast-Crepaldi (Corrigido v56 - Estável)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -41,7 +41,7 @@ def set_background():
 set_background()
 
 # ==================================================================================
-# FUNÇÕES DE CACHE
+# LÓGICA DE ANÁLISE
 # ==================================================================================
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
@@ -89,7 +89,6 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
 
     return results
 
-# ---------------------- FUNÇÃO PRINCIPAL DE ANÁLISE ----------------------
 def run_full_analysis():
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
@@ -122,9 +121,9 @@ def run_full_analysis():
         st.session_state.analysis_results = None
 
 
-# ----------------------------------------------------------------------------------
+# ==================================================================================
 # RENDERIZAÇÃO
-# ----------------------------------------------------------------------------------
+# ==================================================================================
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
         return
@@ -133,9 +132,6 @@ def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
     var_cfg = results["var_cfg"]
 
-    # --- ATUALIZAÇÃO AQUI: Removida a linha extra st.markdown("---") ---
-    # O ui.py já coloca uma linha no final do cabeçalho. Não precisamos de outra aqui.
-    
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
@@ -311,6 +307,38 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
+
+# ==================================================================================
+# MAIN EXECUTION
+# ==================================================================================
+def main():
+    if 'gee_initialized' not in st.session_state:
+        gee_handler.inicializar_gee()
+        st.session_state.gee_initialized = True
+
+    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
+    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
+
+    if opcao_menu == "Sobre o Aplicativo":
+        ui.renderizar_pagina_sobre()
+        return
+
+    ui.renderizar_pagina_principal(opcao_menu)
+    
+    # Definição de variáveis de controle
+    is_polygon = (opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono")
+    is_running = st.session_state.get("analysis_triggered", False)
+    has_geom = 'drawn_geometry' in st.session_state
+    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
+
+    if is_polygon and not is_running and not has_geom and not has_res:
+        render_polygon_drawer()
+
+    if is_running:
+        st.session_state.analysis_triggered = False 
+        run_full_analysis() 
+
+    render_analysis_results()
 
 if __name__ == "__main__":
     main()
