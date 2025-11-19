@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido - Com Exportações JPG/XLSX)
+# main.py — Clima-Cast-Crepaldi (Atualizado v52 - Satélite)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -279,7 +279,15 @@ def render_analysis_results():
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     
-    m = folium.Map(location=[-15.78, -47.93], zoom_start=4)
+    # --- ATUALIZAÇÃO AQUI: Mapa de Satélite Google ---
+    m = folium.Map(
+        location=[-15.78, -47.93], 
+        zoom_start=4,
+        tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", # Tiles de Satélite
+        attr="Google"
+    )
+    # -------------------------------------------------
+
     Draw(
         export=False,
         draw_options={
