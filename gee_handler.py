@@ -54,6 +54,13 @@ ERA5_VARS = {
             "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'] 
         }
     },
+    "Temperatura do Ponto de Orvalho (2m) - Td": {
+        "band": "dewpoint_2m_temperature", 
+        "unit": "°C", 
+        "scale_factor": 1.0, 
+        "offset": -273.15, 
+        "aggregation": "mean"
+    },
     "Precipitação Total": {
         "band": "total_precipitation_sum", 
         "result_band": "total_precipitation_sum", 
@@ -463,4 +470,5 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     except Exception as e:
         st.error(f"⚠️ Falha ao processar dados legados do GEE: {e}")
         return None
+
 
