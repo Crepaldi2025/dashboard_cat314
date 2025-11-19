@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v55)
+# main.py — Clima-Cast-Crepaldi (Corrigido v60)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -77,7 +77,7 @@ def set_background():
 # LÓGICA DE EXECUÇÃO DA ANÁLISE
 # =================================================
 
-@st.cache_data
+# (v60) REMOVIDO @st.cache_data para evitar erro de Pickle com objetos de Mapa/HTML
 def run_analysis(tipo_localizacao, uf, municipio, drawn_geometry, tipo_periodo, variavel_analise, start_date, end_date):
     """
     Executa a análise no GEE e retorna os resultados.
@@ -90,13 +90,8 @@ def run_analysis(tipo_localizacao, uf, municipio, drawn_geometry, tipo_periodo, 
             feature_collection, local_name = gee_handler.get_brazil_municipality(uf, municipio)
         elif tipo_localizacao == "Polígono":
             feature_collection, local_name = gee_handler.convert_geojson_to_ee(drawn_geometry), "Polígono Personalizado"
-        # Fallback para Círculo se necessário, ou erro se feature_collection for None
+        # Fallback para Círculo se necessário
         else:
-             # Se for círculo, a lógica de geometria é tratada dentro do get_variable_params ou get_gee_image
-             # dependendo de como gee_handler está estruturado.
-             # Se gee_handler espera feature_collection para tudo, precisamos garantir que Círculo retorne algo válido aqui.
-             # Assumindo que para Círculo usamos coordenadas passadas via st.session_state, mas run_analysis precisa receber.
-             # Por simplicidade, mantemos o fluxo atual.
              feature_collection = None 
              local_name = "Área Personalizada"
 
@@ -114,7 +109,6 @@ def run_analysis(tipo_localizacao, uf, municipio, drawn_geometry, tipo_periodo, 
         dataset, band, unit = gee_handler.get_variable_params(variavel_analise)
 
         # 3. Executar o Mapeamento
-        # Nota: get_gee_image internamente pode lidar com Círculo se usar geometry do session_state
         ee_image, vis_params = gee_handler.get_gee_image(dataset, band, start_date, end_date)
         
         # Se feature_collection ainda é None (caso do Círculo), tentamos pegar da imagem ou do session
@@ -185,10 +179,7 @@ def run_analysis_callback():
         st.session_state.analysis_triggered = False
         return
 
-    # --- CORREÇÃO DE VARIÁVEIS ---
-    # UI.py salva em 'estado' e 'municipio'. O antigo main tentava 'uf_selecionado'.
-    
-    # 1. Recupera o valor bruto do Estado (ex: "São Paulo - SP" ou apenas "SP")
+    # 1. Recupera o valor bruto do Estado
     estado_raw = st.session_state.get('estado', '')
     
     # 2. Extrai apenas a sigla se houver separador
@@ -203,8 +194,8 @@ def run_analysis_callback():
     # Executa a análise
     st.session_state.analysis_results = run_analysis(
         st.session_state.tipo_localizacao, 
-        uf_val,         # Variável corrigida
-        municipio_val,  # Variável corrigida
+        uf_val,         
+        municipio_val,  
         st.session_state.drawn_geometry if 'drawn_geometry' in st.session_state else None, 
         st.session_state.tipo_periodo, 
         st.session_state.variavel_analise if 'variavel_analise' in st.session_state else st.session_state.get('variavel'), 
@@ -262,7 +253,7 @@ def main():
     # Renderiza o corpo principal da página
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # Verifica se a análise foi disparada (pelo botão na sidebar que seta a flag)
+    # Verifica se a análise foi disparada
     if st.session_state.get("analysis_triggered"):
         run_analysis_callback()
     
@@ -280,7 +271,6 @@ def main():
     
     # Lógica para o modo Polígono
     if is_polygon_mode:
-        # Renderiza o Mapa de Desenho
         map_key = st.session_state.get('map_key', 0)
         
         m = folium.Map(location=[-14.235, -51.9253], zoom_start=4, control_scale=True, tiles="OpenStreetMap", key=map_key)
@@ -322,7 +312,6 @@ def main():
             charts_visualizer.render_results_if_available(st.session_state)
             
     else:
-        # Se não for modo Polígono, exibe resultados se existirem
         if has_results:
             charts_visualizer.render_results_if_available(st.session_state)
 
