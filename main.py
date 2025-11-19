@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Restaurado v46 - Compatível)
+# main.py — Clima-Cast-Crepaldi (Corrigido - Com Exportações JPG/XLSX)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -56,20 +56,17 @@ def get_geo_caching_key(session_state):
         key += f"|geojson:{hash(str(session_state.get('drawn_geometry')))}"
     return key
 
-# REMOVIDO @st.cache_data aqui para evitar erros de Pickle com objetos complexos
 def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
-    # Lógica original v31
+    # Lógica original v31 (Sem @st.cache_data para evitar erros de Pickle)
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     if not geometry: return None 
     
-    # Pega a configuração da variável (agora inclui Ponto de Orvalho)
     var_cfg = gee_handler.ERA5_VARS.get(variavel)
     if not var_cfg: return None
     
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
     if aba == "Mapas":
-        # Chama a função legada/original get_era5_image
         ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry)
         if ee_image is None: return None
         results["ee_image"] = ee_image
@@ -111,7 +108,6 @@ def run_full_analysis():
             spinner_message = "Processando imagem e amostrando dados..."
         
         with st.spinner(spinner_message):
-            # Chama a lógica sem cache direto para evitar erros de serialização
             analysis_data = run_analysis_logic(
                 variavel, start_date, end_date, geo_key, aba
             )
@@ -214,17 +210,31 @@ def render_analysis_results():
             st.markdown("### Exportar Mapas")
             
             try:
+                # Decodifica imagens
                 title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
                 map_png_bytes = base64.b64decode(png_url.split(",")[1])
                 map_jpg_bytes = base64.b64decode(jpg_url.split(",")[1])
                 colorbar_bytes = base64.b64decode(colorbar_b64.split(",")[1])
                 
+                # Gera imagem PNG completa
                 final_png_data = map_visualizer._stitch_images_to_bytes(
                     title_bytes, map_png_bytes, colorbar_bytes, format='PNG'
                 )
+                # Gera imagem JPEG completa
+                final_jpg_data = map_visualizer._stitch_images_to_bytes(
+                    title_bytes, map_jpg_bytes, colorbar_bytes, format='JPEG'
+                )
+
+                col_exp1, col_exp2 = st.columns(2)
                 if final_png_data:
-                    st.download_button("Exportar (PNG)", data=final_png_data, file_name="mapa_completo.png", mime="image/png", use_container_width=True)
-            except Exception:
+                    with col_exp1:
+                        st.download_button("Exportar (PNG)", data=final_png_data, file_name="mapa_completo.png", mime="image/png", use_container_width=True)
+                if final_jpg_data:
+                    with col_exp2:
+                        st.download_button("Exportar (JPEG)", data=final_jpg_data, file_name="mapa_completo.jpeg", mime="image/jpeg", use_container_width=True)
+
+            except Exception as e:
+                st.error(f"Erro na exportação: {e}")
                 st.download_button("Exportar (Somente Mapa)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
 
         st.markdown("---") 
@@ -236,8 +246,24 @@ def render_analysis_results():
             df_map = results["map_dataframe"]
             st.dataframe(df_map, use_container_width=True)
             
+            # Botões de Download da Tabela
+            col_d1, col_d2 = st.columns(2)
+            
+            # CSV
             csv = df_map.to_csv(index=False).encode('utf-8')
-            st.download_button("Exportar CSV", csv, "dados_mapa.csv", "text/csv")
+            with col_d1:
+                st.download_button("Exportar CSV", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
+            
+            # EXCEL
+            try:
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    df_map.to_excel(writer, index=False, sheet_name='Dados Amostrais')
+                excel_data = excel_buffer.getvalue()
+                with col_d2:
+                    st.download_button("Exportar XLSX", excel_data, "dados_mapa.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            except Exception as e:
+                st.warning("Biblioteca openpyxl não encontrada ou erro ao gerar Excel.")
 
     elif aba == "Séries Temporais":
         st.markdown("---")
