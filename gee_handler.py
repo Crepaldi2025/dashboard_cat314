@@ -72,6 +72,20 @@ ERA5_VARS = {
             "palette": ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58', '#081040']
         }
     },
+    # V52: Adicionando vis_params e result_band para Ponto de Orvalho
+    "Temperatura do Ponto de Orvalho (2m) - Td": {
+        "band": "dewpoint_2m_temperature", 
+        "result_band": "dewpoint_2m_temperature", # Adicionado (para consistência de agregação/seleção)
+        "unit": "°C", 
+        "scale_factor": 1.0, 
+        "offset": -273.15, # Conversão para Celsius
+        "aggregation": "mean",
+        "vis_params": { # Adicionado (em °C)
+            "min": 5, 
+            "max": 35, 
+            "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'] # Usando a mesma paleta de temperatura
+        }
+    },
     "Umidade Relativa (2m)": {
         "bands": ["temperature_2m", "dewpoint_temperature_2m"], 
         "result_band": "relative_humidity", 
@@ -470,5 +484,6 @@ def get_gee_data(dataset, band, start_date, end_date, feature):
     except Exception as e:
         st.error(f"⚠️ Falha ao processar dados legados do GEE: {e}")
         return None
+
 
 
