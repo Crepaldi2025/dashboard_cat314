@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Atualizado v57 - Texto Informativo Melhorado)
+# ui.py (Atualizado v58 - Ajuste de Padding/Margens)
 # ==================================================================================
 
 import streamlit as st
@@ -171,19 +171,19 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 def renderizar_pagina_principal(opcao):
-    # CSS PARA REMOVER ESPAÇO EM BRANCO SUPERIOR
+    # --- CSS CORRIGIDO: Mais espaço para evitar cortes ---
     st.markdown("""
         <style>
             .block-container {
-                padding-top: 1rem !important;
-                padding-bottom: 0rem !important;
+                padding-top: 3.5rem !important; /* Aumentado de 1rem para 3.5rem */
+                padding-bottom: 4rem !important; /* Aumentado de 0rem para 4rem */
             }
             h1 {
-                padding-top: 0rem !important;
                 margin-top: 0rem !important;
             }
         </style>
     """, unsafe_allow_html=True)
+    # -----------------------------------------------------
 
     fuso_br = pytz.timezone('America/Sao_Paulo')
     agora = datetime.now(fuso_br)
@@ -201,7 +201,6 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
-        # --- ATUALIZAÇÃO AQUI: Texto mais claro ---
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 def renderizar_resumo_selecao():
