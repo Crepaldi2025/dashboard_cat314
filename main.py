@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (v67 - Tabela Padronizada)
+# main.py — Clima-Cast-Crepaldi (v68 - Função Main Restaurada e Tabelas Padronizadas)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -122,7 +122,7 @@ def run_full_analysis():
 
 
 # ==================================================================================
-# RENDERIZAÇÃO (PADRONIZADA)
+# RENDERIZAÇÃO DE RESULTADOS
 # ==================================================================================
 def render_analysis_results():
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -135,7 +135,7 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # Variáveis de Título
+    # --- INICIALIZAÇÃO SEGURA DE VARIÁVEIS DE TÍTULO ---
     variavel = st.session_state.get('variavel', '')
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     tipo_local = st.session_state.get('tipo_localizacao', '').lower()
@@ -170,6 +170,7 @@ def render_analysis_results():
         
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
     titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
+    # ---------------------------------------------------
 
     if aba == "Mapas":
         st.markdown("---") 
@@ -187,26 +188,23 @@ def render_analysis_results():
             st.subheader(titulo_mapa) 
             with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
                 st.markdown("""
-                **Controles de Navegação e Visualização:**
-                * **Zoom (+/-):** Aproxima ou afasta a visualização do mapa.
-                * **Tela Cheia (⛶):** Expande o mapa para ocupar toda a tela.
-                * **Camadas (🗂️):** Alterna entre Satélite e Mapa de Ruas.
+                **Controles:**
+                * **Zoom (+/-):** Aproxima ou afasta.
+                * **Tela Cheia (⛶):** Expande o mapa.
+                * **Camadas (🗂️):** Alterna entre Satélite e Mapa.
                 
-                **Ferramentas de Desenho (Barra Esquerda):**
-                * **Linha (╱):** Desenhar rotas.
-                * **Polígono (⬟):** Desenhar áreas irregulares.
-                * **Retângulo (⬛):** Desenhar áreas quadradas.
-                * **Círculo (⭕):** Desenhar áreas circulares.
-                * **Marcador (📍):** Adicionar pontos.
-                * **Editar (📝):** Mover/Alterar desenhos.
+                **Ferramentas de Desenho:**
+                * **Linha (╱):** Rotas.
+                * **Polígono (⬟):** Áreas livres.
+                * **Retângulo (⬛):** Áreas quadradas.
+                * **Círculo (⭕):** Áreas circulares.
+                * **Marcador (📍):** Pontos.
+                * **Editar (📝):** Alterar desenhos.
                 * **Lixeira (🗑️):** Apagar desenhos.
                 """)
             
             map_visualizer.create_interactive_map(
-                ee_image, 
-                feature, 
-                vis_params, 
-                var_cfg["unit"] 
+                ee_image, feature, vis_params, var_cfg["unit"] 
             ) 
 
         elif tipo_mapa == "Estático":
@@ -240,22 +238,10 @@ def render_analysis_results():
                 col_exp1, col_exp2 = st.columns(2)
                 if final_png_data:
                     with col_exp1:
-                        st.download_button(
-                            label="📷 Baixar Mapa (PNG)", 
-                            data=final_png_data, 
-                            file_name="mapa_completo.png", 
-                            mime="image/png", 
-                            use_container_width=True
-                        )
+                        st.download_button("📷 Baixar Mapa (PNG)", data=final_png_data, file_name="mapa_completo.png", mime="image/png", use_container_width=True)
                 if final_jpg_data:
                     with col_exp2:
-                        st.download_button(
-                            label="📷 Baixar Mapa (JPEG)", 
-                            data=final_jpg_data, 
-                            file_name="mapa_completo.jpeg", 
-                            mime="image/jpeg", 
-                            use_container_width=True
-                        )
+                        st.download_button("📷 Baixar Mapa (JPEG)", data=final_jpg_data, file_name="mapa_completo.jpeg", mime="image/jpeg", use_container_width=True)
 
             except Exception as e:
                 st.error(f"Erro na exportação: {e}")
@@ -270,8 +256,7 @@ def render_analysis_results():
         else:
             df_map = results["map_dataframe"]
             
-            # --- CONFIGURAÇÃO DE TABELA PROFISSIONAL PARA O MAPA ---
-            # Identifica dinamicamente a coluna de valor (que não é Lat/Lon)
+            # --- TABELA PADRONIZADA PARA MAPA ---
             cols = df_map.columns.tolist()
             val_col = [c for c in cols if c not in ['Latitude', 'Longitude']][0]
             unit = var_cfg["unit"]
@@ -279,34 +264,19 @@ def render_analysis_results():
             st.dataframe(
                 df_map, 
                 use_container_width=True,
-                hide_index=True, # Esconde o índice numérico
+                hide_index=True, 
                 column_config={
-                    "Latitude": st.column_config.NumberColumn(
-                        "Latitude", format="%.4f", width="small"
-                    ),
-                    "Longitude": st.column_config.NumberColumn(
-                        "Longitude", format="%.4f", width="small"
-                    ),
-                    val_col: st.column_config.NumberColumn(
-                        val_col,
-                        format=f"%.2f {unit}", # Adiciona a unidade (ex: 25.00 °C)
-                        width="medium"
-                    )
+                    "Latitude": st.column_config.NumberColumn("Latitude", format="%.4f", width="small"),
+                    "Longitude": st.column_config.NumberColumn("Longitude", format="%.4f", width="small"),
+                    val_col: st.column_config.NumberColumn(val_col, format=f"%.2f {unit}", width="medium")
                 }
             )
-            # -------------------------------------------------------
+            # ------------------------------------
             
             col_d1, col_d2 = st.columns(2)
-            
             csv = df_map.to_csv(index=False).encode('utf-8')
             with col_d1:
-                st.download_button(
-                    label="Exportar CSV (Dados)", 
-                    data=csv, 
-                    file_name="dados_mapa.csv", 
-                    mime="text/csv", 
-                    use_container_width=True
-                )
+                st.download_button("Exportar CSV (Dados)", data=csv, file_name="dados_mapa.csv", mime="text/csv", use_container_width=True)
             
             try:
                 excel_buffer = io.BytesIO()
@@ -314,13 +284,7 @@ def render_analysis_results():
                     df_map.to_excel(writer, index=False, sheet_name='Dados Amostrais')
                 excel_data = excel_buffer.getvalue()
                 with col_d2:
-                    st.download_button(
-                        label="Exportar XLSX (Dados)", 
-                        data=excel_data, 
-                        file_name="dados_mapa.xlsx", 
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-                        use_container_width=True
-                    )
+                    st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name="dados_mapa.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
             except Exception as e:
                 st.warning("Biblioteca openpyxl não encontrada.")
 
@@ -367,6 +331,37 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
+
+# ==================================================================================
+# FUNÇÃO MAIN - AQUI ESTÁ ELA!
+# ==================================================================================
+def main():
+    if 'gee_initialized' not in st.session_state:
+        gee_handler.inicializar_gee()
+        st.session_state.gee_initialized = True
+
+    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
+    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
+
+    if opcao_menu == "Sobre o Aplicativo":
+        ui.renderizar_pagina_sobre()
+        return
+
+    ui.renderizar_pagina_principal(opcao_menu)
+    
+    is_polygon = (opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono")
+    is_running = st.session_state.get("analysis_triggered", False)
+    has_geom = 'drawn_geometry' in st.session_state
+    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
+
+    if is_polygon and not is_running and not has_geom and not has_res:
+        render_polygon_drawer()
+
+    if is_running:
+        st.session_state.analysis_triggered = False 
+        run_full_analysis() 
+
+    render_analysis_results()
 
 if __name__ == "__main__":
     main()
