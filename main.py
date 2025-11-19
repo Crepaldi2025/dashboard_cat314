@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Atualizado v52 - Satélite)
+# main.py — Clima-Cast-Crepaldi (Atualizado v53 - Ajuda Mapa Completa)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -180,12 +180,25 @@ def render_analysis_results():
 
         if tipo_mapa == "Interativo":
             st.subheader(titulo_mapa) 
+            
+            # --- ATUALIZAÇÃO AQUI: Texto de Ajuda Completo ---
             with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
                 st.markdown("""
-                **Como usar os botões do mapa:**
-                * **Zoom (+/-):** Aproxima ou afasta.
-                * **Camadas:** Alterne entre Satélite e Mapa.
+                **Controles de Navegação e Visualização:**
+                * **Zoom (+/-):** Aproxima ou afasta a visualização do mapa.
+                * **Tela Cheia (⛶):** Expande o mapa para ocupar toda a tela.
+                * **Camadas (🗂️):** (Canto superior direito) Alterna entre a visualização de Satélite e Mapa de Ruas.
+
+                **Ferramentas de Desenho e Edição (Barra Lateral Esquerda):**
+                * **Linha (╱):** Permite desenhar linhas ou rotas no mapa.
+                * **Polígono (⬟):** Desenha áreas com formato livre/irregular.
+                * **Retângulo (⬛):** Desenha áreas quadradas ou retangulares.
+                * **Círculo (⭕):** Desenha áreas circulares.
+                * **Marcador (📍):** Adiciona pontos de interesse/marcação.
+                * **Editar (📝):** Permite clicar em um desenho existente para mover seus pontos ou alterá-lo.
+                * **Lixeira (🗑️):** Permite clicar em um desenho para excluí-lo do mapa.
                 """)
+            # ---------------------------------------------------
             
             map_visualizer.create_interactive_map(
                 ee_image, 
@@ -210,17 +223,14 @@ def render_analysis_results():
             st.markdown("### Exportar Mapas")
             
             try:
-                # Decodifica imagens
                 title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
                 map_png_bytes = base64.b64decode(png_url.split(",")[1])
                 map_jpg_bytes = base64.b64decode(jpg_url.split(",")[1])
                 colorbar_bytes = base64.b64decode(colorbar_b64.split(",")[1])
                 
-                # Gera imagem PNG completa
                 final_png_data = map_visualizer._stitch_images_to_bytes(
                     title_bytes, map_png_bytes, colorbar_bytes, format='PNG'
                 )
-                # Gera imagem JPEG completa
                 final_jpg_data = map_visualizer._stitch_images_to_bytes(
                     title_bytes, map_jpg_bytes, colorbar_bytes, format='JPEG'
                 )
@@ -246,15 +256,12 @@ def render_analysis_results():
             df_map = results["map_dataframe"]
             st.dataframe(df_map, use_container_width=True)
             
-            # Botões de Download da Tabela
             col_d1, col_d2 = st.columns(2)
             
-            # CSV
             csv = df_map.to_csv(index=False).encode('utf-8')
             with col_d1:
                 st.download_button("Exportar CSV", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
             
-            # EXCEL
             try:
                 excel_buffer = io.BytesIO()
                 with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
@@ -279,14 +286,13 @@ def render_analysis_results():
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     
-    # --- ATUALIZAÇÃO AQUI: Mapa de Satélite Google ---
+    # Mapa de Satélite para desenho (v52)
     m = folium.Map(
         location=[-15.78, -47.93], 
         zoom_start=4,
-        tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", # Tiles de Satélite
+        tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", 
         attr="Google"
     )
-    # -------------------------------------------------
 
     Draw(
         export=False,
