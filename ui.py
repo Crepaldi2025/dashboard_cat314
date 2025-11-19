@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Atualizado v52 - Melhoria UX Polígono)
+# ui.py (Atualizado v54 - Alerta e Resumo Expandido)
 # ==================================================================================
 
 import streamlit as st
@@ -90,7 +90,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 with st.popover("ℹ️ Ajuda: Círculo"): st.markdown("Insira Lat, Lon e Raio.")
             
-            # --- ATUALIZAÇÃO AQUI: Instruções mais claras e Ícones ---
             elif tipo_loc == "Polígono":
                 if st.session_state.get('drawn_geometry'): 
                     st.success("✅ Polígono capturado com sucesso!")
@@ -99,7 +98,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     <div style="background-color: #e0f7fa; padding: 10px; border-radius: 5px; border-left: 5px solid #00acc1;">
                         <h4 style="margin:0; color: #006064;">👉 Desenhe no Mapa</h4>
                         <p style="font-size: 0.9em; margin-top: 5px;">
-                        Utilize as ferramentas na <b>lateral esquerda do mapa principal</b> (lado direito da tela) para desenhar sua área.
+                        Utilize as ferramentas na <b>lateral esquerda do mapa principal</b> para desenhar sua área.
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
@@ -107,20 +106,11 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 with st.popover("ℹ️ Ajuda: Ferramentas de Desenho"): 
                     st.markdown("""
                     **Guia das Ferramentas:**
-                    
-                    ⬟ **Polígono:**
-                    Clique neste ícone para desenhar formas livres (ex: contorno exato de uma fazenda). Clique ponto a ponto e feche o desenho no ponto inicial.
-                    
-                    ⬛ **Retângulo:**
-                    Clique e arraste para criar uma área retangular rápida.
-                    
-                    📝 **Editar:**
-                    Permite arrastar os pontos de um desenho existente para ajustá-lo.
-                    
-                    🗑️ **Lixeira:**
-                    Clique na lixeira e depois no desenho para apagá-lo. Em seguida, clique em "Save" ou "Clear All".
+                    ⬟ **Polígono:** Formas livres.
+                    ⬛ **Retângulo:** Áreas quadradas.
+                    📝 **Editar:** Ajustar pontos.
+                    🗑️ **Lixeira:** Apagar desenho.
                     """)
-            # ---------------------------------------------------------
             
             st.divider()
 
@@ -163,6 +153,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if st.button("Gerar Análise", type="primary", use_container_width=True, disabled=disable):
                 st.session_state.analysis_triggered = True
                 st.rerun()
+            
+            # --- ATUALIZAÇÃO AQUI: Alerta abaixo do botão ---
+            st.warning("⚠️ **Importante:** Confira todas as opções acima (Variável, Local e Data) antes de gerar a análise.")
+            # ------------------------------------------------
         
         return opcao
 
@@ -186,9 +180,32 @@ def renderizar_pagina_principal(opcao):
         st.markdown("Configure sua análise no **Painel de Controle**.")
 
 def renderizar_resumo_selecao():
-    with st.expander("Resumo dos Filtros", expanded=False):
+    # --- ATUALIZAÇÃO AQUI: expanded=True para listar as opções ---
+    with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
         st.write(f"**Variável:** {st.session_state.variavel}")
-        st.write(f"**Local:** {st.session_state.tipo_localizacao}")
+        
+        tipo = st.session_state.tipo_localizacao
+        st.write(f"**Tipo de Localização:** {tipo}")
+        
+        if tipo == "Estado":
+            st.write(f"**Estado:** {st.session_state.estado}")
+        elif tipo == "Município":
+            st.write(f"**Município:** {st.session_state.municipio} ({st.session_state.estado})")
+        elif tipo == "Círculo (Lat/Lon/Raio)":
+            st.write(f"**Centro:** {st.session_state.latitude}, {st.session_state.longitude}")
+            st.write(f"**Raio:** {st.session_state.raio} km")
+        elif tipo == "Polígono":
+             st.write("**Área:** Polígono desenhado manualmente")
+             
+        periodo = st.session_state.tipo_periodo
+        st.write(f"**Período ({periodo}):**")
+        if periodo == "Personalizado":
+            st.write(f"De {st.session_state.data_inicio.strftime('%d/%m/%Y')} até {st.session_state.data_fim.strftime('%d/%m/%Y')}")
+        elif periodo == "Mensal":
+             st.write(f"{st.session_state.mes_mensal} de {st.session_state.ano_mensal}")
+        elif periodo == "Anual":
+             st.write(f"Ano de {st.session_state.ano_anual}")
+    # -------------------------------------------------------------
 
 def renderizar_pagina_sobre():
     st.title("Sobre o Clima-Cast-Crepaldi")
