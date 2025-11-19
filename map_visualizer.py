@@ -95,9 +95,10 @@ def create_interactive_map(ee_image: ee.Image,
 # COLORBAR PARA MAPAS INTERATIVOS
 # ==================================================================================
 
-def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str, variable_label: str = ""):
+def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     """
-    Adiciona legenda discreta com valores inteiros e rótulos corretos.
+    (v47) Adiciona legenda discreta. Verifica se existe um 'caption' específico
+    nos parâmetros visuais antes de tentar adivinhar pelo nome da unidade.
     """
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
@@ -109,8 +110,9 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     N_STEPS = len(palette) 
     step = round((vmax - vmin) / N_STEPS + 1)
     
-    if step == 0: step = 1
-    
+    # Evitar divisão por zero ou step 0
+    if step < 1: step = 1
+
     index = np.arange(vmin, vmax + step, step, dtype=int)
 
     colormap = StepColormap(
@@ -122,23 +124,27 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
   
     colormap.fmt = '%.0f' 
 
-    ul = (unit_label or "").lower()
-    vl = (variable_label or "").lower()
-
-    if "orvalho" in vl:
-        label = "Ponto de Orvalho (°C)"
-    elif "radiação" in vl or "w/m" in ul:
-        label = "Radiação (W/m²)"
-    elif "umidade" in vl or "%" in ul:
-        label = "Umidade Relativa (%)"
-    elif "vento" in vl or "m/s" in ul:
-        label = "Vento (m/s)"
-    elif "precipitação" in vl or "mm" in ul:
-        label = "Precipitação (mm)"
-    elif "temperatura" in vl or "°" in ul:
-        label = "Temperatura (°C)"
+    # --- LÓGICA DE LEGENDA MELHORADA ---
+    # 1. Tenta pegar o nome específico definido no gee_handler (ex: "Ponto de Orvalho")
+    custom_caption = vis_params.get("caption")
+    
+    if custom_caption:
+        label = custom_caption
     else:
-        label = str(variable_label) if variable_label else str(unit_label)
+        # 2. Se não houver, tenta adivinhar pela unidade (Lógica original)
+        ul = (unit_label or "").lower()
+        if "°" in unit_label or "temp" in ul:
+            label = "Temperatura (°C)"
+        elif "mm" in ul:
+            label = "Precipitação (mm)"
+        elif "m/s" in ul or "vento" in ul:
+            label = "Vento (m/s)"
+        elif "%" in ul: 
+            label = "Umidade Relativa (%)"
+        elif "w/m" in ul:
+            label = "Radiação (W/m²)"
+        else:
+            label = str(unit_label) if unit_label else ""
 
     colormap.caption = label
     
@@ -310,3 +316,4 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         return final_buffer.getvalue()
     except Exception:
         return None
+
