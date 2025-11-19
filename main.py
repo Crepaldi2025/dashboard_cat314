@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v64 - Títulos Restaurados)
+# main.py — Clima-Cast-Crepaldi (Corrigido v65 - NameError Fix)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -135,25 +135,37 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # --- CORREÇÃO: Restauração da Geração de Títulos ---
-    variavel = st.session_state.variavel
-    tipo_periodo = st.session_state.tipo_periodo
-    tipo_local = st.session_state.tipo_localizacao.lower()
+    # --- CORREÇÃO DE VARIÁVEIS E TÍTULOS ---
+    variavel = st.session_state.get('variavel', '')
+    tipo_periodo = st.session_state.get('tipo_periodo', '')
+    tipo_local = st.session_state.get('tipo_localizacao', '').lower()
     
+    # Inicialização segura para evitar NameError
+    periodo_str = ""
+    local_str = ""
+    
+    # Define String de Período
     if tipo_periodo == "Personalizado":
-        start_str = st.session_state.data_inicio.strftime('%d/%m/%Y')
-        end_str = st.session_state.data_fim.strftime('%d/%m/%Y')
-        periodo_str = f"de {start_str} a {end_str}"
+        inicio = st.session_state.get('data_inicio')
+        fim = st.session_state.get('data_fim')
+        if inicio and fim:
+            periodo_str = f"de {inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
     elif tipo_periodo == "Mensal":
-        periodo_str = f"mensal ({st.session_state.mes_mensal} de {st.session_state.ano_mensal})"
+        mes = st.session_state.get('mes_mensal', '')
+        ano = st.session_state.get('ano_mensal', '')
+        periodo_str = f"mensal ({mes} de {ano})"
     elif tipo_periodo == "Anual":
-        periodo_str = f"anual ({st.session_state.ano_anual})"
+        ano = st.session_state.get('ano_anual', '')
+        periodo_str = f"anual ({ano})"
     
+    # Define String de Local
     if tipo_local == "estado":
-        val = st.session_state.estado.split(' - ')[0] if st.session_state.estado else ""
+        estado_raw = st.session_state.get('estado', '')
+        val = estado_raw.split(' - ')[0] if estado_raw else ""
         local_str = f"no {tipo_local} de {val}"
     elif tipo_local == "município":
-        local_str = f"no {tipo_local} de {st.session_state.municipio}"
+        mun = st.session_state.get('municipio', '')
+        local_str = f"no {tipo_local} de {mun}"
     elif tipo_local == "polígono":
         local_str = "para a área desenhada"
     else: 
@@ -217,7 +229,6 @@ def render_analysis_results():
             st.markdown("### Exportar Mapas")
             
             try:
-                # Uso da variável titulo_mapa (que agora existe!)
                 title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
                 map_png_bytes = base64.b64decode(png_url.split(",")[1])
                 map_jpg_bytes = base64.b64decode(jpg_url.split(",")[1])
@@ -286,7 +297,7 @@ def render_analysis_results():
                         label="Exportar XLSX (Dados)", 
                         data=excel_data, 
                         file_name="dados_mapa.xlsx", 
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True
                     )
             except Exception as e:
@@ -294,7 +305,6 @@ def render_analysis_results():
 
     elif aba == "Séries Temporais":
         st.markdown("---")
-        # Uso da variável titulo_serie (que agora existe!)
         st.subheader(titulo_serie)
         
         if "time_series_df" not in results:
