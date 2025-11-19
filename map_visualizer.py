@@ -1,13 +1,5 @@
 # ==================================================================================
-# map_visualizer.py
-# 
-# Módulo: Clima-Cast-Crepaldi
-# Autor: Paulo C. Crepaldi
-#
-# Descrição:
-# (v59) - CORREÇÃO DEFINITIVA DO ERRO "Invalid type" no Image.paint.
-#       - Aplicada conversão para FeatureCollection tanto no mapa INTERATIVO
-#         quanto no ESTÁTICO.
+# map_visualizer.py (Atualizado para Ponto de Orvalho)
 # ==================================================================================
 
 import streamlit as st
@@ -26,22 +18,8 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 
-# ==================================================================================
-# MAPA INTERATIVO (Resultado da Análise)
-# ==================================================================================
-
-def create_interactive_map(ee_image: ee.Image, 
-                           feature: ee.Feature, 
-                           vis_params: dict, 
-                           unit_label: str = "",
-                           variable_label: str = ""):
-    """
-    Cria e exibe um mapa interativo que se centraliza e 
-    dá zoom automaticamente na área de interesse.
-    """
-    
+def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
-        # Tenta obter os limites para centralizar o mapa
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -51,100 +29,45 @@ def create_interactive_map(ee_image: ee.Image,
     except Exception:
         bounds = None
 
-    # Cria o mapa base
     mapa = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="HYBRID")
-    
-    # Adiciona a camada de dados climáticos
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
+    mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
     
-    # --- CORREÇÃO AQUI (Interativo) ---
-    # Envolvemos a feature em ee.FeatureCollection([]) para satisfazer o requisito do .paint()
-    outline_image = ee.Image().paint(ee.FeatureCollection([feature]), 0, 2)
-    mapa.addLayer(outline_image, {"palette": "black"}, "Contorno da Área")
-    
-    # Adiciona a legenda (colorbar) ajustada
-    _add_colorbar_bottomleft(mapa, vis_params, unit_label, variable_label)
+    _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
-    # Ajusta o zoom
     if bounds:
         mapa.fit_bounds(bounds)
     
-    map_html = mapa.to_streamlit(height=500, width=None, use_container_width=True, return_html=True)
-    
-    # Gera estáticos para download
-    png_url, jpg_url, colorbar_img = create_static_map(ee_image, feature, vis_params, unit_label)
-    
-    download_data = {}
-    if png_url:
-        download_data['png'] = {
-            'data': base64.b64decode(png_url.split(",")[1]),
-            'filename': 'mapa_analise.png',
-            'mime': 'image/png'
-        }
-        download_data['jpeg'] = {
-             'data': base64.b64decode(jpg_url.split(",")[1]),
-             'filename': 'mapa_analise.jpg',
-             'mime': 'image/jpeg'
-        }
-        download_data['tiff'] = {'data': b'', 'filename': 'mapa.tif', 'mime': 'image/tiff'}
-
-    return map_html, f"Mapa de {variable_label}", download_data
-
-
-# ==================================================================================
-# COLORBAR PARA MAPAS INTERATIVOS
-# ==================================================================================
+    mapa.to_streamlit(height=500, use_container_width=True)
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
-    """
-    (v47) Adiciona legenda discreta. Verifica se existe um 'caption' específico
-    nos parâmetros visuais antes de tentar adivinhar pelo nome da unidade.
-    """
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
     
-    if not palette or len(palette) == 0:
-        return 
+    if not palette or len(palette) == 0: return 
 
     N_STEPS = len(palette) 
     step = round((vmax - vmin) / N_STEPS + 1)
-    
-    # Evitar divisão por zero ou step 0
-    if step < 1: step = 1
-
     index = np.arange(vmin, vmax + step, step, dtype=int)
 
-    colormap = StepColormap(
-        colors=palette, 
-        index=index, 
-        vmin=vmin, 
-        vmax=vmax
-    )
-  
-    colormap.fmt = '%.0f' 
+    colormap = StepColormap(colors=palette, index=index, vmin=vmin, vmax=vmax)
+    colormap.fmt = '%.0f'
 
-    # --- LÓGICA DE LEGENDA MELHORADA ---
-    # 1. Tenta pegar o nome específico definido no gee_handler (ex: "Ponto de Orvalho")
+    # --- LÓGICA DE LEGENDA ATUALIZADA ---
+    # Se tiver 'caption' no vis_params (definido no gee_handler), usa ele.
     custom_caption = vis_params.get("caption")
     
     if custom_caption:
         label = custom_caption
     else:
-        # 2. Se não houver, tenta adivinhar pela unidade (Lógica original)
         ul = (unit_label or "").lower()
-        if "°" in unit_label or "temp" in ul:
-            label = "Temperatura (°C)"
-        elif "mm" in ul:
-            label = "Precipitação (mm)"
-        elif "m/s" in ul or "vento" in ul:
-            label = "Vento (m/s)"
-        elif "%" in ul: 
-            label = "Umidade Relativa (%)"
-        elif "w/m" in ul:
-            label = "Radiação (W/m²)"
-        else:
-            label = str(unit_label) if unit_label else ""
+        if "°" in unit_label or "temp" in ul: label = "Temperatura (°C)"
+        elif "mm" in ul: label = "Precipitação (mm)"
+        elif "m/s" in ul or "vento" in ul: label = "Vento (m/s)"
+        elif "%" in ul: label = "Umidade Relativa (%)"
+        elif "w/m" in ul: label = "Radiação (W/m²)"
+        else: label = str(unit_label) if unit_label else ""
 
     colormap.caption = label
     
@@ -162,101 +85,19 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     macro._template = template
     mapa.get_root().add_child(macro)
 
-
-# ==================================================================================
-# MAPA ESTÁTICO — GERAÇÃO DE IMAGENS
-# ==================================================================================
-
-def create_static_map(ee_image: ee.Image, 
-                      feature: ee.Feature, 
-                      vis_params: dict, 
-                      unit_label: str = "") -> tuple[str, str, str]:
-    """
-    Gera o mapa estático (PNG/JPG) e a legenda (colorbar) discreta.
-    """
-    try:
-        visualized_data = ee_image.visualize(
-            min=vis_params["min"],
-            max=vis_params["max"],
-            palette=vis_params["palette"]
-        )
-        
-        # --- CORREÇÃO AQUI (Estático) ---
-        # Convertemos a Feature única para FeatureCollection antes de passar para paint()
-        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
-        
-        visualized_outline = outline.visualize(palette='000000')
-        final_image_with_outline = visualized_data.blend(visualized_outline)
-
-        try:
-            bounds_geojson = feature.geometry().bounds().getInfo()
-            coords = bounds_geojson['coordinates'][0]
-            min_lon, min_lat = coords[0]
-            max_lon, max_lat = coords[2]
-            delta_lon = abs(max_lon - min_lon)
-            delta_lat = abs(max_lat - min_lat)
-            approx_dim_in_metres = max(delta_lon, delta_lat) * 111000 
-            buffer_metres = approx_dim_in_metres * 0.05 
-            buffered_geometry = feature.geometry().buffer(buffer_metres)
-            region = buffered_geometry
-        except Exception:
-            region = feature.geometry() 
-
-        url = final_image_with_outline.getThumbURL({
-            "region": region,
-            "dimensions": 800,
-            "format": "png" 
-        })
-
-        img_bytes = requests.get(url).content
-        
-        img_png = Image.open(io.BytesIO(img_bytes))
-        img_com_fundo_branco = Image.new("RGBA", img_png.size, "WHITE")
-        img_com_fundo_branco.paste(img_png, (0, 0), img_png)
-        
-        img_rgb_final = img_com_fundo_branco.convert('RGB')
-        jpg_buffer = io.BytesIO()
-        img_rgb_final.save(jpg_buffer, format="JPEG")
-        jpg_b64 = base64.b64encode(jpg_buffer.getvalue()).decode("ascii")
-        jpg_url = f"data:image/jpeg;base64,{jpg_b64}"
-
-        b64_png = base64.b64encode(img_bytes).decode("ascii")
-        png_url = f"data:image/png;base64,{b64_png}"
-        
-        palette = vis_params.get("palette", ["#FFFFFF", "#000000"])
-        vmin = vis_params.get("min", 0)
-        vmax = vis_params.get("max", 1)
-        
-        colorbar_img = _make_compact_colorbar(palette, vmin, vmax, unit_label)
-
-        return png_url, jpg_url, colorbar_img
-
-    except Exception as e:
-        st.error(f"Erro ao gerar mapa estático: {e}")
-        return None, None, None
-
-# ==================================================================================
-# COLORBAR COMPACTA E UTILITÁRIOS
-# ==================================================================================
-
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
-    
     try:
         N_STEPS = len(palette)
         boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
-    except Exception as e:
+    except Exception:
         plt.close(fig)
         return None
 
-    cb = ColorbarBase(
-        ax, cmap=cmap, norm=norm, boundaries=boundaries, ticks=boundaries,
-        spacing='proportional', orientation="horizontal"
-    )
-        
+    cb = ColorbarBase(ax, cmap=cmap, norm=norm, boundaries=boundaries, ticks=boundaries, spacing='proportional', orientation="horizontal")
     cb.set_label(label, fontsize=7)
     cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
@@ -265,9 +106,40 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
     plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
     plt.close(fig)
     buf.seek(0)
-    
-    b64 = base64.b64encode(buf.read()).decode("ascii")
-    return f"data:image/png;base64,{b64}"
+    return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
+
+def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
+    try:
+        visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
+        outline = ee.Image().paint(featureCollection=feature, color=0, width=2)
+        final = visualized_data.blend(outline.visualize(palette='000000'))
+
+        try:
+            b = feature.geometry().bounds().getInfo()['coordinates'][0]
+            dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
+            region = feature.geometry().buffer(dim * 0.05)
+        except: region = feature.geometry()
+
+        url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
+        img_bytes = requests.get(url).content
+        
+        img = Image.open(io.BytesIO(img_bytes))
+        bg = Image.new("RGBA", img.size, "WHITE")
+        bg.paste(img, (0, 0), img)
+        
+        buf = io.BytesIO()
+        bg.convert('RGB').save(buf, format="JPEG")
+        jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
+        png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
+        
+        # Verifica se tem caption customizado (mesma logica do interativo)
+        lbl = vis_params.get("caption", unit_label)
+        cbar = _make_compact_colorbar(vis_params.get("palette", ["#FFF", "#000"]), vis_params.get("min", 0), vis_params.get("max", 1), lbl)
+
+        return png, jpg, cbar
+    except Exception as e:
+        st.error(f"Erro estático: {e}")
+        return None, None, None
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
     try:
@@ -281,39 +153,25 @@ def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
         plt.close(fig)
         buf.seek(0)
         return buf.getvalue()
-    except Exception:
-        return None
+    except: return None
 
 def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
     try:
-        title_img = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
-        map_img = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
-        colorbar_img = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
-
-        width = map_img.width
+        t = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
+        m = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
+        c = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
         
-        def resize_to_width(img, target_width):
-            if img.width == target_width: return img
-            ratio = target_width / img.width
-            target_height = int(img.height * ratio)
-            return img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        w = m.width
+        def rz(im, tw): return im if im.width == tw else im.resize((tw, int(im.height * (tw/im.width))), Image.Resampling.LANCZOS)
+        t = rz(t, w)
+        c = rz(c, w)
 
-        title_img = resize_to_width(title_img, width)
-        colorbar_img = resize_to_width(colorbar_img, width)
-
-        total_height = title_img.height + map_img.height + colorbar_img.height
-        final_img_rgba = Image.new('RGBA', (width, total_height), (255, 255, 255, 255))
-
-        final_img_rgba.paste(title_img, (0, 0), title_img)
-        final_img_rgba.paste(map_img, (0, title_img.height), map_img)
-        final_img_rgba.paste(colorbar_img, (0, title_img.height + map_img.height), colorbar_img)
+        final = Image.new('RGBA', (w, t.height + m.height + c.height), (255, 255, 255, 255))
+        final.paste(t, (0, 0), t)
+        final.paste(m, (0, t.height), m)
+        final.paste(c, (0, t.height + m.height), c)
         
-        final_buffer = io.BytesIO()
-        if format.upper() == 'JPEG':
-            final_img_rgba.convert('RGB').save(final_buffer, format='JPEG', quality=95)
-        else:
-            final_img_rgba.save(final_buffer, format='PNG')
-        return final_buffer.getvalue()
-    except Exception:
-        return None
-
+        buf = io.BytesIO()
+        final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
+        return buf.getvalue()
+    except: return None
