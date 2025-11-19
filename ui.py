@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Atualizado v56 - Ajuda Círculo Detalhada)
+# ui.py (Atualizado v57 - Texto Informativo Melhorado)
 # ==================================================================================
 
 import streamlit as st
@@ -89,7 +89,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Longitude", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
-                # --- ATUALIZAÇÃO AQUI: Ajuda Detalhada ---
                 with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
                     st.markdown("""
                     **Como preencher as coordenadas:**
@@ -102,7 +101,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     
                     💡 **Dica:** Abra o Google Maps, clique com o botão direito no local desejado e copie os números que aparecem no topo (ex: `-22.42, -45.46`).
                     """)
-                # -----------------------------------------
             
             elif tipo_loc == "Polígono":
                 if st.session_state.get('drawn_geometry'): 
@@ -203,7 +201,8 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
-        st.markdown("Configure sua análise no **Painel de Controle**.")
+        # --- ATUALIZAÇÃO AQUI: Texto mais claro ---
+        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 def renderizar_resumo_selecao():
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
