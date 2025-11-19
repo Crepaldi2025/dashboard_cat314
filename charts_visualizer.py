@@ -1,5 +1,5 @@
 # ==================================================================================
-# charts_visualizer.py — Visualização de Gráficos e Tabelas
+# charts_visualizer.py — Visualização de Gráficos e Estatísticas (Restaurado v58)
 # ==================================================================================
 import streamlit as st
 import pandas as pd
@@ -58,14 +58,14 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
 
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     """
-    Exibe um gráfico de série temporal interativo e uma explicação de seus controles.
+    Exibe um gráfico de série temporal interativo, estatísticas detalhadas e exportação.
     """
     
     # CSS para ajustar tamanho da fonte das métricas
     st.markdown("""
     <style>
     div[data-testid="stMetricValue"] {
-        font-size: 1.2rem; 
+        font-size: 1.1rem; 
     }
     </style>
     """, unsafe_allow_html=True)
@@ -113,12 +113,37 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         st.error(f"Erro ao gerar o gráfico Plotly: {e}")
         return
 
-    # Estatísticas
+    # ==========================================================
+    # ESTATÍSTICAS DETALHADAS (Restaurado com Tooltips)
+    # ==========================================================
     st.markdown("#### Estatísticas do Período")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Média", f"{df_clean['value'].mean():.1f} {unit}")
-    col2.metric("Máxima", f"{df_clean['value'].max():.1f} {unit}")
-    col3.metric("Mínima", f"{df_clean['value'].min():.1f} {unit}")
+    
+    # Cálculos
+    media = df_clean['value'].mean()
+    maximo = df_clean['value'].max()
+    minimo = df_clean['value'].min()
+    amplitude = maximo - minimo
+    desvio_padrao = df_clean['value'].std()
+
+    # Layout de 5 colunas
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    col1.metric("Média", f"{media:.1f} {unit}")
+    col2.metric("Máxima", f"{maximo:.1f} {unit}")
+    col3.metric("Mínima", f"{minimo:.1f} {unit}")
+    
+    # Métricas com explicação (Tooltip)
+    col4.metric(
+        "Amplitude", 
+        f"{amplitude:.1f} {unit}",
+        help="Diferença entre o valor máximo e o mínimo registrados no período. Indica a magnitude total da variação."
+    )
+    
+    col5.metric(
+        "Desvio Padrão", 
+        f"{desvio_padrao:.1f}",
+        help="Medida estatística de dispersão. Quanto maior o desvio padrão, mais os valores variam em relação à média (dados mais instáveis)."
+    )
 
     # Dica de Uso
     st.info(
