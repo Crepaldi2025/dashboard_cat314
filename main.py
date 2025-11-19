@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Padronizado v62)
+# main.py — Clima-Cast-Crepaldi (Corrigido v63 - Estável)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -252,7 +252,8 @@ def render_analysis_results():
 
             except Exception as e:
                 st.error(f"Erro na exportação: {e}")
-                st.download_button("📷 Baixar Mapa (Somente Imagem)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
+                if png_url:
+                    st.download_button("📷 Baixar Mapa (Somente Imagem)", data=base64.b64decode(png_url.split(",")[1]), file_name="mapa.png", mime="image/png", use_container_width=True)
 
         st.markdown("---") 
         st.subheader("Tabela de Dados") 
@@ -286,7 +287,7 @@ def render_analysis_results():
                         label="Exportar XLSX (Dados)", 
                         data=excel_data, 
                         file_name="dados_mapa.xlsx", 
-                        application_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", # CORREÇÃO AQUI
                         use_container_width=True
                     )
             except Exception as e:
