@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Corrigido v65 - NameError Fix)
+# main.py — Clima-Cast-Crepaldi (Corrigido v66 - Função main restaurada)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -135,12 +135,11 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # --- CORREÇÃO DE VARIÁVEIS E TÍTULOS ---
+    # --- INICIALIZAÇÃO SEGURA DE VARIÁVEIS ---
     variavel = st.session_state.get('variavel', '')
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     tipo_local = st.session_state.get('tipo_localizacao', '').lower()
     
-    # Inicialização segura para evitar NameError
     periodo_str = ""
     local_str = ""
     
@@ -346,6 +345,37 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
+
+# ==================================================================================
+# MAIN EXECUTION - AQUI ESTÁ A FUNÇÃO QUE FALTAVA!
+# ==================================================================================
+def main():
+    if 'gee_initialized' not in st.session_state:
+        gee_handler.inicializar_gee()
+        st.session_state.gee_initialized = True
+
+    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
+    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
+
+    if opcao_menu == "Sobre o Aplicativo":
+        ui.renderizar_pagina_sobre()
+        return
+
+    ui.renderizar_pagina_principal(opcao_menu)
+    
+    is_polygon = (opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono")
+    is_running = st.session_state.get("analysis_triggered", False)
+    has_geom = 'drawn_geometry' in st.session_state
+    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
+
+    if is_polygon and not is_running and not has_geom and not has_res:
+        render_polygon_drawer()
+
+    if is_running:
+        st.session_state.analysis_triggered = False 
+        run_full_analysis() 
+
+    render_analysis_results()
 
 if __name__ == "__main__":
     main()
