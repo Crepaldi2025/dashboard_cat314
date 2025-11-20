@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Versão v70 - Explicações Detalhadas Restauradas)
+# ui.py (Versão v72 - Correção da Bandeira no Windows/Edge)
 # ==================================================================================
 
 import streamlit as st
@@ -51,7 +51,7 @@ def reset_analysis_results_only():
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
         # --- 1. TÍTULO ---
-        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast-Crepaldi</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast</h2>", unsafe_allow_html=True)
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
@@ -128,7 +128,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
-                # --- RESTAURADO: Ajuda detalhada do Círculo ---
                 with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
                     st.markdown("""
                     **Como preencher as coordenadas:**
@@ -146,7 +145,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if st.session_state.get('drawn_geometry'): 
                     st.success("✅ Polígono Definido", icon="🛡️")
                 else: 
-                    # --- RESTAURADO: Aviso visual claro ---
                     st.markdown("""
                     <div style="background-color: #e0f7fa; padding: 10px; border-radius: 5px; border-left: 5px solid #00acc1; font-size: 0.85em;">
                         <b style="color: #006064;">👉 Desenhe no Mapa Principal</b><br>
@@ -154,7 +152,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     </div>
                     """, unsafe_allow_html=True)
 
-                # --- RESTAURADO: Guia detalhado das ferramentas ---
                 with st.popover("ℹ️ Guia de Ferramentas"): 
                     st.markdown("""
                     **Função de cada ícone no mapa:**
@@ -252,7 +249,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("---")
             st.markdown(
                 """
-                <div style='text-align: center; color: black; font-size: 14px;'>
+                <div style='text-align: center; color: grey; font-size: 12px;'>
                 Desenvolvido por <b>Paulo C. Crepaldi</b><br>
                 v1.0.0 | 2025
                 </div>
@@ -262,7 +259,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 def renderizar_pagina_principal(opcao):
-    # CSS Refinado
     st.markdown("""
         <style>
             .block-container { padding-top: 3rem !important; padding-bottom: 5rem !important; }
@@ -283,6 +279,7 @@ def renderizar_pagina_principal(opcao):
             else: st.write("🌐")
         with tc: st.title(f"{opcao}")
     with c2:
+        # --- CORREÇÃO AQUI: Substituímos emoji 🇧🇷 por <img> ---
         st.markdown(
             f"""
             <div style='
@@ -293,7 +290,8 @@ def renderizar_pagina_principal(opcao):
                 background-color:rgba(255,255,255,0.7);
                 font-size: 0.9rem;
             '>
-                <b>🇧🇷 BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br>
+                <img src="https://flagcdn.com/24x18/br.png" style="vertical-align: middle; margin-bottom: 2px;"> 
+                <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br>
                 <span style='color:#666; font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span>
             </div>
             """, 
@@ -303,7 +301,7 @@ def renderizar_pagina_principal(opcao):
     st.markdown("---")
     
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
-        st.info("👈 **Comece aqui:** Configure sua análise no painel lateral e clique em **'🚀 Gerar Análise'**.")
+        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 def renderizar_resumo_selecao():
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
@@ -345,5 +343,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
-
