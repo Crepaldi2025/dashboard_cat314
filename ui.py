@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Atualizado v76 - Interface com Opção Horária e Novas Variáveis)
+# ui.py (Versão v74 - Correção do Seletor de Estado)
 # ==================================================================================
 
 import streamlit as st
@@ -15,10 +15,18 @@ import tempfile
 import pytz
 import re
 
-st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide", initial_sidebar_state="expanded", page_icon="🌦️")
+# Configuração da Página
+st.set_page_config(
+    page_title="Clima-Cast-Crepaldi",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    page_icon="🌦️"
+)
 
-try: locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
-except: pass 
+try:
+    locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
+except:
+    pass 
 
 NOMES_MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
                   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
@@ -42,33 +50,50 @@ def reset_analysis_results_only():
     
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
+        # --- 1. TÍTULO ---
         st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast</h2>", unsafe_allow_html=True)
         st.markdown("---")
 
-        st.radio("Modo de Visualização", ["Mapas", "Séries Temporais", "Sobre o Aplicativo"], label_visibility="collapsed", key='nav_option', on_change=reset_analysis_state)
+        # --- 2. NAVEGAÇÃO PRINCIPAL ---
+        st.radio(
+            "Modo de Visualização",
+            ["Mapas", "Séries Temporais", "Sobre o Aplicativo"],
+            label_visibility="collapsed", 
+            key='nav_option',
+            on_change=reset_analysis_state
+        )
+        
         opcao = st.session_state.get('nav_option', 'Mapas')
 
         if opcao in ["Mapas", "Séries Temporais"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
+            # --- 3. BASE DE DADOS ---
             st.markdown("#### 🛰️ Base de Dados", help="Reanálise climática global de alta resolução (ECMWF).")
-            st.selectbox("Selecione a Base de Dados", ["ERA5-LAND"], key='base_de_dados', on_change=reset_analysis_state, label_visibility="collapsed")
+            st.selectbox(
+                "Selecione a Base de Dados", 
+                ["ERA5-LAND"], 
+                key='base_de_dados', 
+                on_change=reset_analysis_state,
+                label_visibility="collapsed"
+            )
 
             st.divider()
 
+            # --- 4. VARIÁVEL ---
             st.markdown("#### 🌡️ Variável Meteorológica")
             st.selectbox(
                 "Selecione a Variável", 
                 [
                     "Temperatura do Ar (2m)", 
                     "Temperatura do Ponto de Orvalho (2m)",
-                    "Temperatura da Superfície (Skin)",  # NOVO
+                    "Temperatura da Superfície (Skin)",
                     "Precipitação Total", 
                     "Umidade Relativa (2m)", 
-                    "Umidade do Solo (0-7 cm)",    # NOVO
-                    "Umidade do Solo (7-28 cm)",   # NOVO
-                    "Umidade do Solo (28-100 cm)", # NOVO
-                    "Umidade do Solo (100-289 cm)", # NOVO
+                    "Umidade do Solo (0-7 cm)",
+                    "Umidade do Solo (7-28 cm)",
+                    "Umidade do Solo (28-100 cm)",
+                    "Umidade do Solo (100-289 cm)",
                     "Velocidade do Vento (10m)", 
                     "Radiação Solar Incidente"
                 ], 
@@ -79,38 +104,85 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             st.divider()
 
+            # --- 5. LOCALIZAÇÃO ---
             st.markdown("#### 📍 Localização")
-            st.selectbox("Tipo de Recorte", ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], key='tipo_localizacao', on_change=reset_analysis_state) 
+            st.selectbox(
+                "Tipo de Recorte", 
+                ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], 
+                key='tipo_localizacao', 
+                on_change=reset_analysis_state
+            ) 
             
             tipo_loc = st.session_state.get('tipo_localizacao', 'Estado')
+            
+            # Prepara a lista de UFs (Estado - UF)
             lista_ufs = ["Selecione..."] + [f"{mapa_nomes_uf[uf]} - {uf}" for uf in sorted(mapa_nomes_uf)]
-
-            if tipo_loc == "Estado":
+            
+            # CORREÇÃO: Unificação do seletor de Estado para evitar conflito de chaves
+            if tipo_loc in ["Estado", "Município"]:
+                # Verifica se a lista carregou corretamente
+                if len(lista_ufs) <= 1:
+                    st.error("⚠️ Erro: Lista de estados vazia. Verifique 'municipios_ibge.json'.")
+                
                 st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
-            elif tipo_loc == "Município":
-                st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
+            
+            # Seletor de Município (aparece apenas se o tipo for Município)
+            if tipo_loc == "Município":
                 estado_str = st.session_state.get('estado', 'Selecione...')
-                lista_muns = ["Selecione..."] + dados_geo.get(estado_str.split(' - ')[-1], []) if estado_str != "Selecione..." else ["Selecione um estado primeiro"]
+                
+                lista_muns = ["Selecione um estado primeiro"]
+                if estado_str != "Selecione...":
+                     uf_sigla = estado_str.split(' - ')[-1]
+                     muns = dados_geo.get(uf_sigla, [])
+                     if muns:
+                        lista_muns = ["Selecione..."] + muns
+                
                 st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
+            
             elif tipo_loc == "Círculo (Lat/Lon/Raio)":
                 c1, c2 = st.columns(2)
                 with c1: st.number_input("Lat", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
                 with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
-                with st.popover("ℹ️ Ajuda: Círculo"): st.markdown("Insira Lat/Lon (decimais) e Raio.")
+                
+                with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
+                    st.markdown("""
+                    **Como preencher as coordenadas:**
+                    * **Latitude:** Graus decimais (ex: -22.42).
+                    * **Longitude:** Graus decimais (ex: -45.46).
+                    * **Raio (km):** Distância do centro até a borda.
+                    """)
+            
             elif tipo_loc == "Polígono":
-                if st.session_state.get('drawn_geometry'): st.success("✅ Polígono Definido", icon="🛡️")
-                else: st.markdown("<div style='background-color:#e0f7fa;padding:8px;border-radius:5px;color:#006064;font-size:0.85em;'><b>👉 Desenhe no Mapa Principal</b></div>", unsafe_allow_html=True)
-                with st.popover("ℹ️ Guia Ferramentas"): st.markdown("Use as ferramentas do mapa.")
+                if st.session_state.get('drawn_geometry'): 
+                    st.success("✅ Polígono Definido", icon="🛡️")
+                else: 
+                    st.markdown("""
+                    <div style="background-color: #e0f7fa; padding: 10px; border-radius: 5px; border-left: 5px solid #00acc1; font-size: 0.85em;">
+                        <b style="color: #006064;">👉 Desenhe no Mapa Principal</b><br>
+                        Utilize as ferramentas na lateral esquerda do mapa para desenhar.
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with st.popover("ℹ️ Guia de Ferramentas"): 
+                    st.markdown("""
+                    **Ferramentas:**
+                    ⬟ **Polígono:** Áreas livres.
+                    ⬛ **Retângulo:** Áreas quadradas.
+                    📝 **Editar:** Ajustar pontos.
+                    🗑️ **Lixeira:** Apagar.
+                    """)
             
             st.divider()
 
+            # --- 6. PERÍODO ---
             st.markdown("#### 📅 Recorte Temporal")
             
-            # Seletor de Tipo de Período (Adicionado Horário Específico)
+            # Seletor de Tipo de Período
             opcoes_periodo = ["Personalizado", "Mensal", "Anual"]
-            if opcao == "Mapas": opcoes_periodo.append("Horário Específico") # Só para mapas
+            if opcao == "Mapas": opcoes_periodo.append("Horário Específico")
             
+            # Só mostra o seletor se for Mapa, senão trava em Personalizado
             if opcao == "Mapas":
                 st.selectbox("Tipo de Período", opcoes_periodo, key='tipo_periodo', on_change=reset_analysis_state, label_visibility="collapsed")
             else:
@@ -119,54 +191,72 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             tipo_per = st.session_state.get('tipo_periodo', 'Personalizado')
             ano_atual = datetime.now().year
             lista_anos = list(range(ano_atual, 1949, -1))
+
             st.session_state.date_error = False
             
-            # Lógica dos Seletores de Data
             if tipo_per == "Personalizado":
                 hoje = datetime.now()
-                fim = hoje.replace(day=1) - relativedelta(days=1)
-                inicio = fim.replace(day=1)
+                fim_padrao = hoje.replace(day=1) - relativedelta(days=1)
+                inicio_padrao = fim_padrao.replace(day=1)
                 c1, c2 = st.columns(2)
-                with c1: st.date_input("Início", value=inicio, key='data_inicio', on_change=reset_analysis_state, format="DD/MM/YYYY")
-                with c2: st.date_input("Fim", value=fim, key='data_fim', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                with c1: st.date_input("Início", value=inicio_padrao, key='data_inicio', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                with c2: st.date_input("Fim", value=fim_padrao, key='data_fim', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                
                 if st.session_state.data_fim < st.session_state.data_inicio:
                     st.error("Data final anterior à inicial.")
                     st.session_state.date_error = True
+            
             elif tipo_per == "Mensal":
                 c1, c2 = st.columns(2)
                 with c1: st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
                 with c2: st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
+            
             elif tipo_per == "Anual":
                 st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
             
-            # --- NOVO: Lógica para Horário Específico ---
             elif tipo_per == "Horário Específico":
                 hoje = datetime.now()
-                data_padrao = hoje - relativedelta(days=2) # 2 dias atrás para garantir dados disponíveis
+                data_padrao = hoje - relativedelta(days=2)
                 st.date_input("Data", value=data_padrao, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
                 st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC (3 horas à frente de Brasília).")
-            # --------------------------------------------
             
             st.divider()
 
+            # --- 7. VISUALIZAÇÃO ---
             if opcao == "Mapas":
                 st.markdown("#### 🎨 Visualização")
                 st.radio("Formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_results_only, label_visibility="collapsed")
                 st.divider()
 
+            # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
 
-            st.button("🚀 Gerar Análise", type="primary", use_container_width=True, disabled=disable, on_click=lambda: st.session_state.update(analysis_triggered=True))
+            st.button(
+                "🚀 Gerar Análise", 
+                type="primary", 
+                use_container_width=True, 
+                disabled=disable,
+                on_click=lambda: st.session_state.update(analysis_triggered=True)
+            )
             
             if not disable:
                 st.markdown("<div style='font-size:14px;margin-top:8px;'>⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
+            # --- 9. FOOTER ---
             st.markdown("---")
-            st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v1.0.0 | 2025</div>", unsafe_allow_html=True)
+            st.markdown(
+                """
+                <div style='text-align: center; color: grey; font-size: 12px;'>
+                Desenvolvido por <b>Paulo C. Crepaldi</b><br>
+                v1.0.0 | 2025
+                </div>
+                """, unsafe_allow_html=True
+            )
+        
         return opcao
 
 def renderizar_pagina_principal(opcao):
@@ -204,7 +294,7 @@ def renderizar_resumo_selecao():
             if periodo == "Personalizado": per_txt = f"{st.session_state.data_inicio.strftime('%d/%m/%Y')} - {st.session_state.data_fim.strftime('%d/%m/%Y')}"
             elif periodo == "Mensal": per_txt = f"{st.session_state.mes_mensal}/{st.session_state.ano_mensal}"
             elif periodo == "Anual": per_txt = str(st.session_state.ano_anual)
-            elif periodo == "Horário Específico": # Atualização do resumo
+            elif periodo == "Horário Específico":
                  data = st.session_state.get('data_horaria')
                  hora = st.session_state.get('hora_especifica')
                  if data: per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
@@ -226,6 +316,6 @@ def renderizar_pagina_sobre():
         html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"', html)
         html += "</div>" 
         st.markdown(html, unsafe_allow_html=True)
-    except Exception as e: st.error(f"Erro: {e}")
+    except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
