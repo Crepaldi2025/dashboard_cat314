@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Versão Profissional v68)
+# ui.py (Versão v69 - Sem Logo na Sidebar)
 # ==================================================================================
 
 import streamlit as st
@@ -50,19 +50,15 @@ def reset_analysis_results_only():
     
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
-        # --- 1. BRANDING / LOGO ---
-        if os.path.exists("logo.png"):
-            st.image("logo.png", use_container_width=True)
-        else:
-            st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast</h2>", unsafe_allow_html=True)
-        
+        # --- 1. TÍTULO (Sem Imagem) ---
+        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast</h2>", unsafe_allow_html=True)
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
         st.radio(
             "Modo de Visualização",
             ["Mapas", "Séries Temporais", "Sobre o Aplicativo"],
-            label_visibility="collapsed", # Esconde o título para ficar mais limpo
+            label_visibility="collapsed", 
             key='nav_option',
             on_change=reset_analysis_state
         )
@@ -72,7 +68,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         if opcao in ["Mapas", "Séries Temporais"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
-            # --- 3. CONFIGURAÇÕES AVANÇADAS (Expander para limpar visual) ---
+            # --- 3. CONFIGURAÇÕES AVANÇADAS ---
             with st.expander("🔧 Fonte de Dados & Configurações"):
                 st.selectbox(
                     "Base de Dados", 
@@ -152,7 +148,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             # --- 6. PERÍODO ---
             st.markdown("#### 📅 Recorte Temporal")
             
-            # Só mostra seletor de tipo se for mapa, senão força personalizado
             if opcao == "Mapas": 
                 st.selectbox("Tipo de Período", ["Personalizado", "Mensal", "Anual"], key='tipo_periodo', on_change=reset_analysis_state, label_visibility="collapsed")
             else: 
@@ -186,7 +181,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             st.divider()
 
-            # --- 7. VISUALIZAÇÃO (Só Mapas) ---
+            # --- 7. VISUALIZAÇÃO ---
             if opcao == "Mapas":
                 st.markdown("#### 🎨 Visualização")
                 st.radio("Formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_results_only, label_visibility="collapsed")
@@ -265,7 +260,6 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     
-    # Mensagem de boas-vindas se nada foi gerado
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
         st.info("👈 **Comece aqui:** Configure sua análise no painel lateral e clique em **'🚀 Gerar Análise'**.")
 
@@ -303,9 +297,8 @@ def renderizar_pagina_sobre():
         try: pypandoc.get_pandoc_version()
         except: pypandoc.download_pandoc()
         html = pypandoc.convert_file(path, "html", format="docx", extra_args=["--embed-resources"])
-        # Estilização das imagens do DOCX
         html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"', html)
-        html += "</div>" # Fecha divs abertas
+        html += "</div>" 
         st.markdown(html, unsafe_allow_html=True)
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
