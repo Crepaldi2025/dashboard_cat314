@@ -230,9 +230,23 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
             
             if not disable:
-                st.caption("⚠️ **Atenção:** Confira os filtros antes de gerar.")
+                st.markdown(
+                    """
+                    <div style='font-size: 14px; color: #333; margin-top: 8px; line-height: 1.4;'>
+                    ⚠️ <b>Atenção:</b> Confira os filtros selecionados acima antes de gerar.
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
             else:
-                st.caption("⚠️ Preencha os campos obrigatórios para habilitar.")
+                st.markdown(
+                    """
+                    <div style='font-size: 14px; color: #d32f2f; margin-top: 8px; line-height: 1.4;'>
+                    ⚠️ <b>Obrigatório:</b> Preencha os campos de localização (desenho ou coordenadas) para habilitar o botão.
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
             
             # --- 9. FOOTER ---
             st.markdown("---")
@@ -331,4 +345,5 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
