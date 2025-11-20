@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Versão v72 - Correção da Bandeira no Windows/Edge)
+# ui.py (Versão v73 - Sidebar Refinada: Base de Dados)
 # ==================================================================================
 
 import streamlit as st
@@ -51,7 +51,7 @@ def reset_analysis_results_only():
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
         # --- 1. TÍTULO ---
-        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast-Crepaldi</h2>", unsafe_allow_html=True)
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
@@ -68,15 +68,16 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         if opcao in ["Mapas", "Séries Temporais"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
-            # --- 3. CONFIGURAÇÕES AVANÇADAS ---
-            with st.expander("🔧 Fonte de Dados & Configurações"):
-                st.selectbox(
-                    "Base de Dados", 
-                    ["ERA5-LAND"], 
-                    key='base_de_dados', 
-                    on_change=reset_analysis_state,
-                    help="Reanálise climática global de alta resolução."
-                )
+            # --- 3. BASE DE DADOS (Estilo Unificado) ---
+            # A interrogação (help) agora fica no título, igual aos outros campos
+            st.markdown("#### 🛰️ Base de Dados", help="Reanálise climática global de alta resolução (ECMWF).")
+            st.selectbox(
+                "Selecione a Base de Dados", 
+                ["ERA5-LAND"], 
+                key='base_de_dados', 
+                on_change=reset_analysis_state,
+                label_visibility="collapsed"
+            )
 
             # --- 4. VARIÁVEL ---
             st.markdown("#### 🌡️ Variável Meteorológica")
@@ -279,7 +280,6 @@ def renderizar_pagina_principal(opcao):
             else: st.write("🌐")
         with tc: st.title(f"{opcao}")
     with c2:
-        # --- CORREÇÃO AQUI: Substituímos emoji 🇧🇷 por <img> ---
         st.markdown(
             f"""
             <div style='
