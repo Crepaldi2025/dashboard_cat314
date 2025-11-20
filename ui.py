@@ -79,6 +79,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 label_visibility="collapsed"
             )
 
+            st.divider()
+            
             # --- 4. VARIÁVEL ---
             st.markdown("#### 🌡️ Variável Meteorológica")
             st.selectbox(
@@ -301,7 +303,7 @@ def renderizar_pagina_principal(opcao):
     st.markdown("---")
     
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
-        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
+        st.info("👈 Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 def renderizar_resumo_selecao():
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
@@ -343,3 +345,4 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
