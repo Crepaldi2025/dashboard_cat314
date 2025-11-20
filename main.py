@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (Atualizado v76 - Suporte Horário Completo)
+# main.py — Clima-Cast-Crepaldi (Corrigido v77 - Fix Erro de Data Vazia)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -15,6 +15,7 @@ import pandas as pd
 import folium
 from folium.plugins import Draw 
 from streamlit_folium import st_folium
+from datetime import timedelta # <--- NOVA IMPORTAÇÃO NECESSÁRIA
 
 # =================================================
 # Configuração da Imagem de Fundo
@@ -23,7 +24,19 @@ from streamlit_folium import st_folium
 def set_background():
     image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
     opacity = 0.7
-    page_bg_img = f"""<style>.stApp {{background-image: linear-gradient(rgba(255, 255, 255, {opacity}), rgba(255, 255, 255, {opacity})), url("{image_url}"); background-size: cover; background-position: center center; background-repeat: no-repeat; background-attachment: fixed;}}</style>"""
+    
+    page_bg_img = f"""
+    <style>
+    .stApp {{
+        background-image: linear-gradient(rgba(255, 255, 255, {opacity}), rgba(255, 255, 255, {opacity})), 
+                          url("{image_url}");
+        background-size: cover; 
+        background-position: center center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    </style>
+    """
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
 set_background()
@@ -34,10 +47,14 @@ set_background()
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
     key = f"loc_type:{loc_type}"
-    if loc_type == "Estado": key += f"|estado:{session_state.get('estado')}"
-    elif loc_type == "Município": key += f"|estado:{session_state.get('estado')}|municipio:{session_state.get('municipio')}"
-    elif loc_type == "Círculo (Lat/Lon/Raio)": key += f"|lat:{session_state.get('latitude')}|lon:{session_state.get('longitude')}|raio:{session_state.get('raio')}"
-    elif loc_type == "Polígono": key += f"|geojson:{hash(str(session_state.get('drawn_geometry')))}"
+    if loc_type == "Estado":
+        key += f"|estado:{session_state.get('estado')}"
+    elif loc_type == "Município":
+        key += f"|estado:{session_state.get('estado')}|municipio:{session_state.get('municipio')}"
+    elif loc_type == "Círculo (Lat/Lon/Raio)":
+        key += f"|lat:{session_state.get('latitude')}|lon:{session_state.get('longitude')}|raio:{session_state.get('raio')}"
+    elif loc_type == "Polígono":
+        key += f"|geojson:{hash(str(session_state.get('drawn_geometry')))}"
     return key
 
 def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
@@ -74,7 +91,6 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
             results["static_colorbar_b64"] = colorbar_img
 
     elif aba == "Séries Temporais":
-        # Série Temporal continua Diária (não usa target_hour)
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
         if df is None or df.empty: return None
         results["time_series_df"] = df
@@ -85,12 +101,17 @@ def run_full_analysis():
     aba = st.session_state.get("nav_option", "Mapas")
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
 
-    # Define datas com base na nova lógica
+    # --- CORREÇÃO AQUI: Ajuste de Datas ---
     tipo_per = st.session_state.tipo_periodo
+    
     if tipo_per == "Horário Específico":
-        # Para horário, start_date e end_date são o mesmo dia
         data_unica = st.session_state.get('data_horaria')
-        start_date, end_date = data_unica, data_unica
+        if data_unica:
+            start_date = data_unica
+            # Para o filtro funcionar, a data final deve ser o dia seguinte (janela de 24h)
+            end_date = data_unica + timedelta(days=1) 
+        else:
+            start_date, end_date = None, None
     else:
         start_date, end_date = utils.get_date_range(tipo_per, st.session_state)
 
@@ -108,7 +129,7 @@ def run_full_analysis():
             analysis_data = run_analysis_logic(variavel, start_date, end_date, geo_key, aba)
         
         if analysis_data is None:
-            st.warning("Não foi possível obter dados. Verifique os parâmetros.")
+            st.warning("Não foi possível obter dados. Verifique se há dados disponíveis para esta data/hora.")
             st.session_state.analysis_results = None
         else:
             st.session_state.analysis_results = analysis_data
@@ -130,7 +151,7 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # --- Variáveis de Título Atualizadas ---
+    # --- Variáveis de Título ---
     variavel = st.session_state.get('variavel', '')
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     tipo_local = st.session_state.get('tipo_localizacao', '').lower()
