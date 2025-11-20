@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (Corrigido v78 - Fix Banda Precipitação Horária)
+# gee_handler.py (Corrigido v79 - Fix Cálculo Vento Mapas)
 # ==================================================================================
 import streamlit as st
 import json
@@ -183,7 +183,6 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
     is_hourly = target_hour is not None
     collection_id = 'ECMWF/ERA5_LAND/HOURLY' if is_hourly else 'ECMWF/ERA5_LAND/DAILY_AGGR'
     
-    # 1. Seleção das Bandas Corretas (Fonte)
     band_raw = config.get('band')
     if is_hourly:
         if variable == "Precipitação Total": band_raw = "total_precipitation"
@@ -203,22 +202,25 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
         if col.size().getInfo() == 0: return None
 
         if variable == "Velocidade do Vento (10m)":
-            col = col.map(lambda img: img.addBands(img.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])))
+            # CORREÇÃO AQUI: Seleciona apenas as bandas u e v ANTES de fazer o cálculo
+            # para evitar somar outras bandas da imagem inteira.
+            col = col.map(lambda img: img.addBands(
+                img.select(bands_needed) # Seleciona apenas u e v
+                   .pow(2)
+                   .reduce(ee.Reducer.sum())
+                   .sqrt()
+                   .rename(config['result_band'])
+            ))
         elif variable == "Umidade Relativa (2m)":
             col = col.map(_calc_rh)
         elif variable == "Radiação Solar Incidente":
             col = col.map(lambda img: _calc_rad(img, is_hourly))
         
-        # 2. Definição da Banda de Destino (Para Agregação)
-        # Aqui é onde corrigimos o erro: Se for Horário e Precipitação, 
-        # a banda resultante ainda chama 'total_precipitation', não 'total_precipitation_sum'
+        # Agregação e renomeação correta para Precipitação Horária
         band_for_aggregation = config['result_band']
-        
         if is_hourly and variable == "Precipitação Total":
             band_for_aggregation = "total_precipitation"
-        # Radiação já é renomeada em _calc_rad para 'radiation_wm2', então não precisa mudar
 
-        # Agregação usando o nome correto da banda
         if config['aggregation'] == 'mean': 
             img_agg = col.select(band_for_aggregation).mean()
         elif config['aggregation'] == 'sum': 
@@ -226,7 +228,6 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
         else: 
             img_agg = col.first().select(band_for_aggregation)
 
-        # Conversão de Unidades e Recorte
         final = img_agg.clip(geometry).float()
         if config['unit'] == "°C": final = final.subtract(273.15)
         elif config['unit'] == "mm": final = final.multiply(1000)
@@ -240,16 +241,10 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
 
 def get_sampled_data_as_dataframe(ee_image: ee.Image, geometry: ee.Geometry, variable: str) -> pd.DataFrame:
     if not ee_image or variable not in ERA5_VARS: return pd.DataFrame()
-    
-    # Precisamos descobrir qual o nome da banda que realmente ficou na imagem final
-    # Em vez de confiar cegamente no config, pegamos o primeiro nome da banda da imagem
     try:
         band_name = ee_image.bandNames().get(0).getInfo()
-        
         sample = ee_image.select(band_name).sample(region=geometry, scale=10000, numPixels=500, geometries=True)
         feats = sample.getInfo()['features']
-        
-        # Usa o nome correto da banda para extrair a propriedade
         data = [{'Latitude': f['geometry']['coordinates'][1], 'Longitude': f['geometry']['coordinates'][0], variable: f['properties'][band_name]} for f in feats]
         return pd.DataFrame(data)
     except: return pd.DataFrame()
