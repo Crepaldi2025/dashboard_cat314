@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Versão v69 - Sem Logo na Sidebar)
+# ui.py (Versão v70 - Explicações Detalhadas Restauradas)
 # ==================================================================================
 
 import streamlit as st
@@ -50,8 +50,8 @@ def reset_analysis_results_only():
     
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
-        # --- 1. TÍTULO (Sem Imagem) ---
-        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast-Crepaldi</h2>", unsafe_allow_html=True)
+        # --- 1. TÍTULO ---
+        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast</h2>", unsafe_allow_html=True)
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
@@ -128,19 +128,48 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
-                st.caption("💡 Use coordenadas decimais (ex: -22.5).")
+                # --- RESTAURADO: Ajuda detalhada do Círculo ---
+                with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
+                    st.markdown("""
+                    **Como preencher as coordenadas:**
+                    
+                    * **Latitude:** Coordenada em **graus decimais**. 
+                        * *Para o Brasil:* Use valores negativos (Hemisfério Sul). Ex: `-22.42`.
+                    * **Longitude:** Coordenada em **graus decimais**.
+                        * *Para o Brasil:* Use valores negativos (Oeste de Greenwich). Ex: `-45.46`.
+                    * **Raio (km):** Distância do centro até a borda da área de análise.
+                    
+                    💡 **Dica:** Abra o Google Maps, clique com o botão direito no local desejado e copie os números que aparecem no topo (ex: `-22.42, -45.46`).
+                    """)
             
             elif tipo_loc == "Polígono":
                 if st.session_state.get('drawn_geometry'): 
                     st.success("✅ Polígono Definido", icon="🛡️")
                 else: 
-                    st.info("👉 Desenhe no mapa principal")
-
-                with st.expander("Guia de Desenho"): 
+                    # --- RESTAURADO: Aviso visual claro ---
                     st.markdown("""
-                    * **⬟ Polígono:** Áreas livres.
-                    * **⬛ Retângulo:** Áreas quadradas.
-                    * **🗑️ Lixeira:** Limpar desenho.
+                    <div style="background-color: #e0f7fa; padding: 10px; border-radius: 5px; border-left: 5px solid #00acc1; font-size: 0.85em;">
+                        <b style="color: #006064;">👉 Desenhe no Mapa Principal</b><br>
+                        Utilize as ferramentas na lateral esquerda do mapa (lado direito da tela) para desenhar sua área.
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                # --- RESTAURADO: Guia detalhado das ferramentas ---
+                with st.popover("ℹ️ Guia de Ferramentas"): 
+                    st.markdown("""
+                    **Função de cada ícone no mapa:**
+                    
+                    ⬟ **Polígono:**
+                    Desenha áreas irregulares (ex: contorno de fazenda). Clique ponto a ponto para fechar.
+                    
+                    ⬛ **Retângulo:**
+                    Clique e arraste para criar uma área quadrada/retangular.
+                    
+                    📝 **Editar:**
+                    Permite clicar em um desenho existente e arrastar seus pontos para corrigir.
+                    
+                    🗑️ **Lixeira:**
+                    Clique na lixeira e depois no desenho para apagá-lo.
                     """)
             
             st.divider()
@@ -224,7 +253,6 @@ def renderizar_pagina_principal(opcao):
         <style>
             .block-container { padding-top: 3rem !important; padding-bottom: 5rem !important; }
             h1 { margin-top: 0rem !important; }
-            /* Estilo para cartões de ajuda */
             .stExpander { border: 1px solid #f0f2f6; border-radius: 8px; }
         </style>
     """, unsafe_allow_html=True)
@@ -303,4 +331,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
