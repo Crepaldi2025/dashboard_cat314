@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (Atualizado v77 - Robusto com Fallback de Estados)
+# gee_handler.py (Corrigido v78 - Fix Banda Precipitação Horária)
 # ==================================================================================
 import streamlit as st
 import json
@@ -86,8 +86,6 @@ ERA5_VARS = {
 # ==========================================================
 # HELPERS GEOGRÁFICOS
 # ==========================================================
-
-# Dicionário de Fallback (Garante funcionamento mesmo sem JSON)
 FALLBACK_UF_MAP = {
     'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia',
     'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás',
@@ -103,13 +101,10 @@ def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
     arquivo = "municipios_ibge.json"
     geo_data = defaultdict(list)
     uf_name_map = {}
-    
-    # Tenta ler o arquivo JSON
     try:
         if os.path.exists(arquivo):
             with open(arquivo, 'r', encoding='utf-8') as f:
                 d = json.load(f)
-            
             if isinstance(d, list): 
                 for m in d:
                     uf = m.get('microrregiao', {}).get('mesorregiao', {}).get('UF', {})
@@ -119,16 +114,9 @@ def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
             elif isinstance(d, dict):
                 geo_data = d.get("municipios_por_uf", {})
                 uf_name_map = d.get("nomes_estados", {})
-    except Exception as e:
-        # Se der erro silencioso, seguimos para o fallback
-        print(f"Erro lendo JSON: {e}")
+    except: pass
 
-    # Se o mapa de UFs estiver vazio (arquivo não lido ou vazio), usa o Fallback
-    if not uf_name_map:
-        uf_name_map = FALLBACK_UF_MAP
-        # Note: geo_data (municípios) pode ficar vazio se o arquivo falhar, 
-        # mas pelo menos o seletor de Estados funcionará.
-
+    if not uf_name_map: uf_name_map = FALLBACK_UF_MAP
     return {uf: sorted(geo_data[uf]) for uf in sorted(geo_data)}, uf_name_map
 
 @st.cache_data
@@ -145,37 +133,26 @@ def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Featur
     tipo = session_state.get('tipo_localizacao', 'Estado')
     try:
         if tipo == "Estado":
-            # Garante que pegamos a sigla corretamente mesmo se o formato mudar
             val = session_state.get('estado', '...')
-            if ' - ' in val:
-                uf = val.split(' - ')[-1]
-            else:
-                # Caso fallback onde só temos o nome ou sigla
-                # Tentamos achar a sigla no FALLBACK_UF_MAP reverso ou assumimos que é a sigla
-                uf = val 
-            
+            uf = val.split(' - ')[-1] if ' - ' in val else val
             gdf = _load_all_states_gdf()
             if gdf is None: return None, None
             geom = json.loads(gdf[gdf['abbrev_state'] == uf].to_json())['features'][0]['geometry']
             ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
             return ee_geom, ee.Feature(ee_geom, {'abbrev_state': uf})
-            
         elif tipo == "Município":
             val = session_state.get('estado', '...')
             uf = val.split(' - ')[-1] if ' - ' in val else val
-            
             mun = session_state.get('municipio', '...')
             gdf = _load_municipalities_gdf(uf)
             if gdf is None: return None, None
             geom = json.loads(gdf[gdf['name_muni'] == mun].to_json())['features'][0]['geometry']
             ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
             return ee_geom, ee.Feature(ee_geom, {'name_muni': mun, 'uf': uf})
-            
         elif tipo == "Círculo (Lat/Lon/Raio)":
             pt = ee.Geometry.Point([session_state.longitude, session_state.latitude])
             ee_geom = pt.buffer(session_state.raio * 1000)
             return ee_geom, ee.Feature(ee_geom, {'type': 'Circle'})
-            
         elif tipo == "Polígono":
             if not session_state.get('drawn_geometry'): return None, None
             ee_geom = ee.Geometry(session_state.drawn_geometry, proj='EPSG:4326', geodesic=False)
@@ -184,7 +161,7 @@ def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Featur
     return None, None
 
 # ==========================================================
-# PROCESSAMENTO GEE (HÍBRIDO: DIÁRIO E HORÁRIO)
+# PROCESSAMENTO GEE
 # ==========================================================
 
 def _calc_rh(img):
@@ -206,6 +183,7 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
     is_hourly = target_hour is not None
     collection_id = 'ECMWF/ERA5_LAND/HOURLY' if is_hourly else 'ECMWF/ERA5_LAND/DAILY_AGGR'
     
+    # 1. Seleção das Bandas Corretas (Fonte)
     band_raw = config.get('band')
     if is_hourly:
         if variable == "Precipitação Total": band_raw = "total_precipitation"
@@ -231,10 +209,24 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
         elif variable == "Radiação Solar Incidente":
             col = col.map(lambda img: _calc_rad(img, is_hourly))
         
-        if config['aggregation'] == 'mean': img_agg = col.select(config['result_band']).mean()
-        elif config['aggregation'] == 'sum': img_agg = col.select(config['result_band']).sum()
-        else: img_agg = col.first().select(config['result_band'])
+        # 2. Definição da Banda de Destino (Para Agregação)
+        # Aqui é onde corrigimos o erro: Se for Horário e Precipitação, 
+        # a banda resultante ainda chama 'total_precipitation', não 'total_precipitation_sum'
+        band_for_aggregation = config['result_band']
+        
+        if is_hourly and variable == "Precipitação Total":
+            band_for_aggregation = "total_precipitation"
+        # Radiação já é renomeada em _calc_rad para 'radiation_wm2', então não precisa mudar
 
+        # Agregação usando o nome correto da banda
+        if config['aggregation'] == 'mean': 
+            img_agg = col.select(band_for_aggregation).mean()
+        elif config['aggregation'] == 'sum': 
+            img_agg = col.select(band_for_aggregation).sum()
+        else: 
+            img_agg = col.first().select(band_for_aggregation)
+
+        # Conversão de Unidades e Recorte
         final = img_agg.clip(geometry).float()
         if config['unit'] == "°C": final = final.subtract(273.15)
         elif config['unit'] == "mm": final = final.multiply(1000)
@@ -248,11 +240,17 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
 
 def get_sampled_data_as_dataframe(ee_image: ee.Image, geometry: ee.Geometry, variable: str) -> pd.DataFrame:
     if not ee_image or variable not in ERA5_VARS: return pd.DataFrame()
-    band = ERA5_VARS[variable]['result_band']
+    
+    # Precisamos descobrir qual o nome da banda que realmente ficou na imagem final
+    # Em vez de confiar cegamente no config, pegamos o primeiro nome da banda da imagem
     try:
-        sample = ee_image.select(band).sample(region=geometry, scale=10000, numPixels=500, geometries=True)
+        band_name = ee_image.bandNames().get(0).getInfo()
+        
+        sample = ee_image.select(band_name).sample(region=geometry, scale=10000, numPixels=500, geometries=True)
         feats = sample.getInfo()['features']
-        data = [{'Latitude': f['geometry']['coordinates'][1], 'Longitude': f['geometry']['coordinates'][0], variable: f['properties'][band]} for f in feats]
+        
+        # Usa o nome correto da banda para extrair a propriedade
+        data = [{'Latitude': f['geometry']['coordinates'][1], 'Longitude': f['geometry']['coordinates'][0], variable: f['properties'][band_name]} for f in feats]
         return pd.DataFrame(data)
     except: return pd.DataFrame()
 
