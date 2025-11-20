@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (Atualizado v76 - Novas Variáveis + Análise Horária)
+# gee_handler.py (Atualizado v77 - Robusto com Fallback de Estados)
 # ==================================================================================
 import streamlit as st
 import json
@@ -33,7 +33,7 @@ def inicializar_gee():
 def initialize_gee(): return inicializar_gee()
 
 # ==========================================================
-# DEFINIÇÕES DE VARIÁVEIS (Expandido com Skin Temp e Umidade Solo)
+# DEFINIÇÕES DE VARIÁVEIS
 # ==========================================================
 
 ERA5_VARS = {
@@ -45,8 +45,6 @@ ERA5_VARS = {
         "band": "dewpoint_temperature_2m", "result_band": "dewpoint_temperature_2m", "unit": "°C", "aggregation": "mean",
         "vis_params": {"min": 5, "max": 35, "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'], "caption": "Ponto de Orvalho (°C)"}
     },
-    
-    # --- NOVAS VARIÁVEIS ---
     "Temperatura da Superfície (Skin)": {
         "band": "skin_temperature", "result_band": "skin_temperature", "unit": "°C", "aggregation": "mean",
         "vis_params": {"min": 0, "max": 50, "palette": ['#000080', '#0000FF', '#00FFFF', '#00FF00', '#ADFF2F', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#800000'], "caption": "Temp. Superfície (°C)"}
@@ -67,8 +65,6 @@ ERA5_VARS = {
         "band": "volumetric_soil_water_layer_4", "result_band": "volumetric_soil_water_layer_4", "unit": "m³/m³", "aggregation": "mean",
         "vis_params": {"min": 0, "max": 0.6, "palette": ['#d7191c', '#fdae61', '#ffffbf', '#abdda4', '#2b83ba'], "caption": "Umidade Solo 1-3m"}
     },
-    # -----------------------
-    
     "Precipitação Total": {
         "band": "total_precipitation_sum", "result_band": "total_precipitation_sum", "unit": "mm", "aggregation": "sum",
         "vis_params": {"min": 0, "max": 50, "palette": ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58', '#081040'], "caption": "Precipitação (mm)"}
@@ -90,26 +86,50 @@ ERA5_VARS = {
 # ==========================================================
 # HELPERS GEOGRÁFICOS
 # ==========================================================
+
+# Dicionário de Fallback (Garante funcionamento mesmo sem JSON)
+FALLBACK_UF_MAP = {
+    'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia',
+    'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás',
+    'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais',
+    'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí',
+    'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul',
+    'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo',
+    'SE': 'Sergipe', 'TO': 'Tocantins'
+}
+
 @st.cache_data
 def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
     arquivo = "municipios_ibge.json"
     geo_data = defaultdict(list)
     uf_name_map = {}
+    
+    # Tenta ler o arquivo JSON
     try:
-        if not os.path.exists(arquivo): return {}, {}
-        with open(arquivo, 'r', encoding='utf-8') as f:
-            d = json.load(f)
-        if isinstance(d, list): 
-            for m in d:
-                uf = m.get('microrregiao', {}).get('mesorregiao', {}).get('UF', {})
-                sigla, nome, mun = uf.get('sigla'), uf.get('nome'), m.get('nome')
-                if sigla and nome: uf_name_map[sigla] = nome
-                if sigla and mun: geo_data[sigla].append(mun)
-        elif isinstance(d, dict):
-            geo_data = d.get("municipios_por_uf", {})
-            uf_name_map = d.get("nomes_estados", {})
-        return {uf: sorted(geo_data[uf]) for uf in sorted(geo_data)}, uf_name_map
-    except: return {}, {}
+        if os.path.exists(arquivo):
+            with open(arquivo, 'r', encoding='utf-8') as f:
+                d = json.load(f)
+            
+            if isinstance(d, list): 
+                for m in d:
+                    uf = m.get('microrregiao', {}).get('mesorregiao', {}).get('UF', {})
+                    sigla, nome, mun = uf.get('sigla'), uf.get('nome'), m.get('nome')
+                    if sigla and nome: uf_name_map[sigla] = nome
+                    if sigla and mun: geo_data[sigla].append(mun)
+            elif isinstance(d, dict):
+                geo_data = d.get("municipios_por_uf", {})
+                uf_name_map = d.get("nomes_estados", {})
+    except Exception as e:
+        # Se der erro silencioso, seguimos para o fallback
+        print(f"Erro lendo JSON: {e}")
+
+    # Se o mapa de UFs estiver vazio (arquivo não lido ou vazio), usa o Fallback
+    if not uf_name_map:
+        uf_name_map = FALLBACK_UF_MAP
+        # Note: geo_data (municípios) pode ficar vazio se o arquivo falhar, 
+        # mas pelo menos o seletor de Estados funcionará.
+
+    return {uf: sorted(geo_data[uf]) for uf in sorted(geo_data)}, uf_name_map
 
 @st.cache_data
 def _load_all_states_gdf():
@@ -125,24 +145,37 @@ def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Featur
     tipo = session_state.get('tipo_localizacao', 'Estado')
     try:
         if tipo == "Estado":
-            uf = session_state.get('estado', '...').split(' - ')[-1]
+            # Garante que pegamos a sigla corretamente mesmo se o formato mudar
+            val = session_state.get('estado', '...')
+            if ' - ' in val:
+                uf = val.split(' - ')[-1]
+            else:
+                # Caso fallback onde só temos o nome ou sigla
+                # Tentamos achar a sigla no FALLBACK_UF_MAP reverso ou assumimos que é a sigla
+                uf = val 
+            
             gdf = _load_all_states_gdf()
             if gdf is None: return None, None
             geom = json.loads(gdf[gdf['abbrev_state'] == uf].to_json())['features'][0]['geometry']
             ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
             return ee_geom, ee.Feature(ee_geom, {'abbrev_state': uf})
+            
         elif tipo == "Município":
-            uf = session_state.get('estado', '...').split(' - ')[-1]
+            val = session_state.get('estado', '...')
+            uf = val.split(' - ')[-1] if ' - ' in val else val
+            
             mun = session_state.get('municipio', '...')
             gdf = _load_municipalities_gdf(uf)
             if gdf is None: return None, None
             geom = json.loads(gdf[gdf['name_muni'] == mun].to_json())['features'][0]['geometry']
             ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
             return ee_geom, ee.Feature(ee_geom, {'name_muni': mun, 'uf': uf})
+            
         elif tipo == "Círculo (Lat/Lon/Raio)":
             pt = ee.Geometry.Point([session_state.longitude, session_state.latitude])
             ee_geom = pt.buffer(session_state.raio * 1000)
             return ee_geom, ee.Feature(ee_geom, {'type': 'Circle'})
+            
         elif tipo == "Polígono":
             if not session_state.get('drawn_geometry'): return None, None
             ee_geom = ee.Geometry(session_state.drawn_geometry, proj='EPSG:4326', geodesic=False)
@@ -162,23 +195,17 @@ def _calc_rh(img):
     return img.addBands(e.divide(es).multiply(100).rename('relative_humidity').min(100))
 
 def _calc_rad(img, hourly=False):
-    # Para W/m²: Diário divide por 86400s; Horário divide por 3600s
     div = 3600 if hourly else 86400
     band = 'surface_solar_radiation_downwards' if hourly else 'surface_solar_radiation_downwards_sum'
     return img.addBands(img.select(band).divide(div).rename('radiation_wm2'))
 
 def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee.Geometry, target_hour: int = None) -> ee.Image:
-    """
-    Gera imagem do GEE. Se target_hour for definido, usa coleção HOURLY.
-    """
     if variable not in ERA5_VARS: return None
     config = ERA5_VARS[variable]
     
-    # Seleção de Coleção
     is_hourly = target_hour is not None
     collection_id = 'ECMWF/ERA5_LAND/HOURLY' if is_hourly else 'ECMWF/ERA5_LAND/DAILY_AGGR'
     
-    # Ajuste de bandas para Hourly (nomes diferem do Daily)
     band_raw = config.get('band')
     if is_hourly:
         if variable == "Precipitação Total": band_raw = "total_precipitation"
@@ -193,12 +220,10 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
         col = ee.ImageCollection(collection_id).filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
         
         if is_hourly:
-            # Filtra apenas a hora específica (0 a 23)
             col = col.filter(ee.Filter.calendarRange(target_hour, target_hour, 'hour'))
             
         if col.size().getInfo() == 0: return None
 
-        # Cálculos Específicos
         if variable == "Velocidade do Vento (10m)":
             col = col.map(lambda img: img.addBands(img.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])))
         elif variable == "Umidade Relativa (2m)":
@@ -206,15 +231,13 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
         elif variable == "Radiação Solar Incidente":
             col = col.map(lambda img: _calc_rad(img, is_hourly))
         
-        # Agregação
         if config['aggregation'] == 'mean': img_agg = col.select(config['result_band']).mean()
         elif config['aggregation'] == 'sum': img_agg = col.select(config['result_band']).sum()
         else: img_agg = col.first().select(config['result_band'])
 
-        # Conversão de Unidades e Recorte
         final = img_agg.clip(geometry).float()
         if config['unit'] == "°C": final = final.subtract(273.15)
-        elif config['unit'] == "mm": final = final.multiply(1000) # Tanto hourly quanto daily vem em metros
+        elif config['unit'] == "mm": final = final.multiply(1000)
 
         if final.bandNames().size().getInfo() == 0: return None
         return final
@@ -234,7 +257,6 @@ def get_sampled_data_as_dataframe(ee_image: ee.Image, geometry: ee.Geometry, var
     except: return pd.DataFrame()
 
 def get_time_series_data(variable: str, start_date: date, end_date: date, geometry: ee.Geometry) -> pd.DataFrame:
-    # Série temporal continua usando apenas Diário para manter consistência
     return _get_series_generic(variable, start_date, end_date, geometry)
 
 def _get_series_generic(variable, start, end, geom):
