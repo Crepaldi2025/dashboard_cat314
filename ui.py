@@ -51,7 +51,7 @@ def reset_analysis_results_only():
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
         # --- 1. TÍTULO ---
-        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast-Crepaldi</h2>", unsafe_allow_html=True)
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
@@ -238,7 +238,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("---")
             st.markdown(
                 """
-                <div style='text-align: center; color: grey; font-size: 12px;'>
+                <div style='text-align: center; color: black; font-size: 14px;'>
                 Desenvolvido por <b>Paulo C. Crepaldi</b><br>
                 v1.0.0 | 2025
                 </div>
@@ -331,3 +331,4 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
