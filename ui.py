@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Versão Limpa - Sem GIF, com Calendário 1950)
+# ui.py (Versão v80 - Data Padrão Segura)
 # ==================================================================================
 
 import streamlit as st
@@ -162,7 +162,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             lista_anos = list(range(ano_atual, 1949, -1))
             st.session_state.date_error = False
             
-            # Limites de data (1950 até hoje)
             min_data = datetime(1950, 1, 1)
             max_data = datetime.now()
             
@@ -187,14 +186,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             elif tipo_per == "Horário Específico":
                 hoje = datetime.now()
-                data_padrao = hoje - relativedelta(days=2)
+                # --- CORREÇÃO: Data Padrão para 4 meses atrás (Dados disponíveis) ---
+                data_padrao = hoje - relativedelta(months=4)
                 
                 st.date_input("Data", value=data_padrao, min_value=min_data, max_value=max_data, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
-                
-                # --- REMOVIDO CHECKBOX GIF ---
                 st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC (3 horas à frente de Brasília).")
                 
-                # Aviso simples de snapshot
                 st.info("ℹ️ **Nota:** Esta opção retorna um dado pontual (snapshot) apenas para a hora escolhida.", icon="🕒")
             
             st.divider()
