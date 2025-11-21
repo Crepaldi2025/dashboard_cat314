@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (v100 - Legenda Estática Visível na Tela)
+# main.py — Clima-Cast-Crepaldi (v101 - Fix Polígono em Série Temporal + Satélite)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -165,14 +165,10 @@ def render_analysis_results():
             elif tipo_mapa == "Estático":
                 if results.get("static_map_png_url"):
                     st.subheader(titulo_mapa)
-                    
-                    # --- EXIBIÇÃO DO MAPA E DA LEGENDA NA TELA ---
                     st.image(results["static_map_png_url"], width=500)
                     
                     if results.get("static_colorbar_b64"):
-                        # Mostra a barra de cores logo abaixo do mapa
                         st.image(results["static_colorbar_b64"], width=500)
-                    # ---------------------------------------------
 
                     st.markdown("### Exportar Mapas")
                     try:
@@ -213,9 +209,13 @@ def render_analysis_results():
 
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
+    # USA MAPA DE SATÉLITE PARA FACILITAR O DESENHO
     m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
+    
     Draw(export=False, draw_options={"polygon": {"allowIntersection": False, "showArea": True}, "rectangle": {"allowIntersection": False, "showArea": True}, "circle": False, "marker": False, "polyline": False}, edit_options={"edit": True, "remove": True}).add_to(m)
+    
     map_data = st_folium(m, width=None, height=500, returned_objects=["all_drawings"])
+    
     if map_data and map_data.get("all_drawings"):
         drawing = map_data["all_drawings"][-1]
         if drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
@@ -233,18 +233,31 @@ def main():
         st.session_state.gee_initialized = True
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
+    
     if opcao_menu == "Sobre o Aplicativo":
         ui.renderizar_pagina_sobre()
         return
+    
     ui.renderizar_pagina_principal(opcao_menu)
-    is_polygon = (opcao_menu == "Mapas" and st.session_state.get('tipo_localizacao') == "Polígono")
+    
+    # --- CORREÇÃO: Aceita Polígono também na aba Séries Temporais ---
+    is_polygon = (
+        opcao_menu in ["Mapas", "Séries Temporais"] and 
+        st.session_state.get('tipo_localizacao') == "Polígono"
+    )
+    # ----------------------------------------------------------------
+    
     is_running = st.session_state.get("analysis_triggered", False)
     has_geom = 'drawn_geometry' in st.session_state
     has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
-    if is_polygon and not is_running and not has_geom and not has_res: render_polygon_drawer()
+    
+    if is_polygon and not is_running and not has_geom and not has_res: 
+        render_polygon_drawer()
+    
     if is_running:
         st.session_state.analysis_triggered = False 
         run_full_analysis() 
+    
     render_analysis_results()
 
 if __name__ == "__main__": main()
