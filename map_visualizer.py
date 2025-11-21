@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v94 - Retorno ao Padrão Funcional)
+# map_visualizer.py (v95 - Colorbar Sólida e Visível)
 # ==================================================================================
 
 import streamlit as st
@@ -11,15 +11,15 @@ import requests
 from PIL import Image
 import numpy as np 
 
-# --- Configuração Simples e Funcional ---
+# --- CONFIGURAÇÃO DE BACKEND (CRÍTICO) ---
 import matplotlib
-matplotlib.use('Agg') # Única proteção necessária para nuvem
+matplotlib.use('Agg') # Garante que funciona no servidor sem tela
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
 import matplotlib.colors as mcolors 
-# ----------------------------------------
+# -----------------------------------------
 
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
@@ -51,7 +51,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ==================================================================================
-# COLORBAR INTERATIVO
+# COLORBAR INTELIGENTE (Interativo)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
@@ -64,9 +64,9 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     n_steps = len(palette)
     index = np.linspace(vmin, vmax, n_steps + 1).tolist()
     
-    if (vmax - vmin) < 10: fmt = '%.2f'
-    else: fmt = '%.0f'
-
+    if (vmax - vmin) < 10: fmt = '%.2f' 
+    else: fmt = '%.0f' 
+    
     try:
         colormap = StepColormap(
             colors=palette, index=index, vmin=vmin, vmax=vmax,
@@ -75,7 +75,15 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         colormap.fmt = fmt
         
         macro = MacroElement()
-        macro._template = Template(f"""{{% macro html(this, kwargs) %}}<div style="position: fixed; bottom: 15px; left: 15px; z-index: 9999; background-color: rgba(255, 255, 255, 0.85); padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">{colormap._repr_html_()}</div>{{% endmacro %}}""")
+        macro._template = Template(f"""
+        {{% macro html(this, kwargs) %}}
+        <div style="position: fixed; bottom: 15px; left: 15px; z-index: 9999;
+                    background-color: rgba(255, 255, 255, 0.9);
+                    padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);">
+            {colormap._repr_html_()}
+        </div>
+        {{% endmacro %}}
+        """)
         mapa.get_root().add_child(macro)
     except: pass
 
@@ -85,32 +93,47 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     """
-    Gera a barra de cores estática usando plt.figure (Lógica Original Restaurada).
+    Gera a barra de cores estática.
+    MUDANÇA v95: Fundo branco sólido e tamanho fixo maior para evitar cortes.
     """
     try:
-        # Dimensões que funcionavam no seu código original
-        fig = plt.figure(figsize=(4, 0.5), dpi=150)
-        ax = fig.add_axes([0.05, 0.5, 0.90, 0.3])
+        # Cria figura maior (6x1 polegadas)
+        fig = plt.figure(figsize=(6, 1.2), dpi=150)
+        
+        # Posiciona a barra no centro, com margem suficiente embaixo para os números
+        # [left, bottom, width, height]
+        ax = fig.add_axes([0.05, 0.4, 0.90, 0.3]) 
         
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         
         cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
-        cb.set_label(label, fontsize=8, color='black')
-        cb.ax.tick_params(labelsize=7, color='black', labelcolor='black')
         
-        # Formatação
+        # Estilização de Texto (Preto Sólido)
+        cb.set_label(label, fontsize=10, color='black', labelpad=5)
+        cb.ax.tick_params(labelsize=9, color='black', labelcolor='black')
+        
+        # Borda da barra
+        cb.outline.set_edgecolor('black')
+        cb.outline.set_linewidth(1)
+        
+        # Formatação Numérica
         if (vmax - vmin) < 10:
             cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
+        else:
+            cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
         
+        # Salva em buffer com FUNDO BRANCO (facecolor='white')
+        # transparent=False é vital para garantir que o texto preto apareça
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", pad_inches=0.1, transparent=True)
+        plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", pad_inches=0.1, facecolor='white', transparent=False)
         plt.close(fig)
         buf.seek(0)
         
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
+        
     except Exception as e:
-        st.error(f"Erro colorbar: {e}")
+        st.error(f"Erro ao criar legenda: {e}") # Mostra erro na tela se falhar
         return None
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -123,11 +146,13 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1]))
             region = feature.geometry().buffer(dim * 10000) 
-        except: region = feature.geometry()
+        except: 
+            region = feature.geometry()
 
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
+        # Processa o Mapa (Transparente -> Branco)
         img = Image.open(io.BytesIO(img_bytes))
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
@@ -137,14 +162,16 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
+        # Gera Legenda
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFFFFF", "#000000"])
         
+        # Chamada da função corrigida
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
     except Exception as e:
-        st.error(f"Erro estático: {e}")
+        st.error(f"Erro ao gerar mapa estático: {e}")
         return None, None, None
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
@@ -166,14 +193,17 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         t = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
         m = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
         c = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
+        
         w = m.width
         def rz(im, tw): return im if im.width == tw else im.resize((tw, int(im.height * (tw/im.width))), Image.Resampling.LANCZOS)
         t = rz(t, w)
         c = rz(c, w)
+
         final = Image.new('RGBA', (w, t.height + m.height + c.height), (255, 255, 255, 255))
         final.paste(t, (0, 0), t)
         final.paste(m, (0, t.height), m)
         final.paste(c, (0, t.height + m.height), c)
+        
         buf = io.BytesIO()
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
