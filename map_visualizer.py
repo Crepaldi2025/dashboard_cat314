@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v97 - Correção Definitiva: Backend Agg e OO)
+# map_visualizer.py (v99 - Restauração Fiel da Versão Funcional)
 # ==================================================================================
 
 import streamlit as st
@@ -11,22 +11,21 @@ import requests
 from PIL import Image
 import numpy as np 
 
-# --- CONFIGURAÇÃO CRÍTICA PARA SERVIDORES (STREAMLIT CLOUD) ---
+# --- ÚNICA ADIÇÃO NECESSÁRIA: Backend para Servidor ---
 import matplotlib
-matplotlib.use('Agg') # Força o modo sem interface gráfica (evita erros de display)
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-import matplotlib.ticker as ticker
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.colorbar import ColorbarBase
-import matplotlib.colors as mcolors 
-# --------------------------------------------------------------
+matplotlib.use('Agg') 
+import matplotlib.pyplot as plt
+# ----------------------------------------------------
 
+from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
+from matplotlib.colorbar import ColorbarBase
+from matplotlib import cm
+import matplotlib.colors as mcolors 
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 
 # ==================================================================================
-# MAPA INTERATIVO (Mantido Igual)
+# MAPA INTERATIVO
 # ==================================================================================
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -52,7 +51,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ==================================================================================
-# COLORBAR INTELIGENTE (Para o Mapa Interativo)
+# COLORBAR INTERATIVO (Lógica Original)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
@@ -62,72 +61,94 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     
     if not palette or len(palette) == 0: return 
 
-    n_steps = len(palette)
-    # Garante que os passos da legenda coincidam com as cores
-    index = np.linspace(vmin, vmax, n_steps + 1).tolist()
+    N_STEPS = len(palette) 
+    # Volta para a lógica simples que funcionava
+    step = (vmax - vmin) / N_STEPS
+    if step == 0: step = 1 # Proteção
     
-    # Formatação inteligente (decimais para umidade, inteiros para temperatura)
-    if (vmax - vmin) < 10: fmt = '%.2f' 
-    else: fmt = '%.0f' 
+    # Cria índices
+    index = np.linspace(vmin, vmax, N_STEPS + 1).tolist()
+
+    # Formatação
+    if (vmax - vmin) < 10: fmt = '%.2f'
+    else: fmt = '%.0f'
+
+    colormap = StepColormap(colors=palette, index=index, vmin=vmin, vmax=vmax)
+    colormap.fmt = fmt
+
+    # Tenta caption ou usa unit_label
+    custom_caption = vis_params.get("caption")
+    label = custom_caption if custom_caption else unit_label
+
+    colormap.caption = label
     
-    try:
-        colormap = StepColormap(
-            colors=palette, index=index, vmin=vmin, vmax=vmax,
-            caption=vis_params.get("caption", unit_label)
-        )
-        colormap.fmt = fmt
-        
-        macro = MacroElement()
-        macro._template = Template(f"""{{% macro html(this, kwargs) %}}<div style="position: fixed; bottom: 15px; left: 15px; z-index: 9999; background-color: rgba(255, 255, 255, 0.85); padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">{colormap._repr_html_()}</div>{{% endmacro %}}""")
-        mapa.get_root().add_child(macro)
-    except: pass
+    html = colormap._repr_html_()
+    template = Template(f"""
+    {{% macro html(this, kwargs) %}}
+    <div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999;
+                background: rgba(255,255,255,0.85); padding: 6px 8px;
+                border-radius: 6px; box_shadow: 0 1px 4px rgba(0,0,0,0.3);">
+        {html}
+    </div>
+    {{% endmacro %}}
+    """)
+    macro = MacroElement()
+    macro._template = template
+    mapa.get_root().add_child(macro)
 
 # ==================================================================================
-# MAPA ESTÁTICO (Geração Robusta de Imagens)
+# MAPA ESTÁTICO (Lógica Original Restaurada)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     """
-    Gera a barra de cores estática usando a abordagem Orientada a Objetos (Thread-Safe).
-    Isso impede que a barra suma em execuções paralelas ou no servidor.
+    Restaura EXATAMENTE a função que você enviou, que usa BoundaryNorm
+    para criar a barra discreta (degraus) em vez de contínua.
     """
+    # Dimensões originais que funcionavam
+    fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
+    ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
+    
     try:
-        # 1. Cria uma figura isolada na memória (não usa plt global)
-        # Tamanho (6, 1.2) garante espaço suficiente para texto e números
-        fig = Figure(figsize=(6, 1.2), dpi=150)
-        FigureCanvasAgg(fig) # Acopla o canvas Agg
+        N_STEPS = len(palette)
+        # Cria boundaries exatos baseados no min/max
+        boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
         
-        # 2. Define a área do eixo [left, bottom, width, height]
-        # Bottom=0.4 deixa espaço para os números não serem cortados
-        ax = fig.add_axes([0.05, 0.4, 0.90, 0.3])
+        cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
+        norm = mcolors.BoundaryNorm(boundaries, cmap.N)
         
-        # 3. Desenha a barra
-        cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
-        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-        cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
+        cb = ColorbarBase(
+            ax, 
+            cmap=cmap, 
+            norm=norm, 
+            boundaries=boundaries, 
+            ticks=boundaries, 
+            spacing='proportional', 
+            orientation="horizontal"
+        )
         
-        # 4. Estilização (Preto sobre fundo transparente/branco)
-        cb.set_label(label, fontsize=10, color='black', labelpad=5)
-        cb.ax.tick_params(labelsize=9, color='black', labelcolor='black')
-        cb.outline.set_edgecolor('black')
-        cb.outline.set_linewidth(1)
+        cb.set_label(label, fontsize=7)
         
-        # 5. Formatação dos números (Ticks)
+        # Formatação inteligente dos ticks
         if (vmax - vmin) < 10:
-            cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
+            # Decimais para umidade
+            cb.ax.set_xticklabels([f'{t:.2f}' for t in boundaries])
         else:
-            cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+            # Inteiros para o resto (usando :g para limpar zeros desnecessários)
+            cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
+            
+        cb.ax.tick_params(labelsize=6, length=2, pad=1)
         
-        # 6. Salva no buffer de memória
         buf = io.BytesIO()
-        # facecolor='white' garante que o fundo não fique transparente (melhor leitura)
-        fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0.1, facecolor='white')
+        # Adicionado facecolor='white' para garantir visibilidade
+        plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
+        plt.close(fig)
         buf.seek(0)
-        
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
         
     except Exception as e:
-        st.error(f"Erro ao gerar legenda: {e}")
+        st.error(f"Erro legenda: {e}") # Debug
+        plt.close(fig)
         return None
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -138,15 +159,13 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
 
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
-            dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1]))
-            region = feature.geometry().buffer(dim * 10000) 
-        except: 
-            region = feature.geometry()
+            dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
+            region = feature.geometry().buffer(dim * 0.05)
+        except: region = feature.geometry()
 
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
-        # Tratamento de imagem (Fundo Branco)
         img = Image.open(io.BytesIO(img_bytes))
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
@@ -156,30 +175,28 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
-        # Gera a legenda usando a função robusta acima
+        # Verifica caption
         lbl = vis_params.get("caption", unit_label)
-        pal = vis_params.get("palette", ["#FFFFFF", "#000000"])
+        pal = vis_params.get("palette", ["#FFF", "#000"])
+        
+        # Chama a função restaurada
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
     except Exception as e:
-        st.error(f"Erro ao gerar mapa estático: {e}")
+        st.error(f"Erro estático: {e}")
         return None, None, None
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
-    """Gera o título como imagem usando a mesma abordagem segura (OO)."""
     try:
         dpi = 100
-        fig = Figure(figsize=(width/dpi, height/dpi), dpi=dpi)
-        FigureCanvasAgg(fig)
+        fig = plt.figure(figsize=(width/dpi, height/dpi), dpi=dpi)
         fig.patch.set_facecolor('white')
-        
-        ax = fig.add_axes([0, 0, 1, 1])
-        ax.axis('off')
-        ax.text(0.5, 0.5, title_text, ha='center', va='center', fontsize=14, fontweight='bold', wrap=True)
-        
+        plt.text(0.5, 0.5, title_text, ha='center', va='center', fontsize=14, fontweight='bold', wrap=True)
+        plt.axis('off')
         buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.05, facecolor='white')
+        plt.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.05, facecolor='white')
+        plt.close(fig)
         buf.seek(0)
         return buf.getvalue()
     except: return None
