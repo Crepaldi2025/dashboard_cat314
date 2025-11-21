@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Versão v75 - Aviso sobre Horário Específico)
+# ui.py (Versão v79 - Correção do Calendário 1950)
 # ==================================================================================
 
 import streamlit as st
@@ -51,7 +51,7 @@ def reset_analysis_results_only():
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
         # --- 1. TÍTULO ---
-        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast-Crepaldi</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast</h2>", unsafe_allow_html=True)
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
@@ -162,13 +162,20 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             lista_anos = list(range(ano_atual, 1949, -1))
             st.session_state.date_error = False
             
+            # --- CORREÇÃO: Definindo limites de data (1950 até hoje) ---
+            min_data = datetime(1950, 1, 1)
+            max_data = datetime.now()
+            
             if tipo_per == "Personalizado":
                 hoje = datetime.now()
                 fim_padrao = hoje.replace(day=1) - relativedelta(days=1)
                 inicio_padrao = fim_padrao.replace(day=1)
                 c1, c2 = st.columns(2)
-                with c1: st.date_input("Início", value=inicio_padrao, key='data_inicio', on_change=reset_analysis_state, format="DD/MM/YYYY")
-                with c2: st.date_input("Fim", value=fim_padrao, key='data_fim', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                
+                # Adicionado min_value e max_value
+                with c1: st.date_input("Início", value=inicio_padrao, min_value=min_data, max_value=max_data, key='data_inicio', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                with c2: st.date_input("Fim", value=fim_padrao, min_value=min_data, max_value=max_data, key='data_fim', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                
                 if st.session_state.data_fim < st.session_state.data_inicio:
                     st.error("Data final anterior à inicial.")
                     st.session_state.date_error = True
@@ -184,12 +191,21 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             elif tipo_per == "Horário Específico":
                 hoje = datetime.now()
                 data_padrao = hoje - relativedelta(days=2)
-                st.date_input("Data", value=data_padrao, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
-                st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC (3 horas à frente de Brasília).")
                 
-                # --- NOVO: Aviso Explicativo ---
-                st.info("ℹ️ **Nota:** Esta opção retorna um dado pontual (snapshot) apenas para a hora escolhida. Não gera médias diárias.", icon="🕒")
-                # -------------------------------
+                # Adicionado min_value e max_value
+                st.date_input("Data", value=data_padrao, min_value=min_data, max_value=max_data, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                
+                col_h1, col_h2 = st.columns([2, 1])
+                with col_h1:
+                    st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC.")
+                with col_h2:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.checkbox("GIF 24h", key='gerar_gif', help="Gera animação das 24h do dia selecionado.")
+                
+                if not st.session_state.get('gerar_gif'):
+                    st.info("ℹ️ Retorna dado pontual (snapshot).", icon="🕒")
+                else:
+                    st.info("🎬 Gera animação do dia todo (pode demorar).", icon="🎞️")
             
             st.divider()
 
@@ -204,16 +220,22 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
 
-            st.button("🚀 Gerar Análise", type="primary", use_container_width=True, disabled=disable, on_click=lambda: st.session_state.update(analysis_triggered=True))
+            st.button(
+                "🚀 Gerar Análise", 
+                type="primary", 
+                use_container_width=True, 
+                disabled=disable,
+                on_click=lambda: st.session_state.update(analysis_triggered=True)
+            )
             
             if not disable:
                 st.markdown("<div style='font-size:14px;margin-top:8px;'>⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
-            # --- 9. FOOTER ---
             st.markdown("---")
             st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v1.0.0 | 2025</div>", unsafe_allow_html=True)
+        
         return opcao
 
 def renderizar_pagina_principal(opcao):
@@ -254,7 +276,9 @@ def renderizar_resumo_selecao():
             elif periodo == "Horário Específico":
                  data = st.session_state.get('data_horaria')
                  hora = st.session_state.get('hora_especifica')
-                 if data: per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
+                 if data: 
+                     per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
+                     if st.session_state.get('gerar_gif'): per_txt += " (GIF 24h)"
             st.markdown(f"**Período ({periodo}):**\n{per_txt}")
 
 def renderizar_pagina_sobre():
@@ -276,4 +300,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
