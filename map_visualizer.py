@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v92 - Fix Definitivo OO-Matplotlib)
+# map_visualizer.py (v93 - Colorbar Estática Blindada)
 # ==================================================================================
 
 import streamlit as st
@@ -11,15 +11,17 @@ import requests
 from PIL import Image
 import numpy as np 
 
-# --- IMPORTAÇÕES MATPLOTLIB (Abordagem Orientada a Objetos) ---
+# --- CORREÇÃO CRÍTICA: BACKEND PARA SERVIDOR ---
+import matplotlib
+matplotlib.use('Agg') # Impede erros de vídeo no Streamlit Cloud
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import matplotlib.ticker as ticker
+# -----------------------------------------------
+
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
 import matplotlib.colors as mcolors 
-# -------------------------------------------------------------
-
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 
@@ -30,8 +32,10 @@ from branca.element import Template, MacroElement
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
-        lon_min, lat_min = coords[0]
-        lon_max, lat_max = coords[2]
+        lon_min = coords[0][0]
+        lat_min = coords[0][1]
+        lon_max = coords[2][0]
+        lat_max = coords[2][1]
         bounds = [[lat_min, lon_min], [lat_max, lon_max]]
     except Exception:
         bounds = None
@@ -48,7 +52,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ==================================================================================
-# COLORBAR INTERATIVO
+# COLORBAR INTERATIVO (Branca)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
@@ -59,17 +63,20 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     if not palette or len(palette) == 0: return 
 
     n_steps = len(palette)
+    # Garante passos exatos para não quebrar a legenda
     index = np.linspace(vmin, vmax, n_steps + 1).tolist()
-    
-    if (vmax - vmin) < 10: fmt = '%.2f' 
-    else: fmt = '%.0f' 
-    
+
+    # Formatação inteligente (Decimal vs Inteiro)
+    if (vmax - vmin) < 10: fmt = '%.2f'
+    else: fmt = '%.0f'
+
     try:
         colormap = StepColormap(
             colors=palette, index=index, vmin=vmin, vmax=vmax,
             caption=vis_params.get("caption", unit_label)
         )
         colormap.fmt = fmt
+        
         macro = MacroElement()
         macro._template = Template(f"""{{% macro html(this, kwargs) %}}<div style="position: fixed; bottom: 15px; left: 15px; z-index: 9999; background-color: rgba(255, 255, 255, 0.85); padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">{colormap._repr_html_()}</div>{{% endmacro %}}""")
         mapa.get_root().add_child(macro)
@@ -81,50 +88,46 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     """
-    Gera a barra de cores estática usando Figure() direto (Thread-Safe).
-    Não usa plt.figure() para evitar conflitos no Streamlit.
+    Gera a barra de cores estática usando Figure() direto.
+    Isso evita conflitos de thread que fazem a barra sumir no servidor.
     """
     try:
-        # 1. Cria objeto Figure isolado (Largura 6, Altura 1.5 polegadas)
-        fig = Figure(figsize=(6, 1.5), dpi=150)
-        # 2. Acopla um Canvas (necessário para renderizar sem tela)
-        canvas = FigureCanvasAgg(fig)
+        # 1. Cria objeto Figure isolado (Não usa plt.figure global)
+        # Aumentei levemente a altura (0.6) para garantir que os números caibam
+        fig = Figure(figsize=(5, 0.6), dpi=150)
+        FigureCanvasAgg(fig) # Anexa o canvas para desenho
         
-        # 3. Adiciona Eixo [left, bottom, width, height]
-        # Bottom=0.5 dá bastante espaço para os números não cortarem
-        ax = fig.add_axes([0.05, 0.5, 0.9, 0.3])
+        # 2. Define eixo [left, bottom, width, height]
+        # Bottom=0.5 dá espaço para os números não serem cortados
+        ax = fig.add_axes([0.05, 0.5, 0.90, 0.3])
         
-        # 4. Desenha a barra
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         
         cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
         
-        # 5. Estilização explícita (Preto sobre Branco)
-        fig.patch.set_facecolor('white') # Fundo branco
-        ax.set_facecolor('white')
-        
-        cb.set_label(label, fontsize=10, color='black', labelpad=5)
-        cb.ax.tick_params(labelsize=9, color='black', labelcolor='black', length=4)
+        # 3. Estilização Forte (Preto)
+        cb.set_label(label, fontsize=9, color='black', labelpad=4)
+        cb.ax.tick_params(labelsize=8, color='black', labelcolor='black')
         cb.outline.set_edgecolor('black')
         cb.outline.set_linewidth(1)
         
-        # Formatação de números
+        # 4. Formatação Numérica (Decimal ou Inteiro)
         if (vmax - vmin) < 10:
             cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
         else:
             cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
         
-        # 6. Salva no buffer
+        # 5. Salva
         buf = io.BytesIO()
-        # pad_inches garante margem extra
-        fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0.1, facecolor='white')
+        # transparent=True e bbox_inches='tight' garantem o recorte correto
+        fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0.1, transparent=True)
         buf.seek(0)
         
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
         
     except Exception as e:
-        st.error(f"Erro gerando legenda: {e}")
+        st.error(f"Erro visual: {e}")
         return None
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -151,9 +154,9 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
+        # Gera a legenda (Sempre tenta gerar)
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFFFFF", "#000000"])
-        
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
@@ -162,8 +165,8 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         return None, None, None
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
-    # Usa a mesma lógica OO para o título para evitar erros
     try:
+        # Usa Figure aqui também para segurança
         dpi = 100
         fig = Figure(figsize=(width/dpi, height/dpi), dpi=dpi)
         FigureCanvasAgg(fig)
@@ -184,14 +187,17 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         t = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
         m = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
         c = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
+        
         w = m.width
         def rz(im, tw): return im if im.width == tw else im.resize((tw, int(im.height * (tw/im.width))), Image.Resampling.LANCZOS)
         t = rz(t, w)
         c = rz(c, w)
+
         final = Image.new('RGBA', (w, t.height + m.height + c.height), (255, 255, 255, 255))
         final.paste(t, (0, 0), t)
         final.paste(m, (0, t.height), m)
         final.paste(c, (0, t.height + m.height), c)
+        
         buf = io.BytesIO()
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
