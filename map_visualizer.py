@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v88 - Fix Definitivo Colorbar Estática)
+# map_visualizer.py (v89 - Correção Definitiva e Estável)
 # ==================================================================================
 
 import streamlit as st
@@ -11,16 +11,16 @@ import requests
 from PIL import Image
 import numpy as np 
 
-# --- CONFIGURAÇÃO CRÍTICA DO MATPLOTLIB ---
+# --- CORREÇÃO 1: Backend Não-Interativo (Evita tela preta/erro no servidor) ---
 import matplotlib
-matplotlib.use('Agg') # Força backend não-interativo (Essencial para Streamlit)
+matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
+import matplotlib.ticker as ticker # --- CORREÇÃO 2: Importação necessária para ticks
+# ------------------------------------------------------------------------------
+
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
 import matplotlib.colors as mcolors 
-# ------------------------------------------
-
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 
@@ -51,7 +51,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ==================================================================================
-# COLORBAR INTELIGENTE (Interativo - Branca/Leaflet)
+# COLORBAR INTELIGENTE (Interativo)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
@@ -62,10 +62,10 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     if not palette or len(palette) == 0: return 
 
     n_steps = len(palette)
-    # Usa linspace para garantir divisão exata das cores
+    # CORREÇÃO 3: Uso de linspace para divisão exata
     index = np.linspace(vmin, vmax, n_steps + 1).tolist()
     
-    # Decide formatação (Decimal ou Inteiro)
+    # Lógica de formatação inteligente
     if (vmax - vmin) < 10:
         fmt = '%.2f' 
     else:
@@ -97,16 +97,14 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         print(f"Erro ao gerar colorbar interativa: {e}")
 
 # ==================================================================================
-# MAPA ESTÁTICO (Geração de Imagens - Matplotlib)
+# MAPA ESTÁTICO (Geração de Imagens)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     """Gera a barra de cores estática usando Matplotlib."""
     try:
-        # Aumentei a altura para 0.6 para dar espaço aos números
+        # Aumentei altura e ajustei margens
         fig = plt.figure(figsize=(4, 0.6), dpi=150)
-        
-        # [left, bottom, width, height] -> Subi o bottom para 0.5 para não cortar texto
         ax = fig.add_axes([0.05, 0.5, 0.90, 0.3]) 
         
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
@@ -115,22 +113,20 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
         cb.set_label(label, fontsize=9, color='black')
         cb.ax.tick_params(labelsize=8, color='black', labelcolor='black')
-        cb.outline.set_edgecolor('black')
+        cb.outline.set_edgecolor('black') # Borda preta explícita
         
-        # Formatação condicional de ticks (Decimais para umidade, Inteiros para temp)
+        # CORREÇÃO 4: Formatação de ticks
         if (vmax - vmin) < 10:
             cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
-        else:
-            cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
         
         buf = io.BytesIO()
-        # bbox_inches='tight' + pad_inches garante que nada seja cortado
+        # CORREÇÃO 5: pad_inches=0.1 evita cortar números
         plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", pad_inches=0.1, transparent=True)
         plt.close(fig)
         buf.seek(0)
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
     except Exception as e:
-        print(f"Erro colorbar estática: {e}")
+        st.error(f"Erro colorbar: {e}") # Exibe erro na tela se falhar
         return None
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -158,9 +154,10 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
-        # Gera a legenda estática
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFFFFF", "#000000"])
+        
+        # Gera a legenda
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
@@ -187,14 +184,17 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         t = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
         m = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
         c = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
+        
         w = m.width
         def rz(im, tw): return im if im.width == tw else im.resize((tw, int(im.height * (tw/im.width))), Image.Resampling.LANCZOS)
         t = rz(t, w)
         c = rz(c, w)
+
         final = Image.new('RGBA', (w, t.height + m.height + c.height), (255, 255, 255, 255))
         final.paste(t, (0, 0), t)
         final.paste(m, (0, t.height), m)
         final.paste(c, (0, t.height + m.height), c)
+        
         buf = io.BytesIO()
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
