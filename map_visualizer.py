@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v85 - Fix Definitivo de Colorbar)
+# map_visualizer.py (v86 - Fix Colorbar Ticker Import)
 # ==================================================================================
 
 import streamlit as st
@@ -11,9 +11,10 @@ import requests
 from PIL import Image
 import numpy as np 
 import matplotlib
-# Força backend não-interativo para evitar erros no servidor
+# Força backend não-interativo
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
+import matplotlib.ticker # <--- IMPORTAÇÃO CRÍTICA ADICIONADA
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
 import matplotlib.colors as mcolors 
@@ -75,17 +76,15 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     
     if not palette or len(palette) == 0: return 
 
-    # --- CORREÇÃO v85: Lógica Universal de Escala ---
-    # Em vez de arange, usamos linspace para garantir que os índices
-    # casem perfeitamente com o número de cores, independente da escala (0.1 ou 1000)
+    # Lógica Universal de Escala
     n_steps = len(palette)
     index = np.linspace(vmin, vmax, n_steps + 1).tolist()
     
-    # Decide formatação: se o range for pequeno (<10), usa decimais. Senão, inteiros.
+    # Decide formatação
     if (vmax - vmin) < 10:
-        fmt = '%.2f' # Ex: 0.15
+        fmt = '%.2f' 
     else:
-        fmt = '%.0f' # Ex: 25
+        fmt = '%.0f' 
     
     try:
         colormap = StepColormap(
@@ -95,7 +94,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
             vmax=vmax,
             caption=vis_params.get("caption", unit_label)
         )
-        # Força a formatação dos ticks gerados pelo branca
         colormap.fmt = fmt
         
         macro = MacroElement()
@@ -120,10 +118,10 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     """Gera a barra de cores estática usando Matplotlib (Backend Agg)."""
     try:
-        fig = plt.figure(figsize=(4, 0.4), dpi=150) 
-        ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
+        # Aumentei um pouco a altura (0.5) para caber os números
+        fig = plt.figure(figsize=(4, 0.5), dpi=150) 
+        ax = fig.add_axes([0.05, 0.5, 0.90, 0.3]) # Ajuste de posição
         
-        # Cria um colormap linear contínuo baseado na lista de cores
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         
@@ -131,17 +129,19 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         cb.set_label(label, fontsize=8)
         cb.ax.tick_params(labelsize=7)
         
-        # Se for escala pequena, formata ticks com decimal
+        # Formatação condicional de ticks
         if (vmax - vmin) < 10:
+            # Agora usa o ticker importado corretamente
             cb.ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
         
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", transparent=True)
+        # pad_inches garante que não corte o texto
+        plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", pad_inches=0.1, transparent=True)
         plt.close(fig)
         buf.seek(0)
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
     except Exception as e:
-        print(f"Erro colorbar estática: {e}")
+        print(f"Erro colorbar estática: {e}") # Log no console para debug
         return None
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -172,6 +172,8 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFFFFF", "#000000"])
+        
+        # Gera a legenda
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
@@ -198,14 +200,17 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         t = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
         m = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
         c = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
+        
         w = m.width
         def rz(im, tw): return im if im.width == tw else im.resize((tw, int(im.height * (tw/im.width))), Image.Resampling.LANCZOS)
         t = rz(t, w)
         c = rz(c, w)
+
         final = Image.new('RGBA', (w, t.height + m.height + c.height), (255, 255, 255, 255))
         final.paste(t, (0, 0), t)
         final.paste(m, (0, t.height), m)
         final.paste(c, (0, t.height + m.height), c)
+        
         buf = io.BytesIO()
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
