@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v86 - Fix Colorbar Ticker Import)
+# map_visualizer.py (v87 - Fix Colorbar Layout)
 # ==================================================================================
 
 import streamlit as st
@@ -14,7 +14,7 @@ import matplotlib
 # Força backend não-interativo
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
-import matplotlib.ticker # <--- IMPORTAÇÃO CRÍTICA ADICIONADA
+import matplotlib.ticker as ticker
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
 import matplotlib.colors as mcolors 
@@ -48,24 +48,6 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ==================================================================================
-# GIF GENERATOR
-# ==================================================================================
-def create_gif_from_collection(collection: ee.ImageCollection, vis_params: dict, title: str) -> str:
-    try:
-        video_args = {
-            'dimensions': 600,
-            'region': collection.first().geometry(),
-            'framesPerSecond': 4,
-            'crs': 'EPSG:3857',
-            'min': 0,
-            'max': 255
-        }
-        return collection.getVideoThumbURL(video_args)
-    except Exception as e:
-        st.error(f"Erro ao gerar GIF: {e}")
-        return None
-
-# ==================================================================================
 # COLORBAR INTELIGENTE (Interativo)
 # ==================================================================================
 
@@ -76,11 +58,9 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     
     if not palette or len(palette) == 0: return 
 
-    # Lógica Universal de Escala
     n_steps = len(palette)
     index = np.linspace(vmin, vmax, n_steps + 1).tolist()
     
-    # Decide formatação
     if (vmax - vmin) < 10:
         fmt = '%.2f' 
     else:
@@ -116,38 +96,38 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
-    """Gera a barra de cores estática usando Matplotlib (Backend Agg)."""
+    """Gera a barra de cores estática usando Matplotlib com layout robusto."""
     try:
-        # Aumentei um pouco a altura (0.5) para caber os números
-        fig = plt.figure(figsize=(4, 0.5), dpi=150) 
-        ax = fig.add_axes([0.05, 0.5, 0.90, 0.3]) # Ajuste de posição
-        
+        # Layout automático com subplots é mais seguro que add_axes
+        fig, ax = plt.subplots(figsize=(6, 1), dpi=150)
+        fig.patch.set_alpha(0) # Fundo transparente
+
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         
         cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
-        cb.set_label(label, fontsize=8)
-        cb.ax.tick_params(labelsize=7)
+        cb.set_label(label, fontsize=10, color='black')
+        cb.ax.tick_params(labelsize=9, colors='black')
+        cb.outline.set_edgecolor('black') # Garante borda preta visível
         
-        # Formatação condicional de ticks
+        # Formatação de decimais se o intervalo for pequeno
         if (vmax - vmin) < 10:
-            # Agora usa o ticker importado corretamente
-            cb.ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
+            cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
         
         buf = io.BytesIO()
-        # pad_inches garante que não corte o texto
+        # bbox_inches='tight' garante que nada seja cortado
         plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", pad_inches=0.1, transparent=True)
         plt.close(fig)
         buf.seek(0)
+        
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
     except Exception as e:
-        print(f"Erro colorbar estática: {e}") # Log no console para debug
+        print(f"Erro colorbar estática: {e}")
         return None
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
         visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
-        
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         final = visualized_data.blend(outline.visualize(palette='000000'))
 
@@ -172,8 +152,6 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFFFFF", "#000000"])
-        
-        # Gera a legenda
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
@@ -200,17 +178,14 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         t = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
         m = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
         c = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
-        
         w = m.width
         def rz(im, tw): return im if im.width == tw else im.resize((tw, int(im.height * (tw/im.width))), Image.Resampling.LANCZOS)
         t = rz(t, w)
         c = rz(c, w)
-
         final = Image.new('RGBA', (w, t.height + m.height + c.height), (255, 255, 255, 255))
         final.paste(t, (0, 0), t)
         final.paste(m, (0, t.height), m)
         final.paste(c, (0, t.height + m.height), c)
-        
         buf = io.BytesIO()
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
