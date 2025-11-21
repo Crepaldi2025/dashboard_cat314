@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v83 - Colorbar Robusta)
+# map_visualizer.py (v85 - Fix Definitivo de Colorbar)
 # ==================================================================================
 
 import streamlit as st
@@ -10,6 +10,9 @@ import base64
 import requests
 from PIL import Image
 import numpy as np 
+import matplotlib
+# Força backend não-interativo para evitar erros no servidor
+matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
@@ -17,13 +20,20 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 
+# ==================================================================================
+# MAPA INTERATIVO
+# ==================================================================================
+
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
-        lon_min, lat_min = coords[0]
-        lon_max, lat_max = coords[2]
+        lon_min = coords[0][0]
+        lat_min = coords[0][1]
+        lon_max = coords[2][0]
+        lat_max = coords[2][1]
         bounds = [[lat_min, lon_min], [lat_max, lon_max]]
-    except: bounds = None
+    except Exception:
+        bounds = None
 
     mapa = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="HYBRID")
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
@@ -31,55 +41,113 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
-    if bounds: mapa.fit_bounds(bounds)
+    if bounds:
+        mapa.fit_bounds(bounds)
+    
     mapa.to_streamlit(height=500, use_container_width=True)
 
+# ==================================================================================
+# GIF GENERATOR
+# ==================================================================================
+def create_gif_from_collection(collection: ee.ImageCollection, vis_params: dict, title: str) -> str:
+    try:
+        video_args = {
+            'dimensions': 600,
+            'region': collection.first().geometry(),
+            'framesPerSecond': 4,
+            'crs': 'EPSG:3857',
+            'min': 0,
+            'max': 255
+        }
+        return collection.getVideoThumbURL(video_args)
+    except Exception as e:
+        st.error(f"Erro ao gerar GIF: {e}")
+        return None
+
+# ==================================================================================
+# COLORBAR INTELIGENTE (Interativo)
+# ==================================================================================
+
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
-    palette = vis_params.get("palette", ["#FFF", "#000"])
+    palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
     
-    n_colors = len(palette)
-    is_small_scale = (vmax - vmin) <= 10
-    
-    if is_small_scale:
-        index = np.linspace(vmin, vmax, n_colors + 1).tolist()
-        fmt = '%.2f' 
-    else:
-        step = (vmax - vmin) / n_colors
-        if step < 1: step = 1
-        index = np.arange(vmin, vmax + step, step).tolist()
-        fmt = '%.0f' 
+    if not palette or len(palette) == 0: return 
 
-    if len(index) > len(palette) + 1: index = index[:len(palette)+1]
+    # --- CORREÇÃO v85: Lógica Universal de Escala ---
+    # Em vez de arange, usamos linspace para garantir que os índices
+    # casem perfeitamente com o número de cores, independente da escala (0.1 ou 1000)
+    n_steps = len(palette)
+    index = np.linspace(vmin, vmax, n_steps + 1).tolist()
+    
+    # Decide formatação: se o range for pequeno (<10), usa decimais. Senão, inteiros.
+    if (vmax - vmin) < 10:
+        fmt = '%.2f' # Ex: 0.15
+    else:
+        fmt = '%.0f' # Ex: 25
     
     try:
-        colormap = StepColormap(colors=palette, index=index, vmin=vmin, vmax=vmax, caption=vis_params.get("caption", unit_label))
+        colormap = StepColormap(
+            colors=palette, 
+            index=index, 
+            vmin=vmin, 
+            vmax=vmax,
+            caption=vis_params.get("caption", unit_label)
+        )
+        # Força a formatação dos ticks gerados pelo branca
         colormap.fmt = fmt
+        
         macro = MacroElement()
-        macro._template = Template(f"""{{% macro html(this, kwargs) %}}<div style="position: fixed; bottom: 15px; left: 15px; z-index: 9999; background-color: rgba(255, 255, 255, 0.85); padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">{colormap._repr_html_()}</div>{{% endmacro %}}""")
+        macro._template = Template(f"""
+        {{% macro html(this, kwargs) %}}
+        <div style="position: fixed; bottom: 15px; left: 15px; z-index: 9999;
+                    background-color: rgba(255, 255, 255, 0.85);
+                    padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+            {colormap._repr_html_()}
+        </div>
+        {{% endmacro %}}
+        """)
         mapa.get_root().add_child(macro)
-    except: pass
+        
+    except Exception as e:
+        print(f"Erro ao gerar colorbar interativa: {e}")
+
+# ==================================================================================
+# MAPA ESTÁTICO (Geração de Imagens)
+# ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
-    fig = plt.figure(figsize=(4, 0.4), dpi=150) 
-    ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
+    """Gera a barra de cores estática usando Matplotlib (Backend Agg)."""
     try:
-        cmap = LinearSegmentedColormap.from_list("custom", palette, N=100)
+        fig = plt.figure(figsize=(4, 0.4), dpi=150) 
+        ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
+        
+        # Cria um colormap linear contínuo baseado na lista de cores
+        cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+        
         cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
         cb.set_label(label, fontsize=8)
         cb.ax.tick_params(labelsize=7)
+        
+        # Se for escala pequena, formata ticks com decimal
+        if (vmax - vmin) < 10:
+            cb.ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
+        
         buf = io.BytesIO()
         plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", transparent=True)
         plt.close(fig)
         buf.seek(0)
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
-    except: return None
+    except Exception as e:
+        print(f"Erro colorbar estática: {e}")
+        return None
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
         visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
+        
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         final = visualized_data.blend(outline.visualize(palette='000000'))
 
@@ -87,7 +155,8 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1]))
             region = feature.geometry().buffer(dim * 10000) 
-        except: region = feature.geometry()
+        except: 
+            region = feature.geometry()
 
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
@@ -101,13 +170,13 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
-        # GARANTE QUE SEMPRE HAJA LEGENDA
         lbl = vis_params.get("caption", unit_label)
-        cbar = _make_compact_colorbar(vis_params.get("palette", ["#FFF", "#000"]), vis_params.get("min", 0), vis_params.get("max", 1), lbl)
+        pal = vis_params.get("palette", ["#FFFFFF", "#000000"])
+        cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
     except Exception as e:
-        st.error(f"Erro estático: {e}")
+        st.error(f"Erro ao gerar mapa estático: {e}")
         return None, None, None
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
