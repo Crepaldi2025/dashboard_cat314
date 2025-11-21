@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py (Versão v79 - Correção do Calendário 1950)
+# ui.py (Versão Limpa - Sem GIF, com Calendário 1950)
 # ==================================================================================
 
 import streamlit as st
@@ -162,7 +162,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             lista_anos = list(range(ano_atual, 1949, -1))
             st.session_state.date_error = False
             
-            # --- CORREÇÃO: Definindo limites de data (1950 até hoje) ---
+            # Limites de data (1950 até hoje)
             min_data = datetime(1950, 1, 1)
             max_data = datetime.now()
             
@@ -171,11 +171,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 fim_padrao = hoje.replace(day=1) - relativedelta(days=1)
                 inicio_padrao = fim_padrao.replace(day=1)
                 c1, c2 = st.columns(2)
-                
-                # Adicionado min_value e max_value
                 with c1: st.date_input("Início", value=inicio_padrao, min_value=min_data, max_value=max_data, key='data_inicio', on_change=reset_analysis_state, format="DD/MM/YYYY")
                 with c2: st.date_input("Fim", value=fim_padrao, min_value=min_data, max_value=max_data, key='data_fim', on_change=reset_analysis_state, format="DD/MM/YYYY")
-                
                 if st.session_state.data_fim < st.session_state.data_inicio:
                     st.error("Data final anterior à inicial.")
                     st.session_state.date_error = True
@@ -192,20 +189,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 hoje = datetime.now()
                 data_padrao = hoje - relativedelta(days=2)
                 
-                # Adicionado min_value e max_value
                 st.date_input("Data", value=data_padrao, min_value=min_data, max_value=max_data, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
                 
-                col_h1, col_h2 = st.columns([2, 1])
-                with col_h1:
-                    st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC.")
-                with col_h2:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.checkbox("GIF 24h", key='gerar_gif', help="Gera animação das 24h do dia selecionado.")
+                # --- REMOVIDO CHECKBOX GIF ---
+                st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC (3 horas à frente de Brasília).")
                 
-                if not st.session_state.get('gerar_gif'):
-                    st.info("ℹ️ Retorna dado pontual (snapshot).", icon="🕒")
-                else:
-                    st.info("🎬 Gera animação do dia todo (pode demorar).", icon="🎞️")
+                # Aviso simples de snapshot
+                st.info("ℹ️ **Nota:** Esta opção retorna um dado pontual (snapshot) apenas para a hora escolhida.", icon="🕒")
             
             st.divider()
 
@@ -253,7 +243,7 @@ def renderizar_pagina_principal(opcao):
         st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
     st.markdown("---")
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
-        st.info("👈 **Comece aqui:** Configure sua análise no painel lateral e clique em **'🚀 Gerar Análise'**.")
+        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 def renderizar_resumo_selecao():
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
@@ -276,9 +266,7 @@ def renderizar_resumo_selecao():
             elif periodo == "Horário Específico":
                  data = st.session_state.get('data_horaria')
                  hora = st.session_state.get('hora_especifica')
-                 if data: 
-                     per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
-                     if st.session_state.get('gerar_gif'): per_txt += " (GIF 24h)"
+                 if data: per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
             st.markdown(f"**Período ({periodo}):**\n{per_txt}")
 
 def renderizar_pagina_sobre():
