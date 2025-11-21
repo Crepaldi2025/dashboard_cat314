@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (v80 - Paletas de Cores Melhoradas)
+# gee_handler.py (v83 - Correção Definitiva de Bandas e Datas)
 # ==================================================================================
 import streamlit as st
 import json
@@ -20,16 +20,14 @@ def inicializar_gee():
                 private_key = st.secrets["earthengine_service_account"]["private_key"]
                 credentials = ee.ServiceAccountCredentials(service_account, key_data=private_key)
                 ee.Initialize(credentials=credentials)
-                st.info("✅ Conectado ao GEE (Service Account).")
             else:
                 ee.Initialize()
-                st.info("✅ Conectado ao GEE (Local).")
         except Exception as e:
             st.error(f"⚠️ Falha GEE: {e}")
 
 def initialize_gee(): return inicializar_gee()
 
-# --- DEFINIÇÕES DE VARIÁVEIS E PALETAS ---
+# --- VARIÁVEIS ---
 ERA5_VARS = {
     "Temperatura do Ar (2m)": {
         "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean",
@@ -42,24 +40,6 @@ ERA5_VARS = {
     "Temperatura da Superfície (Skin)": {
         "band": "skin_temperature", "result_band": "skin_temperature", "unit": "°C", "aggregation": "mean",
         "vis_params": {"min": 10, "max": 50, "palette": ['#040274', '#040281', '#0502a3', '#0502b8', '#0502ce', '#0502e6', '#0602ff', '#235cb1', '#307ef3', '#269db1', '#30c8e2', '#32d3ef', '#3be285', '#3ff38f', '#86e26f', '#3ae237', '#b5e22e', '#d6e21f', '#fff705', '#ffd611', '#ffb613', '#ff8b13', '#ff6e08', '#ff500d', '#ff0000', '#de0101', '#c21301', '#a71001', '#911003'], "caption": "Temp. Superfície (°C)"}
-    },
-    # --- UMIDADE DO SOLO (0-0.6 m3/m3) ---
-    # Paleta RdYlBu invertida (Vermelho=Seco, Azul=Úmido)
-    "Umidade do Solo (0-7 cm)": {
-        "band": "volumetric_soil_water_layer_1", "result_band": "volumetric_soil_water_layer_1", "unit": "m³/m³", "aggregation": "mean",
-        "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (0-7cm)"}
-    },
-    "Umidade do Solo (7-28 cm)": {
-        "band": "volumetric_soil_water_layer_2", "result_band": "volumetric_soil_water_layer_2", "unit": "m³/m³", "aggregation": "mean",
-        "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (7-28cm)"}
-    },
-    "Umidade do Solo (28-100 cm)": {
-        "band": "volumetric_soil_water_layer_3", "result_band": "volumetric_soil_water_layer_3", "unit": "m³/m³", "aggregation": "mean",
-        "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (28-100cm)"}
-    },
-    "Umidade do Solo (100-289 cm)": {
-        "band": "volumetric_soil_water_layer_4", "result_band": "volumetric_soil_water_layer_4", "unit": "m³/m³", "aggregation": "mean",
-        "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (1-3m)"}
     },
     "Precipitação Total": {
         "band": "total_precipitation_sum", "result_band": "total_precipitation_sum", "unit": "mm", "aggregation": "sum",
@@ -76,18 +56,15 @@ ERA5_VARS = {
     "Velocidade do Vento (10m)": {
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
         "vis_params": {"min": 0, "max": 15, "palette": ['#FFFFFF', '#E6F5FF', '#CDE0F7', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B'], "caption": "Vento (m/s)"}
-    }
+    },
+    # Solo
+    "Umidade do Solo (0-7 cm)": { "band": "volumetric_soil_water_layer_1", "result_band": "volumetric_soil_water_layer_1", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (0-7cm)"} },
+    "Umidade do Solo (7-28 cm)": { "band": "volumetric_soil_water_layer_2", "result_band": "volumetric_soil_water_layer_2", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (7-28cm)"} },
+    "Umidade do Solo (28-100 cm)": { "band": "volumetric_soil_water_layer_3", "result_band": "volumetric_soil_water_layer_3", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (28-100cm)"} },
+    "Umidade do Solo (100-289 cm)": { "band": "volumetric_soil_water_layer_4", "result_band": "volumetric_soil_water_layer_4", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (1-3m)"} },
 }
 
-FALLBACK_UF_MAP = {
-    'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia',
-    'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás',
-    'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais',
-    'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí',
-    'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul',
-    'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo',
-    'SE': 'Sergipe', 'TO': 'Tocantins'
-}
+FALLBACK_UF_MAP = {'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'}
 
 @st.cache_data
 def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
@@ -167,9 +144,11 @@ def _calc_rad(img, hourly=False):
 def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee.Geometry, target_hour: int = None) -> ee.Image:
     if variable not in ERA5_VARS: return None
     config = ERA5_VARS[variable]
+    
     is_hourly = target_hour is not None
     collection_id = 'ECMWF/ERA5_LAND/HOURLY' if is_hourly else 'ECMWF/ERA5_LAND/DAILY_AGGR'
     
+    # Lógica de Bandas (Fonte)
     band_raw = config.get('band')
     if is_hourly:
         if variable == "Precipitação Total": band_raw = "total_precipitation"
@@ -182,24 +161,40 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
 
     try:
         col = ee.ImageCollection(collection_id).filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-        if is_hourly: col = col.filter(ee.Filter.calendarRange(target_hour, target_hour, 'hour'))
+        
+        if is_hourly:
+            col = col.filter(ee.Filter.calendarRange(target_hour, target_hour, 'hour'))
+            
         if col.size().getInfo() == 0: return None
 
+        # Cálculos Especiais
         if variable == "Velocidade do Vento (10m)":
-            col = col.map(lambda img: img.addBands(img.select(bands_needed).pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])))
-        elif variable == "Umidade Relativa (2m)": col = col.map(_calc_rh)
-        elif variable == "Radiação Solar Incidente": col = col.map(lambda img: _calc_rad(img, is_hourly))
+            # Seleciona explicitamente u e v para evitar erro de dimensão
+            col = col.map(lambda img: img.addBands(
+                img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m'])
+                   .pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
+            ))
+        elif variable == "Umidade Relativa (2m)":
+            col = col.map(_calc_rh)
+        elif variable == "Radiação Solar Incidente":
+            col = col.map(lambda img: _calc_rad(img, is_hourly))
         
+        # Banda Final para Agregação
         band_agg = config['result_band']
         if is_hourly and variable == "Precipitação Total": band_agg = "total_precipitation"
 
-        if config['aggregation'] == 'mean': img_agg = col.select(band_agg).mean()
-        elif config['aggregation'] == 'sum': img_agg = col.select(band_agg).sum()
-        else: img_agg = col.first().select(band_agg)
+        # Agregação
+        if config['aggregation'] == 'mean': 
+            img_agg = col.select(band_agg).mean()
+        elif config['aggregation'] == 'sum': 
+            img_agg = col.select(band_agg).sum()
+        else: 
+            img_agg = col.first().select(band_agg)
 
         final = img_agg.clip(geometry).float()
         if config['unit'] == "°C": final = final.subtract(273.15)
         elif config['unit'] == "mm": final = final.multiply(1000)
+
         if final.bandNames().size().getInfo() == 0: return None
         return final
     except Exception as e:
@@ -228,7 +223,7 @@ def _get_series_generic(variable, start, end, geom):
         col = ee.ImageCollection(col_id).filterDate(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')).select(bands)
         if col.size().getInfo() == 0: return pd.DataFrame()
         if variable == "Velocidade do Vento (10m)":
-            col = col.map(lambda img: img.addBands(img.pow(2).reduce(ee.Reducer.sum()).sqrt().rename(cfg['result_band'])))
+            col = col.map(lambda img: img.addBands(img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m']).pow(2).reduce(ee.Reducer.sum()).sqrt().rename(cfg['result_band'])))
         elif variable == "Umidade Relativa (2m)": col = col.map(_calc_rh)
         elif variable == "Radiação Solar Incidente": col = col.map(lambda img: _calc_rad(img, False))
         else: col = col.map(lambda img: img.rename(cfg['result_band']))
