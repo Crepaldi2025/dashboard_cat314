@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py (Versão v82 - Aviso de Latência de Dados)
+# main.py — Clima-Cast-Crepaldi (v100 - Legenda Estática Visível na Tela)
 # ==================================================================================
 import streamlit as st
 import ui
@@ -92,7 +92,7 @@ def run_full_analysis():
             analysis_data = run_analysis_logic(variavel, start_date, end_date, geo_key, aba)
         
         if analysis_data is None:
-            st.warning("Não foi possível obter dados. Verifique se há dados disponíveis para esta data.")
+            st.warning("Não foi possível obter dados.")
             st.session_state.analysis_results = None
         else:
             st.session_state.analysis_results = analysis_data
@@ -165,7 +165,15 @@ def render_analysis_results():
             elif tipo_mapa == "Estático":
                 if results.get("static_map_png_url"):
                     st.subheader(titulo_mapa)
+                    
+                    # --- EXIBIÇÃO DO MAPA E DA LEGENDA NA TELA ---
                     st.image(results["static_map_png_url"], width=500)
+                    
+                    if results.get("static_colorbar_b64"):
+                        # Mostra a barra de cores logo abaixo do mapa
+                        st.image(results["static_colorbar_b64"], width=500)
+                    # ---------------------------------------------
+
                     st.markdown("### Exportar Mapas")
                     try:
                         title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
@@ -181,10 +189,7 @@ def render_analysis_results():
 
         st.markdown("---") 
         st.subheader("Tabela de Dados") 
-        
-        # --- CORREÇÃO: AVISO DE DADOS VAZIOS ---
-        if "map_dataframe" not in results or results["map_dataframe"].empty: 
-            st.warning("⚠️ Sem dados amostrais. Verifique se a data selecionada possui cobertura (ERA5-Land tem atraso de ~3 meses) ou se a região é válida.")
+        if "map_dataframe" not in results or results["map_dataframe"].empty: st.warning("Sem dados amostrais.")
         else:
             df_map = results["map_dataframe"]
             cols = df_map.columns.tolist()
