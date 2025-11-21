@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (Atualizado para Ponto de Orvalho)
+# map_visualizer.py (Corrigido v80 - Legendas Decimais e Inteiras)
 # ==================================================================================
 
 import streamlit as st
@@ -11,12 +11,15 @@ import requests
 from PIL import Image
 import numpy as np 
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
-from matplotlib import cm
 import matplotlib.colors as mcolors 
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
+
+# ==================================================================================
+# MAPA INTERATIVO
+# ==================================================================================
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
@@ -31,7 +34,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
 
     mapa = geemap.Map(center=[-15.78, -47.93], zoom=4, basemap="HYBRID")
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
-    mapa.addLayer(ee.Image().paint(feature, 0, 2), {"palette": "black"}, "Contorno da Área")
+    mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
@@ -40,6 +43,10 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     
     mapa.to_streamlit(height=500, use_container_width=True)
 
+# ==================================================================================
+# COLORBAR INTELIGENTE (Corrigido)
+# ==================================================================================
+
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
@@ -47,77 +54,88 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     
     if not palette or len(palette) == 0: return 
 
-    N_STEPS = len(palette) 
-    step = round((vmax - vmin) / N_STEPS + 1)
-    index = np.arange(vmin, vmax + step, step, dtype=int)
-
-    colormap = StepColormap(colors=palette, index=index, vmin=vmin, vmax=vmax)
-    colormap.fmt = '%.0f'
-
-    # --- LÓGICA DE LEGENDA ATUALIZADA ---
-    # Se tiver 'caption' no vis_params (definido no gee_handler), usa ele.
-    custom_caption = vis_params.get("caption")
+    n_colors = len(palette)
     
-    if custom_caption:
-        label = custom_caption
+    # --- CORREÇÃO: Lógica para Decimais vs Inteiros ---
+    # Se a diferença for pequena (ex: Umidade Solo 0.0 a 0.6), usa decimais.
+    # Se for grande (ex: Temp 0 a 40), usa inteiros.
+    is_small_scale = (vmax - vmin) <= 10
+    
+    if is_small_scale:
+        # Cria passos decimais exatos
+        index = np.linspace(vmin, vmax, n_colors + 1).tolist()
+        fmt = '%.2f' # Formato 0.00
     else:
-        ul = (unit_label or "").lower()
-        if "°" in unit_label or "temp" in ul: label = "Temperatura (°C)"
-        elif "mm" in ul: label = "Precipitação (mm)"
-        elif "m/s" in ul or "vento" in ul: label = "Vento (m/s)"
-        elif "%" in ul: label = "Umidade Relativa (%)"
-        elif "w/m" in ul: label = "Radiação (W/m²)"
-        else: label = str(unit_label) if unit_label else ""
+        # Cria passos inteiros
+        step = (vmax - vmin) / n_colors
+        if step < 1: step = 1
+        index = np.arange(vmin, vmax + step, step).tolist()
+        fmt = '%.0f' # Formato 0
 
-    colormap.caption = label
+    # Garante que o StepColormap receba cores e índices alinhados
+    # Às vezes o np.arange gera um indice a mais que cores, precisamos ajustar
+    if len(index) > len(palette) + 1:
+        index = index[:len(palette)+1]
     
-    html = colormap._repr_html_()
-    template = Template(f"""
-    {{% macro html(this, kwargs) %}}
-    <div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999;
-                background: rgba(255,255,255,0.85); padding: 6px 8px;
-                border-radius: 6px; box_shadow: 0 1px 4px rgba(0,0,0,0.3);">
-        {html}
-    </div>
-    {{% endmacro %}}
-    """)
-    macro = MacroElement()
-    macro._template = template
-    mapa.get_root().add_child(macro)
+    # Criação da Legenda
+    try:
+        colormap = StepColormap(
+            colors=palette, 
+            index=index, 
+            vmin=vmin, 
+            vmax=vmax,
+            caption=vis_params.get("caption", unit_label)
+        )
+        colormap.fmt = fmt
+        
+        # Injeta HTML/CSS para fixar no canto inferior esquerdo
+        macro = MacroElement()
+        macro._template = Template(f"""
+        {{% macro html(this, kwargs) %}}
+        <div style="position: fixed; bottom: 15px; left: 15px; z-index: 9999;
+                    background-color: rgba(255, 255, 255, 0.85);
+                    padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+            {colormap._repr_html_()}
+        </div>
+        {{% endmacro %}}
+        """)
+        mapa.get_root().add_child(macro)
+        
+    except Exception as e:
+        print(f"Erro ao gerar colorbar: {e}")
+
+# ==================================================================================
+# MAPA ESTÁTICO (Geração de Imagens)
+# ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
-    fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
+    fig = plt.figure(figsize=(4, 0.4), dpi=150) # Levemente maior
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
     try:
-        N_STEPS = len(palette)
-        boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
-        cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
-        norm = mcolors.BoundaryNorm(boundaries, cmap.N)
-    except Exception:
+        cmap = LinearSegmentedColormap.from_list("custom", palette, N=100)
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+        cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
+        cb.set_label(label, fontsize=8)
+        cb.ax.tick_params(labelsize=7)
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", transparent=True)
         plt.close(fig)
-        return None
-
-    cb = ColorbarBase(ax, cmap=cmap, norm=norm, boundaries=boundaries, ticks=boundaries, spacing='proportional', orientation="horizontal")
-    cb.set_label(label, fontsize=7)
-    cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
-    cb.ax.tick_params(labelsize=6, length=2, pad=1)
-    
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
-    plt.close(fig)
-    buf.seek(0)
-    return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
+        buf.seek(0)
+        return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
+    except: return None
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
         visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
-        outline = ee.Image().paint(featureCollection=feature, color=0, width=2)
+        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         final = visualized_data.blend(outline.visualize(palette='000000'))
 
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
-            dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
-            region = feature.geometry().buffer(dim * 0.05)
+            # Buffer dinâmico baseado no tamanho da área
+            dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1]))
+            region = feature.geometry().buffer(dim * 10000) # Ajuste de buffer
         except: region = feature.geometry()
 
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
@@ -132,7 +150,6 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
-        # Verifica se tem caption customizado (mesma logica do interativo)
         lbl = vis_params.get("caption", unit_label)
         cbar = _make_compact_colorbar(vis_params.get("palette", ["#FFF", "#000"]), vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
