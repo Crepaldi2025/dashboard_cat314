@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v87 - Fix Colorbar Layout)
+# map_visualizer.py (v88 - Fix Definitivo Colorbar Estática)
 # ==================================================================================
 
 import streamlit as st
@@ -10,14 +10,17 @@ import base64
 import requests
 from PIL import Image
 import numpy as np 
+
+# --- CONFIGURAÇÃO CRÍTICA DO MATPLOTLIB ---
 import matplotlib
-# Força backend não-interativo
-matplotlib.use('Agg') 
+matplotlib.use('Agg') # Força backend não-interativo (Essencial para Streamlit)
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
 import matplotlib.colors as mcolors 
+# ------------------------------------------
+
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 
@@ -48,7 +51,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ==================================================================================
-# COLORBAR INTELIGENTE (Interativo)
+# COLORBAR INTELIGENTE (Interativo - Branca/Leaflet)
 # ==================================================================================
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
@@ -59,8 +62,10 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     if not palette or len(palette) == 0: return 
 
     n_steps = len(palette)
+    # Usa linspace para garantir divisão exata das cores
     index = np.linspace(vmin, vmax, n_steps + 1).tolist()
     
+    # Decide formatação (Decimal ou Inteiro)
     if (vmax - vmin) < 10:
         fmt = '%.2f' 
     else:
@@ -92,34 +97,37 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
         print(f"Erro ao gerar colorbar interativa: {e}")
 
 # ==================================================================================
-# MAPA ESTÁTICO (Geração de Imagens)
+# MAPA ESTÁTICO (Geração de Imagens - Matplotlib)
 # ==================================================================================
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
-    """Gera a barra de cores estática usando Matplotlib com layout robusto."""
+    """Gera a barra de cores estática usando Matplotlib."""
     try:
-        # Layout automático com subplots é mais seguro que add_axes
-        fig, ax = plt.subplots(figsize=(6, 1), dpi=150)
-        fig.patch.set_alpha(0) # Fundo transparente
-
+        # Aumentei a altura para 0.6 para dar espaço aos números
+        fig = plt.figure(figsize=(4, 0.6), dpi=150)
+        
+        # [left, bottom, width, height] -> Subi o bottom para 0.5 para não cortar texto
+        ax = fig.add_axes([0.05, 0.5, 0.90, 0.3]) 
+        
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=256)
         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         
         cb = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
-        cb.set_label(label, fontsize=10, color='black')
-        cb.ax.tick_params(labelsize=9, colors='black')
-        cb.outline.set_edgecolor('black') # Garante borda preta visível
+        cb.set_label(label, fontsize=9, color='black')
+        cb.ax.tick_params(labelsize=8, color='black', labelcolor='black')
+        cb.outline.set_edgecolor('black')
         
-        # Formatação de decimais se o intervalo for pequeno
+        # Formatação condicional de ticks (Decimais para umidade, Inteiros para temp)
         if (vmax - vmin) < 10:
             cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
+        else:
+            cb.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
         
         buf = io.BytesIO()
-        # bbox_inches='tight' garante que nada seja cortado
+        # bbox_inches='tight' + pad_inches garante que nada seja cortado
         plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", pad_inches=0.1, transparent=True)
         plt.close(fig)
         buf.seek(0)
-        
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
     except Exception as e:
         print(f"Erro colorbar estática: {e}")
@@ -150,6 +158,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
+        # Gera a legenda estática
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFFFFF", "#000000"])
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
