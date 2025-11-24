@@ -92,7 +92,6 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
         
-        # --- CORREÇÃO DE LAYOUT AQUI ---
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
         data_fim = df_clean['date'].max().strftime('%d/%m/%Y')
         
@@ -100,7 +99,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             title=dict(
                 text=f"Série Temporal de {variable}<br><sup>({data_ini} a {data_fim})</sup>", # Dica: Use <sup> para a data ficar menor
                 font=dict(size=28),
-                x=0.5,      # Alinhado à esquerda
+                x=0.25,      # Alinhado à esquerda
                 y=0.95,   # Posição vertical (0 a 1)
                 xanchor='left',
                 yanchor='top'
@@ -188,6 +187,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
 
 
 
