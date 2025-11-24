@@ -1,5 +1,5 @@
 # ==================================================================================
-# map_visualizer.py (v99 - Restauração Fiel da Versão Funcional)
+# map_visualizer.py
 # ==================================================================================
 
 import streamlit as st
@@ -9,9 +9,9 @@ import io
 import base64
 import requests
 from PIL import Image
-import numpy as np 
+import numpy as np
+import matplotlib.ticker as ticker
 
-# --- ÚNICA ADIÇÃO NECESSÁRIA: Backend para Servidor ---
 import matplotlib
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
@@ -102,55 +102,60 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     """
-    Restaura EXATAMENTE a função que você enviou, que usa BoundaryNorm
-    para criar a barra discreta (degraus) em vez de contínua.
+    Gera colorbar estático limitando o número de ticks para evitar sobreposição.
     """
-    # Dimensões originais que funcionavam
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
     
     try:
         N_STEPS = len(palette)
-        # Cria boundaries exatos baseados no min/max
         boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
         
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
         
+        # --- MUDANÇA 1: Removemos 'ticks=boundaries' daqui ---
         cb = ColorbarBase(
             ax, 
             cmap=cmap, 
             norm=norm, 
             boundaries=boundaries, 
-            ticks=boundaries, 
+            # ticks=boundaries,  <-- REMOVIDO: Isso causava a sobreposição
             spacing='proportional', 
             orientation="horizontal"
         )
         
         cb.set_label(label, fontsize=7)
         
-        # Formatação inteligente dos ticks
+        # --- MUDANÇA 2: Limitador inteligente de Ticks ---
+        # Define que queremos no MÁXIMO 6 números na barra
+        locator = ticker.MaxNLocator(nbins=6)
+        cb.locator = locator
+        
+        # --- MUDANÇA 3: Formatador (mantendo sua lógica original) ---
         if (vmax - vmin) < 10:
-            # Decimais para umidade
-            cb.ax.set_xticklabels([f'{t:.2f}' for t in boundaries])
+            # Se a variação for pequena (ex: umidade 0.5 a 0.8), usa 2 casas decimais
+            formatter = ticker.FormatStrFormatter('%.2f')
         else:
-            # Inteiros para o resto (usando :g para limpar zeros desnecessários)
-            cb.ax.set_xticklabels([f'{t:g}' for t in boundaries])
+            # Se for grande (ex: temp 20 a 30), usa inteiro (ou %.0f)
+            # O FormatStrFormatter é mais seguro que o loop manual anterior
+            formatter = ticker.FormatStrFormatter('%.0f')
             
+        cb.formatter = formatter
+        cb.update_ticks() # Aplica as mudanças
+        
         cb.ax.tick_params(labelsize=6, length=2, pad=1)
         
         buf = io.BytesIO()
-        # Adicionado facecolor='white' para garantir visibilidade
         plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
         plt.close(fig)
         buf.seek(0)
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
         
     except Exception as e:
-        st.error(f"Erro legenda: {e}") # Debug
+        st.error(f"Erro legenda: {e}")
         plt.close(fig)
         return None
-
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
         visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
@@ -221,3 +226,4 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
