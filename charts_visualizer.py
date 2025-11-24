@@ -93,23 +93,25 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         fig = _create_chart_figure(df_clean, variable, unit)
         
         # --- CORREÇÃO: Adicionar título DENTRO da figura para exportação ---
-        # Pega as datas formatadas para o título
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
         data_fim = df_clean['date'].max().strftime('%d/%m/%Y')
         
-        # Define o título dinâmico
         fig.update_layout(
             title=dict(
                 text=f"Série Temporal de {variable} ({data_ini} a {data_fim})",
                 font=dict(size=16),
-                x=0,  # Alinhamento à esquerda (ou 0.5 para centro)
+                x=0, 
                 y=0.98
             ),
-            margin=dict(t=80)  # Aumenta margem superior para caber o título
+            margin=dict(t=80) 
         )
         # -------------------------------------------------------------------
 
         st.plotly_chart(fig, use_container_width=True)
+        
+    except Exception as e:  # <--- ESTA PARTE ESTAVA FALTANDO
+        st.error(f"Erro ao plotar gráfico: {e}")
+        return
 
     # 2. Download Imagem
     variable_clean = variable.split(" (")[0].lower().replace(" ", "_")
@@ -122,7 +124,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     except ValueError:
         with col_img1: st.warning("Instale `kaleido` para baixar imagens.")
 
-    # 3. GUIA DE ÍCONES E AJUDA (ATUALIZADO v102)
+    # 3. GUIA DE ÍCONES E AJUDA
     with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
         st.markdown("""
         Ao passar o mouse sobre o canto superior direito do gráfico, você verá uma barra de ferramentas:
@@ -183,4 +185,3 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-
