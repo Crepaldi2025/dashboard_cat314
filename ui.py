@@ -1,6 +1,10 @@
 # ==================================================================================
-# ui.py (Versão v80 - Data Padrão Segura)
+# ui.py - Interface de Usuário
 # ==================================================================================
+
+# ----------------------
+# Bibliotecas importadas
+# ----------------------
 
 import streamlit as st
 from datetime import datetime
@@ -15,7 +19,10 @@ import tempfile
 import pytz
 import re
 
-# Configuração da Página
+# ------------------------------
+# Configuração da Página e Cache
+# ------------------------------
+
 st.set_page_config(
     page_title="Clima-Cast-Crepaldi",
     layout="wide",
@@ -40,6 +47,10 @@ def _carregar_texto_docx(file_path):
         return "\n\n".join(full_text)
     except Exception: return None
 
+# -----------------------
+# Apagar dados da memória
+# -----------------------
+
 def reset_analysis_state():
     for key in ['analysis_triggered', 'analysis_results', 'drawn_geometry']:
         if key in st.session_state: del st.session_state[key]
@@ -47,7 +58,11 @@ def reset_analysis_state():
 def reset_analysis_results_only():
     for key in ['analysis_triggered', 'analysis_results']:
         if key in st.session_state: del st.session_state[key]
-    
+
+# --------------------------
+# Renderizar a barra lateral
+# --------------------------
+
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
         # --- 1. TÍTULO ---
@@ -225,6 +240,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         return opcao
 
+# -----------------------------
+# Renderizar a página principal
+# -----------------------------
+
 def renderizar_pagina_principal(opcao):
     st.markdown("""<style>.block-container{padding-top:3rem!important;padding-bottom:5rem!important}h1{margin-top:0rem!important}.stExpander{border:1px solid #f0f2f6;border-radius:8px}</style>""", unsafe_allow_html=True)
     fuso_br = pytz.timezone('America/Sao_Paulo')
@@ -266,6 +285,10 @@ def renderizar_resumo_selecao():
                  if data: per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
             st.markdown(f"**Período ({periodo}):**\n{per_txt}")
 
+# -------------------------------------
+# Renderizar a opção sobre o aplicativo
+# -------------------------------------
+
 def renderizar_pagina_sobre():
     st.title("Sobre o Clima-Cast-Crepaldi")
     st.markdown("---")
@@ -285,4 +308,5 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
