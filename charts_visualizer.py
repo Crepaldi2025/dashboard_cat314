@@ -92,24 +92,27 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
         
-        # --- CORREÇÃO: Adicionar título DENTRO da figura para exportação ---
+        # --- CORREÇÃO DE LAYOUT AQUI ---
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
         data_fim = df_clean['date'].max().strftime('%d/%m/%Y')
         
         fig.update_layout(
             title=dict(
-                text=f"Série Temporal de {variable} ({data_ini} a {data_fim})",
-                font=dict(size=16),
-                x=0, 
-                y=0.98
+                text=f"Série Temporal de {variable}<br><sup>({data_ini} a {data_fim})</sup>", # Dica: Use <sup> para a data ficar menor
+                font=dict(size=18),
+                x=0,      # Alinhado à esquerda
+                y=0.95,   # Posição vertical (0 a 1)
+                xanchor='left',
+                yanchor='top'
             ),
-            margin=dict(t=80) 
+            # Aumentamos 't' (top) para 110 para dar espaço ao título sem bater no gráfico
+            margin=dict(t=110, l=60, r=30, b=60) 
         )
         # -------------------------------------------------------------------
 
         st.plotly_chart(fig, use_container_width=True)
         
-    except Exception as e:  # <--- ESTA PARTE ESTAVA FALTANDO
+    except Exception as e:
         st.error(f"Erro ao plotar gráfico: {e}")
         return
 
@@ -185,3 +188,4 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
