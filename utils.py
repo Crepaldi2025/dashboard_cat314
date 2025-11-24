@@ -36,7 +36,8 @@ def get_date_range(tipo_periodo, session_state):
         mes_nome = session_state.mes_mensal
         mes_num = MESES_PARA_NUMEROS.get(mes_nome.capitalize(), 1)
         ultimo_dia = calendar.monthrange(ano, mes_num)[1]
-    return date(ano, mes_num, 1), date(ano, mes_num, ultimo_dia)
+        return date(ano, mes_num, 1), date(ano, mes_num, ultimo_dia)
     
-return None, None
+    return None, None
+
 
