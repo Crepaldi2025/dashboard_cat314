@@ -1,6 +1,10 @@
 # ==================================================================================
 # charts_visualizer.py
 # ==================================================================================
+
+# ------------
+#
+# 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -187,6 +191,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
 
 
 
