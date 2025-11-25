@@ -10,11 +10,12 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     
     variable_name = variable.split(" (")[0]
     
+    # Cria o gráfico base JÁ SEM TÍTULO (title=None)
     fig = px.line(
         df,
         x='date',
         y='value',
-        title=None, # Título inicial nulo
+        title=None, 
         labels={
             "date": "Data",
             "value": f"{variable_name} ({unit})"
@@ -94,9 +95,10 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         # -------------------------------------------------------------------------
         # FASE 1: EXIBIÇÃO NA TELA (SEM TÍTULO)
         # -------------------------------------------------------------------------
+        # CORREÇÃO: Removemos 'title=None' para evitar o bug "undefined".
+        # Apenas ajustamos a margem para ficar bonito na tela.
         fig.update_layout(
-            title=None, 
-            margin=dict(t=40, l=60, r=30, b=60) # Margem superior pequena (t=40)
+            margin=dict(t=40, l=60, r=30, b=60) 
         )
         
         st.plotly_chart(fig, use_container_width=True)
@@ -112,14 +114,14 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         fig.update_layout(
             title=dict(
                 text=f"<b>Série Temporal de {variable}</b><br><sup>({data_ini} a {data_fim})</sup>",
-                font=dict(size=24), # FONTE GRANDE
+                font=dict(size=24), # FONTE GRANDE para exportação
                 x=0, 
                 y=0.95,
                 xanchor='left',
                 yanchor='top'
             ),
             # Aumentamos a margem superior (t=130) para caber o título na imagem
-            margin=dict(t=150, l=80, r=30, b=60) 
+            margin=dict(t=190, l=80, r=30, b=60) 
         )
         
     except Exception as e:
@@ -201,4 +203,3 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-
