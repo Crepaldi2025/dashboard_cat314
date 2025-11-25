@@ -119,7 +119,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
                 yanchor='top'
             ),
             # Aumentamos a margem superior (t=130) para caber o título na imagem
-            margin=dict(t=130, l=60, r=30, b=60) 
+            margin=dict(t=150, l=80, r=30, b=60) 
         )
         
     except Exception as e:
@@ -201,3 +201,4 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
