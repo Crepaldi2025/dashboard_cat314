@@ -2,13 +2,17 @@
 # charts_visualizer.py
 # ==================================================================================
 
-# ------------
-#
-# 
+# ----------------------
+# - Importar bibliotecas
+# ----------------------
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io 
+
+# --------------
+# - Criar figura
+# --------------
 
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     
@@ -25,8 +29,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         },
         markers=True
     )
-
-    # Estilização Científica
+    
     fig.update_layout(
         xaxis=dict(
             showline=True, linecolor='black', linewidth=1, ticks='outside', ticklen=6, tickcolor='black',
@@ -62,11 +65,19 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
 
     return fig
 
+# -------------------
+# - Buffer de memória
+# -------------------
+
 def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Dados')
     return excel_buffer.getvalue()
+
+# ---------------
+# - Gerar gráfico
+# ---------------
 
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     st.markdown("""<style>div[data-testid="stMetricValue"] { font-size: 1.1rem; }</style>""", unsafe_allow_html=True)
@@ -111,8 +122,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             # Aumentamos 't' (top) para 110 para dar espaço ao título sem bater no gráfico
             margin=dict(t=200, l=80, r=30, b=60) 
         )
-        # -------------------------------------------------------------------
-
+        
         st.plotly_chart(fig, use_container_width=True)
         
     except Exception as e:
@@ -130,7 +140,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     except ValueError:
         with col_img1: st.warning("Instale `kaleido` para baixar imagens.")
 
-    # 3. GUIA DE ÍCONES E AJUDA
+    # 3. Guia de ícones e ajuda
     with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
         st.markdown("""
         Ao passar o mouse sobre o canto superior direito do gráfico, você verá uma barra de ferramentas:
@@ -191,11 +201,4 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-
-
-
-
-
-
-
 
