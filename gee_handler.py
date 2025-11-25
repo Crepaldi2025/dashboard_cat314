@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (v83 - Correção Definitiva de Bandas e Datas)
+# gee_handler.py
 # ==================================================================================
 import streamlit as st
 import json
@@ -31,19 +31,19 @@ def initialize_gee(): return inicializar_gee()
 ERA5_VARS = {
     "Temperatura do Ar (2m)": {
         "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean",
-        "vis_params": {"min": 0, "max": 35, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000', '#800000'], "caption": "Temperatura (°C)"}
+        "vis_params": {"min": 0, "max": 45, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000', '#800000'], "caption": "Temperatura (°C)"}
     },
     "Temperatura do Ponto de Orvalho (2m)": {
         "band": "dewpoint_temperature_2m", "result_band": "dewpoint_temperature_2m", "unit": "°C", "aggregation": "mean",
-        "vis_params": {"min": 0, "max": 30, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000'], "caption": "Ponto de Orvalho (°C)"}
+        "vis_params": {"min": -10, "max": 30, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000'], "caption": "Ponto de Orvalho (°C)"}
     },
     "Temperatura da Superfície (Skin)": {
         "band": "skin_temperature", "result_band": "skin_temperature", "unit": "°C", "aggregation": "mean",
-        "vis_params": {"min": 10, "max": 50, "palette": ['#040274', '#040281', '#0502a3', '#0502b8', '#0502ce', '#0502e6', '#0602ff', '#235cb1', '#307ef3', '#269db1', '#30c8e2', '#32d3ef', '#3be285', '#3ff38f', '#86e26f', '#3ae237', '#b5e22e', '#d6e21f', '#fff705', '#ffd611', '#ffb613', '#ff8b13', '#ff6e08', '#ff500d', '#ff0000', '#de0101', '#c21301', '#a71001', '#911003'], "caption": "Temp. Superfície (°C)"}
+        "vis_params": {"min": 0, "max": 50, "palette": ['#040274', '#040281', '#0502a3', '#0502b8', '#0502ce', '#0502e6', '#0602ff', '#235cb1', '#307ef3', '#269db1', '#30c8e2', '#32d3ef', '#3be285', '#3ff38f', '#86e26f', '#3ae237', '#b5e22e', '#d6e21f', '#fff705', '#ffd611', '#ffb613', '#ff8b13', '#ff6e08', '#ff500d', '#ff0000', '#de0101', '#c21301', '#a71001', '#911003'], "caption": "Temp. Superfície (°C)"}
     },
     "Precipitação Total": {
         "band": "total_precipitation_sum", "result_band": "total_precipitation_sum", "unit": "mm", "aggregation": "sum",
-        "vis_params": {"min": 0, "max": 50, "palette": ['#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476', '#31A354', '#006D2C', '#08519C', '#08306B'], "caption": "Precipitação (mm)"}
+        "vis_params": {"min": 0, "max": 500, "palette": ['#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476', '#31A354', '#006D2C', '#08519C', '#08306B'], "caption": "Precipitação (mm)"}
     },
     "Umidade Relativa (2m)": {
         "bands": ["temperature_2m", "dewpoint_temperature_2m"], "result_band": "relative_humidity", "unit": "%", "aggregation": "mean",
@@ -55,13 +55,13 @@ ERA5_VARS = {
     },
     "Velocidade do Vento (10m)": {
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
-        "vis_params": {"min": 0, "max": 15, "palette": ['#FFFFFF', '#E6F5FF', '#CDE0F7', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B'], "caption": "Vento (m/s)"}
+        "vis_params": {"min": 0, "max": 35, "palette": ['#FFFFFF', '#E6F5FF', '#CDE0F7', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B'], "caption": "Vento (m/s)"}
     },
     # Solo
-    "Umidade do Solo (0-7 cm)": { "band": "volumetric_soil_water_layer_1", "result_band": "volumetric_soil_water_layer_1", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (0-7cm)"} },
-    "Umidade do Solo (7-28 cm)": { "band": "volumetric_soil_water_layer_2", "result_band": "volumetric_soil_water_layer_2", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (7-28cm)"} },
-    "Umidade do Solo (28-100 cm)": { "band": "volumetric_soil_water_layer_3", "result_band": "volumetric_soil_water_layer_3", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (28-100cm)"} },
-    "Umidade do Solo (100-289 cm)": { "band": "volumetric_soil_water_layer_4", "result_band": "volumetric_soil_water_layer_4", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.1, "max": 0.5, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (1-3m)"} },
+    "Umidade do Solo (0-7 cm)": { "band": "volumetric_soil_water_layer_1", "result_band": "volumetric_soil_water_layer_1", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (0-7cm)"} },
+    "Umidade do Solo (7-28 cm)": { "band": "volumetric_soil_water_layer_2", "result_band": "volumetric_soil_water_layer_2", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (7-28cm)"} },
+    "Umidade do Solo (28-100 cm)": { "band": "volumetric_soil_water_layer_3", "result_band": "volumetric_soil_water_layer_3", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (28-100cm)"} },
+    "Umidade do Solo (100-289 cm)": { "band": "volumetric_soil_water_layer_4", "result_band": "volumetric_soil_water_layer_4", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (1-3m)"} },
 }
 
 FALLBACK_UF_MAP = {'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'}
@@ -243,3 +243,4 @@ def _get_series_generic(variable, start, end, geom):
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
         return df.dropna().sort_values('date')
     except: return pd.DataFrame()
+
