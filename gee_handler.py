@@ -43,7 +43,7 @@ ERA5_VARS = {
     },
     "Precipitação Total": {
         "band": "total_precipitation_sum", "result_band": "total_precipitation_sum", "unit": "mm", "aggregation": "sum",
-        "vis_params": {"min": 0, "max": 500, "palette": ['#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476', '#31A354', '#006D2C', '#08519C', '#08306B'], "caption": "Precipitação (mm)"}
+        "vis_params": {"min": 0, "max": 4000, "palette": ['#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476', '#31A354', '#006D2C', '#08519C', '#08306B'], "caption": "Precipitação (mm)"}
     },
     "Umidade Relativa (2m)": {
         "bands": ["temperature_2m", "dewpoint_temperature_2m"], "result_band": "relative_humidity", "unit": "%", "aggregation": "mean",
@@ -243,4 +243,5 @@ def _get_series_generic(variable, start, end, geom):
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
         return df.dropna().sort_values('date')
     except: return pd.DataFrame()
+
 
