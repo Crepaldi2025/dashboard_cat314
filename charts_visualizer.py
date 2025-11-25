@@ -1,19 +1,10 @@
 # ==================================================================================
 # charts_visualizer.py
 # ==================================================================================
-
-# ----------------------
-# - Importar bibliotecas
-# ----------------------
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import io 
-
-# --------------
-# - Criar figura
-# --------------
+import io
 
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     
@@ -23,14 +14,15 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         df,
         x='date',
         y='value',
-        title=None,
+        title=None, # Título inicial nulo
         labels={
             "date": "Data",
             "value": f"{variable_name} ({unit})"
         },
         markers=True
     )
-    
+
+    # Estilização Científica
     fig.update_layout(
         xaxis=dict(
             showline=True, linecolor='black', linewidth=1, ticks='outside', ticklen=6, tickcolor='black',
@@ -54,8 +46,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         ),
         plot_bgcolor='white', paper_bgcolor='white',
         font=dict(family="Arial, sans-serif", size=14, color="black"),
-        margin=dict(l=60, r=30, t=50, b=60),
-        height=450, hovermode="x"
+        hovermode="x"
     )
     
     fig.update_traces(
@@ -66,19 +57,11 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
 
     return fig
 
-# -------------------
-# - Buffer de memória
-# -------------------
-
 def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Dados')
     return excel_buffer.getvalue()
-
-# ---------------
-# - Gerar gráfico
-# ---------------
 
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     st.markdown("""<style>div[data-testid="stMetricValue"] { font-size: 1.1rem; }</style>""", unsafe_allow_html=True)
@@ -108,23 +91,36 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
         
+        # -------------------------------------------------------------------------
+        # FASE 1: EXIBIÇÃO NA TELA (SEM TÍTULO)
+        # -------------------------------------------------------------------------
+        fig.update_layout(
+            title=None, 
+            margin=dict(t=40, l=60, r=30, b=60) # Margem superior pequena (t=40)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # -------------------------------------------------------------------------
+        # FASE 2: PREPARAÇÃO PARA DOWNLOAD (COM TÍTULO)
+        # -------------------------------------------------------------------------
+        # A partir daqui, modificamos a figura APENAS na memória para gerar a imagem
+        
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
         data_fim = df_clean['date'].max().strftime('%d/%m/%Y')
         
         fig.update_layout(
             title=dict(
-                text=f"Série Temporal de {variable}<br><sup>({data_ini} a {data_fim})</sup>", # Dica: Use <sup> para a data ficar menor
-                font=dict(size=28),
-                x=0.25,      # Alinhado à esquerda
-                y=0.95,   # Posição vertical (0 a 1)
+                text=f"<b>Série Temporal de {variable}</b><br><sup>({data_ini} a {data_fim})</sup>",
+                font=dict(size=24), # FONTE GRANDE
+                x=0, 
+                y=0.95,
                 xanchor='left',
                 yanchor='top'
             ),
-            # Aumentamos 't' (top) para 110 para dar espaço ao título sem bater no gráfico
-            margin=dict(t=200, l=80, r=30, b=60) 
+            # Aumentamos a margem superior (t=130) para caber o título na imagem
+            margin=dict(t=130, l=60, r=30, b=60) 
         )
-        
-        st.plotly_chart(fig, use_container_width=True)
         
     except Exception as e:
         st.error(f"Erro ao plotar gráfico: {e}")
@@ -133,15 +129,18 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     # 2. Download Imagem
     variable_clean = variable.split(" (")[0].lower().replace(" ", "_")
     col_img1, col_img2, _ = st.columns([1, 1, 2])
+    
     try:
+        # Gera as imagens usando a figura modificada (com título)
         img_png = fig.to_image(format="png", width=1200, height=800, scale=2)
         img_jpg = fig.to_image(format="jpeg", width=1200, height=800, scale=2)
+        
         with col_img1: st.download_button("📷 Baixar Gráfico (PNG)", data=img_png, file_name=f"grafico_{variable_clean}.png", mime="image/png", use_container_width=True)
         with col_img2: st.download_button("📷 Baixar Gráfico (JPG)", data=img_jpg, file_name=f"grafico_{variable_clean}.jpg", mime="image/jpeg", use_container_width=True)
     except ValueError:
         with col_img1: st.warning("Instale `kaleido` para baixar imagens.")
 
-    # 3. Guia de ícones e ajuda
+    # 3. GUIA DE ÍCONES E AJUDA
     with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
         st.markdown("""
         Ao passar o mouse sobre o canto superior direito do gráfico, você verá uma barra de ferramentas:
@@ -202,5 +201,3 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-
-
