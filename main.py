@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (v101 - Fix Polígono em Série Temporal + Satélite)
+# main.py
 # ==================================================================================
 import streamlit as st
 import ui
@@ -245,8 +245,7 @@ def main():
         opcao_menu in ["Mapas", "Séries Temporais"] and 
         st.session_state.get('tipo_localizacao') == "Polígono"
     )
-    # ----------------------------------------------------------------
-    
+        
     is_running = st.session_state.get("analysis_triggered", False)
     has_geom = 'drawn_geometry' in st.session_state
     has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
@@ -261,3 +260,4 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
