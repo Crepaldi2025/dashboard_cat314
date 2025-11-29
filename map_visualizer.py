@@ -147,20 +147,43 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         return None
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
-        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
-        final = visualized_data.blend(outline.visualize(palette='000000'))
+        # 1. Criar Fundo de Satélite (Sentinel-2)
+        # Filtra imagens de 2023 com poucas nuvens e faz a mediana para limpar o visual
+        s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
+            .filterBounds(feature.geometry()) \
+            .filterDate('2023-01-01', '2024-01-01') \
+            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20)) \
+            .median() \
+            .visualize(min=0, max=3000, bands=['B4', 'B3', 'B2'])
 
+        # 2. Visualizar os Dados Climáticos (Sua camada de dados)
+        visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
+        
+        # 3. Visualizar o Contorno (Linha preta)
+        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
+        outline_vis = outline.visualize(palette='000000')
+
+        # 4. Composição Final: Fundo Satélite -> Dados -> Contorno
+        # O blend coloca uma camada sobre a outra
+        final = s2.blend(visualized_data).blend(outline_vis)
+
+        # 5. Definir a região de recorte (Bounding Box + margem de 5%)
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
+            # Cálculo simples de dimensão para buffer (aproximado)
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
-            region = feature.geometry().buffer(dim * 0.05)
-        except: region = feature.geometry()
+            region = feature.geometry().buffer(dim * 0.05).bounds()
+        except: 
+            region = feature.geometry().bounds()
 
+        # 6. Gerar URL e baixar imagem
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
         img = Image.open(io.BytesIO(img_bytes))
+        
+        # Não precisamos mais criar fundo branco, pois o satélite preenche o fundo
+        # Mas mantemos a conversão para garantir compatibilidade
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
         
@@ -169,9 +192,9 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
+        # Legenda
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFF", "#000"])
-        
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
@@ -213,5 +236,6 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
