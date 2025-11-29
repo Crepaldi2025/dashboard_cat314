@@ -145,10 +145,16 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         st.error(f"Erro legenda: {e}")
         plt.close(fig)
         return None
+
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # 1. Criar Fundo de Satélite (Sentinel-2)
-        # Filtra imagens de 2023 com poucas nuvens e faz a mediana para limpar o visual
+        # 1. BASE DE FUNDO (Proteção para Oceanos)
+        # Cria um fundo cinza/azulado. Se o Sentinel-2 não cobrir a área (ex: alto mar),
+        # aparecerá esta cor em vez de branco/transparente.
+        background_fill = ee.Image.constant(1).visualize(palette=['#2a2a2a'])
+
+        # 2. SATÉLITE (Sentinel-2)
+        # Tenta pegar imagem de satélite. Onde não houver (nuvens/mar), será transparente.
         s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
             .filterBounds(feature.geometry()) \
             .filterDate('2023-01-01', '2024-01-01') \
@@ -156,34 +162,42 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
             .median() \
             .visualize(min=0, max=3000, bands=['B4', 'B3', 'B2'])
 
-        # 2. Visualizar os Dados Climáticos (Sua camada de dados)
-        visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
+        # 3. DADOS CLIMÁTICOS
+        visualized_data = ee_image.visualize(
+            min=vis_params["min"], 
+            max=vis_params["max"], 
+            palette=vis_params["palette"]
+        )
         
-        # 3. Visualizar o Contorno (Linha preta)
-        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
+        # 4. CONTORNO
+        outline = ee.Image().paint(
+            featureCollection=ee.FeatureCollection([feature]), 
+            color=0, 
+            width=2
+        )
         outline_vis = outline.visualize(palette='000000')
 
-        # 4. Composição Final: Fundo Satélite -> Dados -> Contorno
-        # O blend coloca uma camada sobre a outra
-        final = s2.blend(visualized_data).blend(outline_vis)
+        # 5. MONTAGEM (BLEND)
+        # Ordem: Fundo Sólido -> Satélite -> Dados -> Contorno
+        final = background_fill.blend(s2).blend(visualized_data).blend(outline_vis)
 
-        # 5. Definir a região de recorte (Bounding Box + margem de 5%)
+        # 6. DEFINIR REGIÃO
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
-            # Cálculo simples de dimensão para buffer (aproximado)
+            # Dimensão aproximada da área
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
-            region = feature.geometry().buffer(dim * 0.05).bounds()
+            # Aumentei a margem para 15% (0.15) para dar mais contexto ao redor
+            region = feature.geometry().buffer(dim * 0.15).bounds()
         except: 
             region = feature.geometry().bounds()
 
-        # 6. Gerar URL e baixar imagem
+        # 7. EXPORTAÇÃO
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
         img = Image.open(io.BytesIO(img_bytes))
         
-        # Não precisamos mais criar fundo branco, pois o satélite preenche o fundo
-        # Mas mantemos a conversão para garantir compatibilidade
+        # Fundo branco apenas para compor o JPEG final, caso sobre transparência
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
         
@@ -198,6 +212,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
+
     except Exception as e:
         st.error(f"Erro estático: {e}")
         return None, None, None
@@ -236,6 +251,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
