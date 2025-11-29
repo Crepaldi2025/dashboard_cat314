@@ -148,11 +148,10 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # 1. BASE DE FUNDO (Proteção para Oceanos/Áreas sem satélite)
-        # Cor cinza escura para preencher buracos do satélite
+        # 1. BASE DE FUNDO (Proteção para Oceanos)
         background_fill = ee.Image.constant(1).visualize(palette=['#202020'])
 
-        # 2. SATÉLITE (Sentinel-2)
+        # 2. SATÉLITE (Sentinel-2) - Fundo Realista
         s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
             .filterBounds(feature.geometry()) \
             .filterDate('2023-01-01', '2024-01-01') \
@@ -160,14 +159,24 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
             .median() \
             .visualize(min=0, max=3000, bands=['B4', 'B3', 'B2'])
 
-        # 3. DADOS CLIMÁTICOS
+        # 3. CAMADA DE REFERÊNCIA (Estados/Limites Administrativos)
+        # Adiciona limites estaduais/provinciais para dar contexto de "cidades/localização"
+        # FAO GAUL: Global Administrative Unit Layers
+        states = ee.FeatureCollection("FAO/GAUL/2015/level1")
+        # Filtra apenas para a região do mapa para ficar mais leve
+        states_local = states.filterBounds(feature.geometry().buffer(100000))
+        
+        # Pinta as bordas dos estados de branco semi-transparente
+        states_vis = ee.Image().paint(states_local, 0, 1).visualize(palette=['ffffff'], opacity=0.6)
+
+        # 4. DADOS CLIMÁTICOS
         visualized_data = ee_image.visualize(
             min=vis_params["min"], 
             max=vis_params["max"], 
             palette=vis_params["palette"]
         )
         
-        # 4. CONTORNO
+        # 5. CONTORNO DO POLÍGONO DO USUÁRIO
         outline = ee.Image().paint(
             featureCollection=ee.FeatureCollection([feature]), 
             color=0, 
@@ -175,32 +184,26 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         )
         outline_vis = outline.visualize(palette='000000')
 
-        # 5. MONTAGEM (Camadas)
-        # Blend coloca uma sobre a outra. 
-        final = background_fill.blend(s2).blend(visualized_data).blend(outline_vis)
+        # 6. MONTAGEM FINAL
+        # Ordem: Fundo -> Satélite -> Fronteiras(Estados) -> Dados -> Contorno do Polígono
+        final = background_fill.blend(s2).blend(states_vis).blend(visualized_data).blend(outline_vis)
 
-        # 6. DEFINIR REGIÃO
+        # 7. DEFINIR REGIÃO
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
-            # Buffer de 15% para dar margem
             region = feature.geometry().buffer(dim * 0.15).bounds()
         except: 
             region = feature.geometry().bounds()
 
-        # 7. DOWNLOAD DA IMAGEM
+        # 8. DOWNLOAD
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
-        # --- CORREÇÃO DO ERRO AQUI ---
-        # Abre a imagem e FORÇA a conversão para RGBA (garante canal Alpha)
+        # Converte para RGBA para evitar erro de máscara
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-        # -----------------------------
         
-        # Cria fundo branco (caso haja transparência residual)
         bg = Image.new("RGBA", img.size, "WHITE")
-        
-        # Agora o paste funciona porque 'img' garantidamente tem canal Alpha
         bg.paste(img, (0, 0), img)
         
         buf = io.BytesIO()
@@ -253,6 +256,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
