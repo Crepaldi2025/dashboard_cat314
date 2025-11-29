@@ -146,63 +146,44 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         plt.close(fig)
         return None
 
+# ==============================================================================
+# No arquivo: map_visualizer.py
+# Substitua a função create_static_map por esta versão (LEVE e RÁPIDA)
+# ==============================================================================
+
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # 1. BASE DE FUNDO (Proteção para Oceanos)
-        background_fill = ee.Image.constant(1).visualize(palette=['#202020'])
-
-        # 2. SATÉLITE (Sentinel-2) - Fundo Realista
-        s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
-            .filterBounds(feature.geometry()) \
-            .filterDate('2023-01-01', '2024-01-01') \
-            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20)) \
-            .median() \
-            .visualize(min=0, max=3000, bands=['B4', 'B3', 'B2'])
-
-        # 3. CAMADA DE REFERÊNCIA (Estados/Limites Administrativos)
-        # Adiciona limites estaduais/provinciais para dar contexto de "cidades/localização"
-        # FAO GAUL: Global Administrative Unit Layers
-        states = ee.FeatureCollection("FAO/GAUL/2015/level1")
-        # Filtra apenas para a região do mapa para ficar mais leve
-        states_local = states.filterBounds(feature.geometry().buffer(100000))
-        
-        # Pinta as bordas dos estados de branco semi-transparente
-        states_vis = ee.Image().paint(states_local, 0, 1).visualize(palette=['ffffff'], opacity=0.6)
-
-        # 4. DADOS CLIMÁTICOS
+        # 1. Visualizar os Dados Climáticos
         visualized_data = ee_image.visualize(
             min=vis_params["min"], 
             max=vis_params["max"], 
             palette=vis_params["palette"]
         )
         
-        # 5. CONTORNO DO POLÍGONO DO USUÁRIO
-        outline = ee.Image().paint(
-            featureCollection=ee.FeatureCollection([feature]), 
-            color=0, 
-            width=2
-        )
+        # 2. Visualizar o Contorno (Linha preta)
+        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         outline_vis = outline.visualize(palette='000000')
 
-        # 6. MONTAGEM FINAL
-        # Ordem: Fundo -> Satélite -> Fronteiras(Estados) -> Dados -> Contorno do Polígono
-        final = background_fill.blend(s2).blend(states_vis).blend(visualized_data).blend(outline_vis)
+        # 3. Composição Final: Dados -> Contorno
+        # (Sem satélite pesado, fundo transparente/branco nativo)
+        final = visualized_data.blend(outline_vis)
 
-        # 7. DEFINIR REGIÃO
+        # 4. Definir a região de recorte
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
-            region = feature.geometry().buffer(dim * 0.15).bounds()
+            region = feature.geometry().buffer(dim * 0.05) # Buffer pequeno de 5%
         except: 
-            region = feature.geometry().bounds()
+            region = feature.geometry()
 
-        # 8. DOWNLOAD
+        # 5. Gerar URL e baixar imagem
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
-        # Converte para RGBA para evitar erro de máscara
+        # Processamento seguro da imagem
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         
+        # Cria fundo branco limpo
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
         
@@ -217,7 +198,6 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
-
     except Exception as e:
         st.error(f"Erro estático: {e}")
         return None, None, None
@@ -256,6 +236,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
