@@ -137,6 +137,8 @@ def _calc_rh(img):
     return img.addBands(e.divide(es).multiply(100).rename('relative_humidity').min(100))
 
 def _calc_rad(img, hourly=False):
+    # OBS: Usada apenas para dados Diários ou ERA5-Land.
+    # Para ERA5 Horário (Fluxo), não usamos esta função.
     div = 3600 if hourly else 86400
     band = 'surface_solar_radiation_downwards' if hourly else 'surface_solar_radiation_downwards_sum'
     return img.addBands(img.select(band).divide(div).rename('radiation_wm2'))
@@ -150,14 +152,28 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
     
     # Lógica de Bandas (Fonte)
     band_raw = config.get('band')
+    
+    # --- CORREÇÃO DE RADIAÇÃO HORÁRIA ---
+    # O ERA5-Land Horário é acumulativo (soma 24h à meia-noite). 
+    # Para obter fluxo instantâneo (W/m²) sem erro, usamos o ERA5 GLOBAL.
+    using_era5_global = False
+    
     if is_hourly:
-        if variable == "Precipitação Total": band_raw = "total_precipitation"
-        elif variable == "Radiação Solar Incidente": band_raw = "surface_solar_radiation_downwards"
+        if variable == "Precipitação Total": 
+            band_raw = "total_precipitation"
+        elif variable == "Radiação Solar Incidente": 
+            # Troca para ERA5 Global que tem a banda de fluxo médio (mean_surface_downward_short_wave_radiation_flux)
+            # Isso resolve o problema de valores 4000 W/m² à noite (acumulação).
+            collection_id = 'ECMWF/ERA5/HOURLY'
+            band_raw = "mean_surface_downward_short_wave_radiation_flux"
+            using_era5_global = True
     
     bands_needed = config.get('bands', [band_raw])
-    if is_hourly:
+    if is_hourly and not using_era5_global:
         if variable == "Precipitação Total": bands_needed = ["total_precipitation"]
         elif variable == "Radiação Solar Incidente": bands_needed = ["surface_solar_radiation_downwards"]
+    elif using_era5_global:
+        bands_needed = [band_raw]
 
     try:
         col = ee.ImageCollection(collection_id).filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
@@ -169,7 +185,6 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
 
         # Cálculos Especiais
         if variable == "Velocidade do Vento (10m)":
-            # Seleciona explicitamente u e v para evitar erro de dimensão
             col = col.map(lambda img: img.addBands(
                 img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m'])
                    .pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
@@ -177,7 +192,12 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
         elif variable == "Umidade Relativa (2m)":
             col = col.map(_calc_rh)
         elif variable == "Radiação Solar Incidente":
-            col = col.map(lambda img: _calc_rad(img, is_hourly))
+            if using_era5_global:
+                # Se for ERA5 Global, já vem em W/m². Só renomeia.
+                col = col.map(lambda img: img.select(band_raw).rename('radiation_wm2'))
+            else:
+                # Se for Diário (Land), faz o cálculo padrão
+                col = col.map(lambda img: _calc_rad(img, is_hourly))
         
         # Banda Final para Agregação
         band_agg = config['result_band']
@@ -192,8 +212,11 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
             img_agg = col.first().select(band_agg)
 
         final = img_agg.clip(geometry).float()
+        
+        # Conversão de Unidades
         if config['unit'] == "°C": final = final.subtract(273.15)
         elif config['unit'] == "mm": final = final.multiply(1000)
+        # Radiação W/m² não precisa de conversão aqui se vier do ERA5 Global ou do _calc_rad
 
         if final.bandNames().size().getInfo() == 0: return None
         return final
@@ -243,55 +266,25 @@ def _get_series_generic(variable, start, end, geom):
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
         return df.dropna().sort_values('date')
     except: return pd.DataFrame()
-        
+
 def obter_vis_params_interativo(variavel: str):
-    """
-    Cria widgets na interface principal (dentro de um expander)
-    para permitir ajuste dinâmico de Min e Max da visualização.
-    """
-    # Verifica se a variável existe na configuração global
     if variavel not in ERA5_VARS:
         return {}
 
-    # 1. Obtém os valores padrão definidos no dicionário global
     config_padrao = ERA5_VARS[variavel]['vis_params']
     padrao_min = float(config_padrao.get('min', 0))
     padrao_max = float(config_padrao.get('max', 100))
     
-    # 2. Cria o container recolhível (Expander) na área principal
-    # 'expanded=False' inicia fechado para não ocupar espaço desnecessário
     with st.expander(f"🎨 Ajustar Escala de Cores: {variavel}", expanded=False):
-        
-        # Mostra a legenda e os valores originais para referência
         unidade = ERA5_VARS[variavel].get('unit', '')
         st.caption(f"Unidade: {unidade} | Valores Padrão: {padrao_min} a {padrao_max}")
-        
-        # Cria duas colunas para os inputs ficarem lado a lado
         col1, col2 = st.columns(2)
-        
         with col1:
-            novo_min = st.number_input(
-                "Valor Mínimo", 
-                value=padrao_min, 
-                step=1.0,         # Passo de incremento
-                format="%.1f",    # Formatação visual
-                key=f"min_{variavel}"  # Chave única para o Streamlit não confundir
-            )
-
+            novo_min = st.number_input("Valor Mínimo", value=padrao_min, step=1.0, format="%.1f", key=f"min_{variavel}")
         with col2:
-            novo_max = st.number_input(
-                "Valor Máximo", 
-                value=padrao_max, 
-                step=1.0,
-                format="%.1f",
-                key=f"max_{variavel}"
-            )
+            novo_max = st.number_input("Valor Máximo", value=padrao_max, step=1.0, format="%.1f", key=f"max_{variavel}")
 
-    # 3. Retorna a configuração atualizada para o mapa usar
-    # Fazemos uma cópia (.copy) para garantir que não estamos alterando 
-    # o dicionário global ERA5_VARS permanentemente
     nova_config = config_padrao.copy()
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
-    
     return nova_config
