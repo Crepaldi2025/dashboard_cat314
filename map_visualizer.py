@@ -2,10 +2,6 @@
 # map_visualizer.py
 # ==================================================================================
 
-# ------------------------
-# - Bibliotecas importadas
-# ------------------------
-
 import streamlit as st
 import geemap.foliumap as geemap
 import ee
@@ -18,20 +14,20 @@ import matplotlib.ticker as ticker
 import matplotlib
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colorbar import ColorbarBase
-from matplotlib import cm
 import matplotlib.colors as mcolors 
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
-import folium
+import folium 
 
-# ---------------
-# MAPA INTERATIVO
-# ---------------
+# ------------------------------------------------------------------
+# 1. MAPA INTERATIVO
+# ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
+        # Obtém limites para zoom
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -40,28 +36,33 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         bounds = [[lat_min, lon_min], [lat_max, lon_max]]
         
         # Centro
-        centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
+        centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates'] 
         lon_c, lat_c = centro[0], centro[1]
     except Exception:
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # 1. Cria o mapa SEM basemap definido (para não dar erro de chave/BoxKeyError)
-    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
-    
-    # 2. Adiciona o Fundo ESRI WORLD IMAGERY manualmente (Satélite Verde Escuro)
-    mapa.add_tile_layer(
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        name="Esri World Imagery",
-        attribution="Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-    )
+    # --- SOLUÇÃO DEFINITIVA DO FUNDO ---
+    # Passamos a URL da Esri diretamente no 'tiles' do construtor.
+    # Isso impede que o mapa padrão (OSM) seja carregado.
+    esri_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    esri_attr = "Esri World Imagery"
 
-    # 3. Adiciona Dados e Contorno
+    mapa = geemap.Map(
+        center=[lat_c, lon_c], 
+        zoom=4,
+        tiles=esri_url, # Força o tile da Esri como base primária
+        attr=esri_attr
+    )
+    
+    # Adiciona dados climáticos e contorno
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
-    # 4. Lógica do Marcador (Apenas para Círculo)
+    # --- LÓGICA DO MARCADOR (PINO) ---
+    # Só adiciona o pino se for CÍRCULO.
     tipo_local = st.session_state.get('tipo_localizacao', '')
+    
     if tipo_local == "Círculo (Lat/Lon/Raio)":
         folium.Marker(
             location=[lat_c, lon_c],
@@ -70,6 +71,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
             icon=folium.Icon(color='red', icon='info-sign')
         ).add_to(mapa)
     
+    # Legenda
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
     if bounds:
@@ -77,9 +79,74 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     
     mapa.to_streamlit(height=500, use_container_width=True)
 
-# -------------------
-# COLORBAR INTERATIVO 
-# -------------------
+# ------------------------------------------------------------------
+# 2. MAPA ESTÁTICO
+# ------------------------------------------------------------------
+
+def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
+    try:
+        # 1. Visualização dos Dados
+        visualized_data = ee_image.visualize(
+            min=vis_params["min"], 
+            max=vis_params["max"], 
+            palette=vis_params["palette"]
+        )
+        
+        # 2. Visualização do Contorno
+        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
+        outline_vis = outline.visualize(palette='000000')
+
+        # 3. Composição Inicial
+        final = visualized_data.blend(outline_vis)
+
+        # --- LÓGICA DO PONTO CENTRAL (VERMELHO) ---
+        # Só desenha a bolinha vermelha se for CÍRCULO.
+        tipo_local = st.session_state.get('tipo_localizacao', '')
+
+        if tipo_local == "Círculo (Lat/Lon/Raio)":
+            b = feature.geometry().bounds().getInfo()['coordinates'][0]
+            width_deg = abs(b[2][0] - b[0][0]) 
+            radius_m = max(50, (width_deg * 111000) * 0.015)
+
+            center_geom = feature.geometry().centroid(maxError=1).buffer(radius_m)
+            center_feat = ee.FeatureCollection([ee.Feature(center_geom)])
+            center_vis = ee.Image().paint(center_feat, 0, 0).visualize(palette=['FF0000'])
+            
+            final = final.blend(center_vis)
+
+        # 4. Região
+        try:
+            b = feature.geometry().bounds().getInfo()['coordinates'][0]
+            dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
+            region = feature.geometry().buffer(dim * 0.05)
+        except: 
+            region = feature.geometry()
+
+        # 5. Download
+        url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
+        img_bytes = requests.get(url).content
+        
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        bg = Image.new("RGBA", img.size, "WHITE")
+        bg.paste(img, (0, 0), img)
+        
+        buf = io.BytesIO()
+        bg.convert('RGB').save(buf, format="JPEG")
+        jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
+        png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
+        
+        lbl = vis_params.get("caption", unit_label)
+        pal = vis_params.get("palette", ["#FFF", "#000"])
+        cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
+
+        return png, jpg, cbar
+    except Exception as e:
+        st.error(f"Erro estático: {e}")
+        return None, None, None
+
+# ------------------------------------------------------------------
+# 3. FUNÇÕES AUXILIARES
+# ------------------------------------------------------------------
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     palette = vis_params.get("palette", None)
@@ -90,22 +157,17 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
     N_STEPS = len(palette) 
     step = (vmax - vmin) / N_STEPS
-    if step == 0: step = 1 # Proteção
+    if step == 0: step = 1
     
-    # Cria índices
     index = np.linspace(vmin, vmax, N_STEPS + 1).tolist()
-
-    # Formatação
     if (vmax - vmin) < 10: fmt = '%.2f'
     else: fmt = '%.0f'
 
     colormap = StepColormap(colors=palette, index=index, vmin=vmin, vmax=vmax)
     colormap.fmt = fmt
 
-    # Tenta caption ou usa unit_label
     custom_caption = vis_params.get("caption")
     label = custom_caption if custom_caption else unit_label
-
     colormap.caption = label
     
     html = colormap._repr_html_()
@@ -122,64 +184,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     macro._template = template
     mapa.get_root().add_child(macro)
 
-# -------------
-# MAPA ESTÁTICO
-# -------------
-
-def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
-    try:
-        # 1. Dados
-        visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
-        
-        # 2. Contorno
-        outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
-        outline_vis = outline.visualize(palette='000000')
-        
-        # Composição Base
-        final = visualized_data.blend(outline_vis)
-
-        # 3. Lógica do Ponto Vermelho (Apenas para Círculo)
-        tipo_local = st.session_state.get('tipo_localizacao', '')
-        if tipo_local == "Círculo (Lat/Lon/Raio)":
-            b = feature.geometry().bounds().getInfo()['coordinates'][0]
-            width_deg = abs(b[2][0] - b[0][0]) 
-            radius_m = max(50, (width_deg * 111000) * 0.015)
-
-            center_geom = feature.geometry().centroid(maxError=1).buffer(radius_m)
-            center_feat = ee.FeatureCollection([ee.Feature(center_geom)])
-            center_vis = ee.Image().paint(center_feat, 0, 0).visualize(palette=['FF0000'])
-            
-            final = final.blend(center_vis)
-
-        try:
-            b = feature.geometry().bounds().getInfo()['coordinates'][0]
-            dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
-            region = feature.geometry().buffer(dim * 0.05)
-        except: region = feature.geometry()
-
-        url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
-        img_bytes = requests.get(url).content
-        
-        # Processamento seguro da imagem
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-        bg = Image.new("RGBA", img.size, "WHITE")
-        bg.paste(img, (0, 0), img)
-        
-        buf = io.BytesIO()
-        bg.convert('RGB').save(buf, format="JPEG")
-        jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
-        png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
-        
-        lbl = vis_params.get("caption", unit_label)
-        pal = vis_params.get("palette", ["#FFF", "#000"])
-        
-        cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
-
-        return png, jpg, cbar
-    except Exception as e:
-        st.error(f"Erro estático: {e}")
-        return None, None, None
-
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
@@ -192,22 +196,16 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
                 
         cb = ColorbarBase(
-            ax, 
-            cmap=cmap, 
-            norm=norm, 
-            boundaries=boundaries, 
-            spacing='proportional', 
-            orientation="horizontal"
+            ax, cmap=cmap, norm=norm, boundaries=boundaries, 
+            spacing='proportional', orientation="horizontal"
         )
         
         cb.set_label(label, fontsize=7)
         locator = ticker.MaxNLocator(nbins=6)
         cb.locator = locator
                 
-        if (vmax - vmin) < 10:
-            formatter = ticker.FormatStrFormatter('%.2f')
-        else:
-            formatter = ticker.FormatStrFormatter('%.0f')
+        if (vmax - vmin) < 10: formatter = ticker.FormatStrFormatter('%.2f')
+        else: formatter = ticker.FormatStrFormatter('%.0f')
             
         cb.formatter = formatter
         cb.update_ticks()
