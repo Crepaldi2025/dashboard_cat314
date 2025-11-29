@@ -45,11 +45,11 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     # Cria o mapa
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
     
-    # --- FUNDO: GOOGLE HYBRID (Satélite + Ruas) ---
-    # Escolhi Híbrido para ficar igual ao seu print (Verde/Satélite) mas com contexto
+    # --- FUNDO: GOOGLE SATELLITE (Somente Satélite, sem ruas) ---
+    # lyrs=s : Satellite only
     mapa.add_tile_layer(
-        url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-        name="Google Hybrid",
+        url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        name="Google Satellite",
         attribution="Google"
     )
 
@@ -57,7 +57,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
-    # --- LÓGICA DO MARCADOR ---
+    # --- LÓGICA DO MARCADOR (PINO) ---
     # Só adiciona o pino se for CÍRCULO
     tipo_local = st.session_state.get('tipo_localizacao', '')
     
@@ -97,7 +97,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         # 3. Composição Inicial: Dados -> Contorno
         final = visualized_data.blend(outline_vis)
 
-        # --- LÓGICA DO PONTO CENTRAL ---
+        # --- LÓGICA DO PONTO CENTRAL (VERMELHO) ---
         # Só desenha o ponto vermelho se for CÍRCULO
         tipo_local = st.session_state.get('tipo_localizacao', '')
 
