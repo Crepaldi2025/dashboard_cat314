@@ -149,8 +149,17 @@ def render_analysis_results():
         st.markdown("---") 
         
         if "ee_image" in results:
+            #feature = results["feature"]
+            #vis_params = copy.deepcopy(var_cfg["vis_params"])
+            #tipo_mapa = st.session_state.get("map_type", "Interativo")
+
             feature = results["feature"]
-            vis_params = copy.deepcopy(var_cfg["vis_params"])
+            
+            # --- MODIFICAÇÃO: CHAMADA INTERATIVA ---
+            # Chama a função que desenha os sliders na barra lateral e retorna os valores ajustados
+            vis_params = gee_handler.obter_vis_params_interativo(variavel)
+            # ---------------------------------------
+
             tipo_mapa = st.session_state.get("map_type", "Interativo")
 
             if tipo_mapa == "Interativo":
@@ -261,3 +270,4 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
