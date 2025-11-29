@@ -22,11 +22,12 @@ from branca.element import Template, MacroElement
 import folium 
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (CORREÇÃO DO FUNDO ESRI)
+# 1. MAPA INTERATIVO
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
+        # Obtém limites para zoom
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -34,25 +35,24 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         lat_max = coords[2][1]
         bounds = [[lat_min, lon_min], [lat_max, lon_max]]
         
+        # Centro
         centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates'] 
         lon_c, lat_c = centro[0], centro[1]
     except Exception:
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # Inicializa o mapa
-    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
+    # --- AQUI ESTÁ A SOLUÇÃO DEFINITIVA ---
+    # Ao definir basemap="Esri.WorldImagery" DENTRO do construtor,
+    # ele substitui o OpenStreetMap padrão pelo Satélite da Esri.
+    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, basemap="Esri.WorldImagery")
     
-    # --- CORREÇÃO DEFINITIVA DO FUNDO ---
-    # Adiciona a camada Esri World Imagery (Satélite) como base
-    mapa.add_basemap("Esri.WorldImagery")
-
-    # Adiciona dados e contorno
+    # Adiciona dados climáticos e contorno
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
-    # --- LÓGICA DO MARCADOR ---
-    # O pino vermelho só aparece se for Círculo
+    # --- LÓGICA DO MARCADOR (PINO) ---
+    # O pino SÓ aparece se for CÍRCULO.
     tipo_local = st.session_state.get('tipo_localizacao', '')
     
     if tipo_local == "Círculo (Lat/Lon/Raio)":
@@ -77,22 +77,22 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # Visualização dos Dados
+        # 1. Visualização dos Dados
         visualized_data = ee_image.visualize(
             min=vis_params["min"], 
             max=vis_params["max"], 
             palette=vis_params["palette"]
         )
         
-        # Visualização do Contorno
+        # 2. Visualização do Contorno
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         outline_vis = outline.visualize(palette='000000')
 
-        # Composição Inicial
+        # 3. Composição Inicial
         final = visualized_data.blend(outline_vis)
 
         # --- LÓGICA DO PONTO CENTRAL (VERMELHO) ---
-        # Só desenha a bolinha vermelha se for CÍRCULO
+        # Só desenha a bolinha vermelha se for CÍRCULO.
         tipo_local = st.session_state.get('tipo_localizacao', '')
 
         if tipo_local == "Círculo (Lat/Lon/Raio)":
@@ -106,7 +106,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
             
             final = final.blend(center_vis)
 
-        # Região
+        # 4. Região
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
@@ -114,7 +114,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         except: 
             region = feature.geometry()
 
-        # Download
+        # 5. Download
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
