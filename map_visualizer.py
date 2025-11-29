@@ -22,12 +22,12 @@ from branca.element import Template, MacroElement
 import folium 
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (Fundo Esri Satélite Estável)
+# 1. MAPA INTERATIVO (Esri Satélite Puro - Sem Nomes)
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
-        # Obtém limites
+        # Obtém limites para zoom
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -45,20 +45,25 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     # Inicializa o mapa
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
     
-    # --- URL ESTÁVEL DA ESRI ---
-    # Usando 'services.arcgisonline.com' que é o padrão mais robusto
+    # --- URL DO SATÉLITE PURO DA ESRI (SEM RÓTULOS) ---
+    # Esta URL carrega apenas as imagens aéreas/satélite, sem camadas de texto.
+    url_esri = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    
     mapa.add_tile_layer(
-        url="https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        url=url_esri,
         name="Esri World Imagery",
-        attribution="Esri"
+        attribution="Tiles © Esri"
     )
 
-    # Adiciona camadas
+    # Adiciona dados climáticos
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
+    
+    # Adiciona contorno preto
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
-    # Marcador (Pino) - Só para Círculo
+    # --- LÓGICA DO MARCADOR (Apenas para Círculo) ---
     tipo_local = st.session_state.get('tipo_localizacao', '')
+    
     if tipo_local == "Círculo (Lat/Lon/Raio)":
         folium.Marker(
             location=[lat_c, lon_c],
@@ -67,6 +72,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
             icon=folium.Icon(color='red', icon='info-sign')
         ).add_to(mapa)
     
+    # Legenda
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
     if bounds:
@@ -75,39 +81,40 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Texto Grande + Bolinha Preta)
+# 2. MAPA ESTÁTICO (Bolinha Preta + Texto Lat/Lon)
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # Dados
+        # 1. Dados
         visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
         
-        # Contorno
+        # 2. Contorno
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         outline_vis = outline.visualize(palette='000000')
 
-        # Composição
+        # 3. Composição
         final = visualized_data.blend(outline_vis)
 
-        # Região
+        # Região de recorte
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
             region = feature.geometry().buffer(dim * 0.05)
         except: region = feature.geometry()
 
-        # Download
+        # Download da Imagem (Fundo Transparente/Branco - Leve)
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
-        # Edição PIL
+        # Abre imagem para edição com PIL
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         
-        # DESENHO MANUAL: Bolinha Preta + Texto GRANDE
+        # --- DESENHO MANUAL: Bolinha Preta + Texto (Apenas se for Círculo) ---
         tipo_local = st.session_state.get('tipo_localizacao', '')
         if tipo_local == "Círculo (Lat/Lon/Raio)":
             try:
+                # Coordenadas do centro
                 centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
                 lon_txt, lat_txt = centro[0], centro[1]
 
@@ -115,41 +122,38 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
                 w, h = img.size
                 cx, cy = w / 2, h / 2
                 
-                # Bolinha Preta
+                # 1. Bolinha Preta (Raio 5)
                 r = 5
                 draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill="black", outline="white", width=1)
                 
-                # Texto
-                texto = f"lat={lat_txt:.2f}\nlon={lon_txt:.2f}"
+                # 2. Texto Lat/Lon
+                texto = f"lat={lat_txt:.4f}\nlon={lon_txt:.4f}"
                 
-                # --- FONTE GRANDE (TAMANHO 24) ---
+                # Tenta fonte tamanho 24
                 try:
-                    # Tenta Arial
                     font = ImageFont.truetype("arial.ttf", 24)
                 except:
                     try:
-                        # Tenta DejaVu (Linux/Streamlit Cloud)
                         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
                     except:
-                        # Fallback (infelizmente não muda tamanho, mas garante que não trava)
                         font = ImageFont.load_default()
 
-                # Posição do texto
+                # Posição do texto (levemente deslocado)
                 tx, ty = cx + 12, cy - 25
                 
-                # Borda branca no texto
+                # Contorno Branco no Texto (para contraste)
                 draw.text((tx-2, ty), texto, font=font, fill="white")
                 draw.text((tx+2, ty), texto, font=font, fill="white")
                 draw.text((tx, ty-2), texto, font=font, fill="white")
                 draw.text((tx, ty+2), texto, font=font, fill="white")
                 
-                # Texto Preto
+                # Texto Preto Principal
                 draw.text((tx, ty), texto, font=font, fill="black")
 
             except Exception as e:
                 print(f"Erro desenho estático: {e}")
 
-        # Fundo Branco (JPEG)
+        # Fundo Branco para JPEG
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
         
@@ -158,7 +162,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         bg.convert('RGB').save(buf, format="JPEG")
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         
-        # Output PNG (Com o desenho incluído)
+        # Output PNG (Salva a versão editada com o desenho!)
         buf_png = io.BytesIO()
         img.save(buf_png, format="PNG")
         png = f"data:image/png;base64,{base64.b64encode(buf_png.getvalue()).decode('ascii')}"
@@ -284,4 +288,3 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
-
