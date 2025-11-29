@@ -102,7 +102,8 @@ def run_full_analysis():
         st.session_state.analysis_results = None
 
 def render_analysis_results():
-    if "analysis_results" not in st.session_state or st.session_state.analysis_results is None: return
+    if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
+        return
 
     results = st.session_state.analysis_results
     aba = st.session_state.get("nav_option", "Mapas")
@@ -111,6 +112,7 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
+    # --- Construção dos Títulos Dinâmicos ---
     variavel = st.session_state.get('variavel', '')
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     tipo_local = st.session_state.get('tipo_localizacao', '').lower()
@@ -139,39 +141,42 @@ def render_analysis_results():
     elif tipo_local == "município":
         mun = st.session_state.get('municipio', '')
         local_str = f"no {tipo_local} de {mun}"
-    elif tipo_local == "polígono": local_str = "para a área desenhada"
-    else: local_str = "para o círculo definido"
+    elif tipo_local == "polígono": 
+        local_str = "para a área desenhada"
+    else: 
+        local_str = "para o círculo definido"
         
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
     titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
 
+    # --- Renderização da Aba MAPAS ---
     if aba == "Mapas":
         st.markdown("---") 
         
         if "ee_image" in results:
-            #feature = results["feature"]
-            #vis_params = copy.deepcopy(var_cfg["vis_params"])
-            #tipo_mapa = st.session_state.get("map_type", "Interativo")
-
             feature = results["feature"]
-            
-            # --- MODIFICAÇÃO: CHAMADA INTERATIVA ---
-            # Chama a função que desenha os sliders na barra lateral e retorna os valores ajustados
-            vis_params = gee_handler.obter_vis_params_interativo(variavel)
-            # ---------------------------------------
-
             tipo_mapa = st.session_state.get("map_type", "Interativo")
 
             if tipo_mapa == "Interativo":
-                st.subheader(titulo_mapa) 
+                st.subheader(titulo_mapa)
+                
+                # ==========================================================
+                # NOVO: Controle de Cores (Aparece entre Título e Mapa)
+                # ==========================================================
+                vis_params = gee_handler.obter_vis_params_interativo(variavel)
+                # ==========================================================
+                
                 with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
                     st.markdown("""
                     **Controles:** Zoom (+/-), Tela Cheia (⛶), Camadas (🗂️).
                     **Ferramentas:** Linha (╱), Polígono (⬟), Retângulo (⬛), Círculo (⭕), Marcador (📍), Editar (📝), Lixeira (🗑️).
                     """)
+                
+                # Renderiza o mapa com os vis_params atualizados dinamicamente
                 map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
 
             elif tipo_mapa == "Estático":
+                # Nota: O mapa estático usa a imagem já gerada no backend (não atualiza com o slider instantaneamente)
                 if results.get("static_map_png_url"):
                     st.subheader(titulo_mapa)
                     st.image(results["static_map_png_url"], width=500)
@@ -182,35 +187,58 @@ def render_analysis_results():
                     st.markdown("### Exportar Mapas")
                     try:
                         title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
-                        map_png, map_jpg, cbar = base64.b64decode(results["static_map_png_url"].split(",")[1]), base64.b64decode(results["static_map_jpg_url"].split(",")[1]), base64.b64decode(results["static_colorbar_b64"].split(",")[1])
+                        # Decodifica as strings base64 armazenadas
+                        map_png = base64.b64decode(results["static_map_png_url"].split(",")[1])
+                        map_jpg = base64.b64decode(results["static_map_jpg_url"].split(",")[1])
+                        cbar = base64.b64decode(results["static_colorbar_b64"].split(",")[1])
+                        
                         final_png = map_visualizer._stitch_images_to_bytes(title_bytes, map_png, cbar, format='PNG')
                         final_jpg = map_visualizer._stitch_images_to_bytes(title_bytes, map_jpg, cbar, format='JPEG')
+                        
                         c1, c2 = st.columns(2)
                         if final_png:
                             with c1: st.download_button("📷 Baixar Mapa (PNG)", final_png, "mapa.png", "image/png", use_container_width=True)
                         if final_jpg:
                             with c2: st.download_button("📷 Baixar Mapa (JPEG)", final_jpg, "mapa.jpeg", "image/jpeg", use_container_width=True)
-                    except: pass
+                    except: 
+                        pass
 
         st.markdown("---") 
         st.subheader("Tabela de Dados") 
-        if "map_dataframe" not in results or results["map_dataframe"].empty: st.warning("Sem dados amostrais.")
+        if "map_dataframe" not in results or results["map_dataframe"].empty: 
+            st.warning("Sem dados amostrais.")
         else:
             df_map = results["map_dataframe"]
             cols = df_map.columns.tolist()
+            # Identifica a coluna de valor (excluindo Lat/Lon)
             val_col = [c for c in cols if c not in ['Latitude', 'Longitude']][0]
             unit = var_cfg["unit"]
-            st.dataframe(df_map, use_container_width=True, hide_index=True, column_config={"Latitude": st.column_config.NumberColumn("Latitude", format="%.4f", width="small"), "Longitude": st.column_config.NumberColumn("Longitude", format="%.4f", width="small"), val_col: st.column_config.NumberColumn(val_col, format=f"%.2f {unit}", width="medium")})
+            
+            st.dataframe(
+                df_map, 
+                use_container_width=True, 
+                hide_index=True, 
+                column_config={
+                    "Latitude": st.column_config.NumberColumn("Latitude", format="%.4f", width="small"), 
+                    "Longitude": st.column_config.NumberColumn("Longitude", format="%.4f", width="small"), 
+                    val_col: st.column_config.NumberColumn(val_col, format=f"%.2f {unit}", width="medium")
+                }
+            )
             
             cd1, cd2 = st.columns(2)
             csv = df_map.to_csv(index=False).encode('utf-8')
-            with cd1: st.download_button("Exportar CSV (Dados)", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
+            with cd1: 
+                st.download_button("Exportar CSV (Dados)", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
             try:
                 buf = io.BytesIO()
-                with pd.ExcelWriter(buf, engine='openpyxl') as writer: df_map.to_excel(writer, index=False, sheet_name='Dados')
-                with cd2: st.download_button("Exportar XLSX (Dados)", buf.getvalue(), "dados_mapa.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-            except: st.warning("Biblioteca openpyxl ausente.")
+                with pd.ExcelWriter(buf, engine='openpyxl') as writer: 
+                    df_map.to_excel(writer, index=False, sheet_name='Dados')
+                with cd2: 
+                    st.download_button("Exportar XLSX (Dados)", buf.getvalue(), "dados_mapa.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            except: 
+                st.warning("Biblioteca openpyxl ausente.")
 
+    # --- Renderização da Aba SÉRIES TEMPORAIS ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             st.subheader(titulo_serie)
@@ -270,4 +298,5 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
 
