@@ -22,12 +22,12 @@ from branca.element import Template, MacroElement
 import folium 
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (FUNDO ESRI SATELLITE)
+# 1. MAPA INTERATIVO (Fundo ESRI Satellite - Idêntico ao Print)
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
-        # Tenta obter os limites para o zoom
+        # Obtém limites para zoom
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -35,7 +35,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         lat_max = coords[2][1]
         bounds = [[lat_min, lon_min], [lat_max, lon_max]]
         
-        # Centro para posicionamento da câmera
+        # Centro
         centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates'] 
         lon_c, lat_c = centro[0], centro[1]
     except Exception:
@@ -45,19 +45,20 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     # Cria o mapa
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
     
-    # --- ALTERAÇÃO: FUNDO ESRI WORLD IMAGERY ---
+    # --- CORREÇÃO FINAL: FUNDO ESRI WORLD IMAGERY ---
+    # Este é o tile exato que aparece com a atribuição "Esri" no seu print.
     mapa.add_tile_layer(
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         name="Esri World Imagery",
-        attribution="Esri"
+        attribution="Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
     )
 
-    # Adiciona dados e contorno
+    # Adiciona dados climáticos e contorno
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
     # --- LÓGICA DO MARCADOR (PINO) ---
-    # Só adiciona o pino se for CÍRCULO
+    # O pino SÓ aparece se for CÍRCULO. No caso do seu print (Município), ele não aparecerá.
     tipo_local = st.session_state.get('tipo_localizacao', '')
     
     if tipo_local == "Círculo (Lat/Lon/Raio)":
@@ -77,7 +78,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Mantido Estável + Ponto Central Condicional)
+# 2. MAPA ESTÁTICO
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -93,28 +94,25 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         outline_vis = outline.visualize(palette='000000')
 
-        # 3. Composição Inicial: Dados -> Contorno
+        # 3. Composição Inicial
         final = visualized_data.blend(outline_vis)
 
         # --- LÓGICA DO PONTO CENTRAL (VERMELHO) ---
-        # Só desenha o ponto vermelho se for CÍRCULO
+        # Só desenha a bolinha vermelha se for CÍRCULO.
         tipo_local = st.session_state.get('tipo_localizacao', '')
 
         if tipo_local == "Círculo (Lat/Lon/Raio)":
-            # Calcula tamanho do ponto proporcional para aparecer no zoom do print
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             width_deg = abs(b[2][0] - b[0][0]) 
             radius_m = max(50, (width_deg * 111000) * 0.015)
 
-            # Cria a bolinha vermelha
             center_geom = feature.geometry().centroid(maxError=1).buffer(radius_m)
             center_feat = ee.FeatureCollection([ee.Feature(center_geom)])
             center_vis = ee.Image().paint(center_feat, 0, 0).visualize(palette=['FF0000'])
             
-            # Adiciona o ponto à composição
             final = final.blend(center_vis)
 
-        # 4. Região (Zoom)
+        # 4. Região
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
@@ -126,7 +124,6 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
-        # Processamento
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
@@ -136,7 +133,6 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
-        # Legenda
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFF", "#000"])
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
