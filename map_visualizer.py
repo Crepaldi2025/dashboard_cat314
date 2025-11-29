@@ -22,7 +22,7 @@ from branca.element import Template, MacroElement
 import folium 
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO
+# 1. MAPA INTERATIVO (FUNDO ESRI SATELLITE)
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -45,12 +45,11 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     # Cria o mapa
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
     
-    # --- FUNDO: GOOGLE SATELLITE (Somente Satélite, sem ruas) ---
-    # lyrs=s : Satellite only
+    # --- ALTERAÇÃO: FUNDO ESRI WORLD IMAGERY ---
     mapa.add_tile_layer(
-        url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        name="Google Satellite",
-        attribution="Google"
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        name="Esri World Imagery",
+        attribution="Esri"
     )
 
     # Adiciona dados e contorno
@@ -78,7 +77,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO
+# 2. MAPA ESTÁTICO (Mantido Estável + Ponto Central Condicional)
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -102,7 +101,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         tipo_local = st.session_state.get('tipo_localizacao', '')
 
         if tipo_local == "Círculo (Lat/Lon/Raio)":
-            # Calcula tamanho do ponto proporcional
+            # Calcula tamanho do ponto proporcional para aparecer no zoom do print
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             width_deg = abs(b[2][0] - b[0][0]) 
             radius_m = max(50, (width_deg * 111000) * 0.015)
