@@ -8,7 +8,7 @@ import ee
 import io
 import base64
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont # Importações para editar a imagem estática
 import numpy as np
 import matplotlib.ticker as ticker
 import matplotlib
@@ -22,7 +22,7 @@ from branca.element import Template, MacroElement
 import folium 
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (Esri Satélite Puro - Sem Nomes)
+# 1. MAPA INTERATIVO (Satélite Esri Puro)
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -42,18 +42,20 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # Inicializa o mapa
-    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
+    # Inicializa o mapa sem basemap definido (para evitar BoxKeyError)
+    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False)
     
-    # --- URL DO SATÉLITE PURO DA ESRI (SEM RÓTULOS) ---
-    # Esta URL carrega apenas as imagens aéreas/satélite, sem camadas de texto.
-    url_esri = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-    
-    mapa.add_tile_layer(
-        url=url_esri,
-        name="Esri World Imagery",
-        attribution="Tiles © Esri"
+    # --- SOLUÇÃO DEFINITIVA DO FUNDO (TileLayer Direto) ---
+    # Adicionamos a camada Esri manualmente como um TileLayer do Folium.
+    # Isso garante que ela seja carregada ignorando dicionários do geemap.
+    esri_layer = folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+        name="Esri Satellite",
+        overlay=False, # Define como camada base (fundo)
+        control=True
     )
+    esri_layer.add_to(mapa)
 
     # Adiciona dados climáticos
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
@@ -81,7 +83,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Bolinha Preta + Texto Lat/Lon)
+# 2. MAPA ESTÁTICO (Bolinha Preta + Texto Grande)
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -129,13 +131,16 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
                 # 2. Texto Lat/Lon
                 texto = f"lat={lat_txt:.4f}\nlon={lon_txt:.4f}"
                 
-                # Tenta fonte tamanho 24
+                # --- FONTE GRANDE (TAMANHO 24) ---
                 try:
+                    # Tenta carregar fonte arial tamanho 24
                     font = ImageFont.truetype("arial.ttf", 24)
                 except:
                     try:
+                        # Tenta fonte linux padrão se arial falhar
                         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
                     except:
+                        # Fallback (não muda tamanho, mas garante execução)
                         font = ImageFont.load_default()
 
                 # Posição do texto (levemente deslocado)
