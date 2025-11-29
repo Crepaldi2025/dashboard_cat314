@@ -120,7 +120,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
                 draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill="black", outline="white", width=1)
                 
                 # Texto
-                texto = f"lat={lat_txt:.4f}\nlon={lon_txt:.4f}"
+                texto = f"lat={lat_txt:.2f}\nlon={lon_txt:.2f}"
                 
                 # --- FONTE GRANDE (TAMANHO 24) ---
                 try:
@@ -284,3 +284,4 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
