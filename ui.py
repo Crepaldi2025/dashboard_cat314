@@ -233,7 +233,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if not disable:
                 st.markdown(
                     "<div style='font-size:14px;margin-top:8px;'>"
-                    "⚠️ <b>Atenção:</b> Confira os filtros. O tempo de resposta pode variar conforme a complexidade da consulta."
+                    "⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>"
+                    "Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar."
                     "</div>", 
                     unsafe_allow_html=True
                 )
@@ -313,6 +314,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
