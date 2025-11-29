@@ -1,5 +1,5 @@
 # ==================================================================================
-# ui.py - Interface de Usuário
+# ui.py
 # ==================================================================================
 
 # ----------------------
@@ -231,7 +231,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
             
             if not disable:
-                st.markdown("<div style='font-size:14px;margin-top:8px;'>⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.</div>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div style='font-size:14px;margin-top:8px;'>"
+                    "⚠️ <b>Atenção:</b> Confira os filtros. O tempo de resposta pode variar conforme a complexidade da consulta."
+                    "</div>", 
+                    unsafe_allow_html=True
+                )
             else:
                 st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
@@ -308,5 +313,6 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
