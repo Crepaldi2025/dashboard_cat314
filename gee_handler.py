@@ -246,51 +246,52 @@ def _get_series_generic(variable, start, end, geom):
         
 def obter_vis_params_interativo(variavel: str):
     """
-    Cria widgets do Streamlit na barra lateral (ou onde for chamado)
-    para permitir que o usuário ajuste Min e Max dinamicamente.
+    Cria widgets na interface principal (dentro de um expander)
+    para permitir ajuste dinâmico de Min e Max da visualização.
     """
+    # Verifica se a variável existe na configuração global
     if variavel not in ERA5_VARS:
         return {}
 
-    # 1. Pega os valores padrão definidos no dicionário
+    # 1. Obtém os valores padrão definidos no dicionário global
     config_padrao = ERA5_VARS[variavel]['vis_params']
-    padrao_min = config_padrao.get('min', 0)
-    padrao_max = config_padrao.get('max', 100)
+    padrao_min = float(config_padrao.get('min', 0))
+    padrao_max = float(config_padrao.get('max', 100))
     
-    # 2. Cria um Expander (funciona como um "botão" que abre as opções)
-    # Usamos st.sidebar para garantir que fique no menu, mas pode remover o .sidebar se preferir no corpo
-    with st.sidebar.expander(f"🎨 Ajustar Escala ({variavel})", expanded=False):
-        st.markdown(f"**Legenda:** {config_padrao.get('caption', '')}")
+    # 2. Cria o container recolhível (Expander) na área principal
+    # 'expanded=False' inicia fechado para não ocupar espaço desnecessário
+    with st.expander(f"🎨 Ajustar Escala de Cores: {variavel}", expanded=False):
         
+        # Mostra a legenda e os valores originais para referência
+        unidade = ERA5_VARS[variavel].get('unit', '')
+        st.caption(f"Unidade: {unidade} | Valores Padrão: {padrao_min} a {padrao_max}")
+        
+        # Cria duas colunas para os inputs ficarem lado a lado
         col1, col2 = st.columns(2)
         
-        # O key=f"..." é vital para o Streamlit não confundir widgets de variáveis diferentes
-        novo_min = col1.number_input(
-            "Mínimo", 
-            value=float(padrao_min), 
-            key=f"min_{variavel}"
-        )
-        
-        novo_max = col2.number_input(
-            "Máximo", 
-            value=float(padrao_max), 
-            key=f"max_{variavel}"
-        )
-        
-        # Botão de resetar (opcional, mas útil)
-        if st.button("Restaurar Padrão", key=f"reset_{variavel}"):
-             # O rerun vai forçar a recarga com os valores originais se você limpar o session state
-             # ou simplesmente o usuário ajusta manualmente. 
-             # Simplificando: apenas avisa o usuário
-             st.caption(f"Padrão: {padrao_min} a {padrao_max}")
+        with col1:
+            novo_min = st.number_input(
+                "Valor Mínimo", 
+                value=padrao_min, 
+                step=1.0,         # Passo de incremento
+                format="%.1f",    # Formatação visual
+                key=f"min_{variavel}"  # Chave única para o Streamlit não confundir
+            )
 
-    # 3. Retorna uma cópia da configuração com os novos valores
+        with col2:
+            novo_max = st.number_input(
+                "Valor Máximo", 
+                value=padrao_max, 
+                step=1.0,
+                format="%.1f",
+                key=f"max_{variavel}"
+            )
+
+    # 3. Retorna a configuração atualizada para o mapa usar
+    # Fazemos uma cópia (.copy) para garantir que não estamos alterando 
+    # o dicionário global ERA5_VARS permanentemente
     nova_config = config_padrao.copy()
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
     
     return nova_config
-
-
-
-
