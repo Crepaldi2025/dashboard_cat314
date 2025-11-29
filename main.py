@@ -54,12 +54,10 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
             results["ee_image"] = ee_image
             df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
             if df_map_samples is not None: results["map_dataframe"] = df_map_samples
-                
-            if st.session_state.get("map_type", "Interativo") == "Estático":
-                png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(ee_image, feature, var_cfg["vis_params"], var_cfg["unit"])
-                results["static_map_png_url"] = png_url
-                results["static_map_jpg_url"] = jpg_url
-                results["static_colorbar_b64"] = colorbar_img
+            
+            # --- REMOVIDO DAQUI: A geração do mapa estático (create_static_map) ---
+            # O motivo: Agora geraremos o mapa na função 'render' para aceitar 
+            # as cores dinâmicas dos sliders.
 
     elif aba == "Séries Temporais":
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
@@ -112,7 +110,7 @@ def render_analysis_results():
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # --- Construção dos Títulos Dinâmicos ---
+    # --- Construção dos Títulos ---
     variavel = st.session_state.get('variavel', '')
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     tipo_local = st.session_state.get('tipo_localizacao', '').lower()
@@ -149,48 +147,57 @@ def render_analysis_results():
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
     titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
 
-    # --- Renderização da Aba MAPAS ---
     if aba == "Mapas":
         st.markdown("---") 
         
         if "ee_image" in results:
             feature = results["feature"]
             tipo_mapa = st.session_state.get("map_type", "Interativo")
+            
+            st.subheader(titulo_mapa)
+
+            # ==========================================================
+            # CONTROLE DE CORES (AGORA GLOBAL PARA AMBOS OS MAPAS)
+            # ==========================================================
+            # Fica fora do if/else para aparecer sempre
+            vis_params = gee_handler.obter_vis_params_interativo(variavel)
+            # ==========================================================
 
             if tipo_mapa == "Interativo":
-                st.subheader(titulo_mapa)
-                
-                # ==========================================================
-                # NOVO: Controle de Cores (Aparece entre Título e Mapa)
-                # ==========================================================
-                vis_params = gee_handler.obter_vis_params_interativo(variavel)
-                # ==========================================================
-                
                 with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
                     st.markdown("""
                     **Controles:** Zoom (+/-), Tela Cheia (⛶), Camadas (🗂️).
                     **Ferramentas:** Linha (╱), Polígono (⬟), Retângulo (⬛), Círculo (⭕), Marcador (📍), Editar (📝), Lixeira (🗑️).
                     """)
                 
-                # Renderiza o mapa com os vis_params atualizados dinamicamente
                 map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
 
             elif tipo_mapa == "Estático":
-                # Nota: O mapa estático usa a imagem já gerada no backend (não atualiza com o slider instantaneamente)
-                if results.get("static_map_png_url"):
-                    st.subheader(titulo_mapa)
-                    st.image(results["static_map_png_url"], width=500)
+                # ======================================================
+                # GERAÇÃO DINÂMICA DO MAPA ESTÁTICO
+                # ======================================================
+                # Gera o mapa agora, usando o 'vis_params' que acabamos de pegar dos sliders
+                with st.spinner("Gerando imagem estática com nova escala..."):
+                    png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
+                        results["ee_image"], 
+                        feature, 
+                        vis_params, # <--- Usa os params dos sliders
+                        var_cfg["unit"]
+                    )
+                
+                if png_url:
+                    st.image(png_url, width=500)
                     
-                    if results.get("static_colorbar_b64"):
-                        st.image(results["static_colorbar_b64"], width=500)
+                    if colorbar_img:
+                        st.image(colorbar_img, width=500)
 
                     st.markdown("### Exportar Mapas")
                     try:
                         title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
-                        # Decodifica as strings base64 armazenadas
-                        map_png = base64.b64decode(results["static_map_png_url"].split(",")[1])
-                        map_jpg = base64.b64decode(results["static_map_jpg_url"].split(",")[1])
-                        cbar = base64.b64decode(results["static_colorbar_b64"].split(",")[1])
+                        
+                        map_png = base64.b64decode(png_url.split(",")[1])
+                        map_jpg = base64.b64decode(jpg_url.split(",")[1])
+                        cbar = base64.b64decode(colorbar_img.split(",")[1])
                         
                         final_png = map_visualizer._stitch_images_to_bytes(title_bytes, map_png, cbar, format='PNG')
                         final_jpg = map_visualizer._stitch_images_to_bytes(title_bytes, map_jpg, cbar, format='JPEG')
@@ -200,8 +207,8 @@ def render_analysis_results():
                             with c1: st.download_button("📷 Baixar Mapa (PNG)", final_png, "mapa.png", "image/png", use_container_width=True)
                         if final_jpg:
                             with c2: st.download_button("📷 Baixar Mapa (JPEG)", final_jpg, "mapa.jpeg", "image/jpeg", use_container_width=True)
-                    except: 
-                        pass
+                    except Exception as e: 
+                        st.error(f"Erro na exportação: {e}")
 
         st.markdown("---") 
         st.subheader("Tabela de Dados") 
@@ -210,7 +217,6 @@ def render_analysis_results():
         else:
             df_map = results["map_dataframe"]
             cols = df_map.columns.tolist()
-            # Identifica a coluna de valor (excluindo Lat/Lon)
             val_col = [c for c in cols if c not in ['Latitude', 'Longitude']][0]
             unit = var_cfg["unit"]
             
@@ -236,9 +242,8 @@ def render_analysis_results():
                 with cd2: 
                     st.download_button("Exportar XLSX (Dados)", buf.getvalue(), "dados_mapa.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
             except: 
-                st.warning("Biblioteca openpyxl ausente.")
+                pass
 
-    # --- Renderização da Aba SÉRIES TEMPORAIS ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             st.subheader(titulo_serie)
@@ -298,5 +303,6 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
 
 
