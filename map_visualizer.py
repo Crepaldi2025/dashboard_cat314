@@ -2,6 +2,10 @@
 # map_visualizer.py
 # ==================================================================================
 
+# ------------------------
+# - Bibliotecas importadas
+# ------------------------
+
 import streamlit as st
 import geemap.foliumap as geemap
 import ee
@@ -11,12 +15,9 @@ import requests
 from PIL import Image
 import numpy as np
 import matplotlib.ticker as ticker
-
 import matplotlib
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
-# ----------------------------------------------------
-
 from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
 from matplotlib.colorbar import ColorbarBase
 from matplotlib import cm
@@ -24,9 +25,9 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 
-# ==================================================================================
+# ---------------
 # MAPA INTERATIVO
-# ==================================================================================
+# ---------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
@@ -50,9 +51,9 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     
     mapa.to_streamlit(height=500, use_container_width=True)
 
-# ==================================================================================
-# COLORBAR INTERATIVO (Lógica Original)
-# ==================================================================================
+# -------------------
+# COLORBAR INTERATIVO 
+# -------------------
 
 def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
     palette = vis_params.get("palette", None)
@@ -62,7 +63,6 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     if not palette or len(palette) == 0: return 
 
     N_STEPS = len(palette) 
-    # Volta para a lógica simples que funcionava
     step = (vmax - vmin) / N_STEPS
     if step == 0: step = 1 # Proteção
     
@@ -96,14 +96,11 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     macro._template = template
     mapa.get_root().add_child(macro)
 
-# ==================================================================================
-# MAPA ESTÁTICO (Lógica Original Restaurada)
-# ==================================================================================
+# -------------
+# MAPA ESTÁTICO
+# -------------
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
-    """
-    Gera colorbar estático limitando o número de ticks para evitar sobreposição.
-    """
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
     
@@ -113,8 +110,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
-        
-        # --- MUDANÇA 1: Removemos 'ticks=boundaries' daqui ---
+                
         cb = ColorbarBase(
             ax, 
             cmap=cmap, 
@@ -126,24 +122,17 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         )
         
         cb.set_label(label, fontsize=7)
-        
-        # --- MUDANÇA 2: Limitador inteligente de Ticks ---
-        # Define que queremos no MÁXIMO 6 números na barra
         locator = ticker.MaxNLocator(nbins=6)
         cb.locator = locator
-        
-        # --- MUDANÇA 3: Formatador (mantendo sua lógica original) ---
+                
         if (vmax - vmin) < 10:
             # Se a variação for pequena (ex: umidade 0.5 a 0.8), usa 2 casas decimais
             formatter = ticker.FormatStrFormatter('%.2f')
         else:
-            # Se for grande (ex: temp 20 a 30), usa inteiro (ou %.0f)
-            # O FormatStrFormatter é mais seguro que o loop manual anterior
             formatter = ticker.FormatStrFormatter('%.0f')
             
         cb.formatter = formatter
         cb.update_ticks() # Aplica as mudanças
-        
         cb.ax.tick_params(labelsize=6, length=2, pad=1)
         
         buf = io.BytesIO()
@@ -180,11 +169,9 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
-        # Verifica caption
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFF", "#000"])
         
-        # Chama a função restaurada
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
         return png, jpg, cbar
@@ -226,4 +213,5 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
