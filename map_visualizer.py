@@ -122,7 +122,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
                 
                 # Tenta carregar uma fonte melhor, senão usa padrão
                 try:
-                    font = ImageFont.truetype("arial.ttf", 14)
+                    font = ImageFont.truetype("arial.ttf", 30)
                 except:
                     font = ImageFont.load_default()
 
@@ -279,3 +279,4 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
