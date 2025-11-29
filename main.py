@@ -1,5 +1,5 @@
 # ==================================================================================
-# main.py — Clima-Cast-Crepaldi (v101 - Fix Polígono em Série Temporal + Satélite)
+# main.py 
 # ==================================================================================
 import streamlit as st
 import ui
@@ -55,9 +55,8 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
             df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
             if df_map_samples is not None: results["map_dataframe"] = df_map_samples
             
-            # --- REMOVIDO DAQUI: A geração do mapa estático (create_static_map) ---
-            # O motivo: Agora geraremos o mapa na função 'render' para aceitar 
-            # as cores dinâmicas dos sliders.
+            # Nota: Mapa estático removido daqui para ser gerado no render (interface),
+            # permitindo ajuste dinâmico de cores.
 
     elif aba == "Séries Temporais":
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
@@ -157,9 +156,10 @@ def render_analysis_results():
             st.subheader(titulo_mapa)
 
             # ==========================================================
-            # CONTROLE DE CORES (AGORA GLOBAL PARA AMBOS OS MAPAS)
+            # CONTROLE DE CORES (IDENTAÇÃO CRÍTICA)
             # ==========================================================
-            # Fica fora do if/else para aparecer sempre
+            # Esta linha deve estar na mesma margem do 'if tipo_mapa'
+            # e NÃO dentro dele. Assim ela aparece para ambos os modos.
             vis_params = gee_handler.obter_vis_params_interativo(variavel)
             # ==========================================================
 
@@ -173,9 +173,6 @@ def render_analysis_results():
                 map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
 
             elif tipo_mapa == "Estático":
-                # ======================================================
-                # GERAÇÃO DINÂMICA DO MAPA ESTÁTICO
-                # ======================================================
                 # Gera o mapa agora, usando o 'vis_params' que acabamos de pegar dos sliders
                 with st.spinner("Gerando imagem estática com nova escala..."):
                     png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
@@ -303,6 +300,3 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
-
-
-
