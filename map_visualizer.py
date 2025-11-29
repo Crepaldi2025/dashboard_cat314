@@ -148,13 +148,11 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # 1. BASE DE FUNDO (Proteção para Oceanos)
-        # Cria um fundo cinza/azulado. Se o Sentinel-2 não cobrir a área (ex: alto mar),
-        # aparecerá esta cor em vez de branco/transparente.
-        background_fill = ee.Image.constant(1).visualize(palette=['#2a2a2a'])
+        # 1. BASE DE FUNDO (Proteção para Oceanos/Áreas sem satélite)
+        # Cor cinza escura para preencher buracos do satélite
+        background_fill = ee.Image.constant(1).visualize(palette=['#202020'])
 
         # 2. SATÉLITE (Sentinel-2)
-        # Tenta pegar imagem de satélite. Onde não houver (nuvens/mar), será transparente.
         s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
             .filterBounds(feature.geometry()) \
             .filterDate('2023-01-01', '2024-01-01') \
@@ -177,28 +175,32 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         )
         outline_vis = outline.visualize(palette='000000')
 
-        # 5. MONTAGEM (BLEND)
-        # Ordem: Fundo Sólido -> Satélite -> Dados -> Contorno
+        # 5. MONTAGEM (Camadas)
+        # Blend coloca uma sobre a outra. 
         final = background_fill.blend(s2).blend(visualized_data).blend(outline_vis)
 
         # 6. DEFINIR REGIÃO
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
-            # Dimensão aproximada da área
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
-            # Aumentei a margem para 15% (0.15) para dar mais contexto ao redor
+            # Buffer de 15% para dar margem
             region = feature.geometry().buffer(dim * 0.15).bounds()
         except: 
             region = feature.geometry().bounds()
 
-        # 7. EXPORTAÇÃO
+        # 7. DOWNLOAD DA IMAGEM
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
-        img = Image.open(io.BytesIO(img_bytes))
+        # --- CORREÇÃO DO ERRO AQUI ---
+        # Abre a imagem e FORÇA a conversão para RGBA (garante canal Alpha)
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        # -----------------------------
         
-        # Fundo branco apenas para compor o JPEG final, caso sobre transparência
+        # Cria fundo branco (caso haja transparência residual)
         bg = Image.new("RGBA", img.size, "WHITE")
+        
+        # Agora o paste funciona porque 'img' garantidamente tem canal Alpha
         bg.paste(img, (0, 0), img)
         
         buf = io.BytesIO()
@@ -251,6 +253,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
