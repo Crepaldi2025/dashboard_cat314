@@ -51,7 +51,7 @@ ERA5_VARS = {
     },
     "Radiação Solar Incidente": {
         "band": "surface_solar_radiation_downwards_sum", "result_band": "radiation_wm2", "unit": "W/m²", "aggregation": "mean",
-        "vis_params": {"min": 50, "max": 500, "palette": ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c'], "caption": "Radiação (W/m²)"}
+        "vis_params": {"min": 0, "max": 500, "palette": ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c'], "caption": "Radiação (W/m²)"}
     },
     "Velocidade do Vento (10m)": {
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
@@ -288,3 +288,4 @@ def obter_vis_params_interativo(variavel: str):
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
     return nova_config
+
