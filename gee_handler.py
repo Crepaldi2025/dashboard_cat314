@@ -43,7 +43,7 @@ ERA5_VARS = {
     },
     "Precipitação Total": {
         "band": "total_precipitation_sum", "result_band": "total_precipitation_sum", "unit": "mm", "aggregation": "sum",
-        "vis_params": {"min": 0, "max": 4000, "palette": ['#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476', '#31A354', '#006D2C', '#08519C', '#08306B'], "caption": "Precipitação (mm)"}
+        "vis_params": {"min": 0, "max": 500, "palette": ['#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476', '#31A354', '#006D2C', '#08519C', '#08306B'], "caption": "Precipitação (mm)"}
     },
     "Umidade Relativa (2m)": {
         "bands": ["temperature_2m", "dewpoint_temperature_2m"], "result_band": "relative_humidity", "unit": "%", "aggregation": "mean",
@@ -51,7 +51,7 @@ ERA5_VARS = {
     },
     "Radiação Solar Incidente": {
         "band": "surface_solar_radiation_downwards_sum", "result_band": "radiation_wm2", "unit": "W/m²", "aggregation": "mean",
-        "vis_params": {"min": 50, "max": 400, "palette": ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c'], "caption": "Radiação (W/m²)"}
+        "vis_params": {"min": 50, "max": 500, "palette": ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c'], "caption": "Radiação (W/m²)"}
     },
     "Velocidade do Vento (10m)": {
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
@@ -243,5 +243,6 @@ def _get_series_generic(variable, start, end, geom):
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
         return df.dropna().sort_values('date')
     except: return pd.DataFrame()
+
 
 
