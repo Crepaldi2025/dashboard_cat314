@@ -243,6 +243,53 @@ def _get_series_generic(variable, start, end, geom):
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
         return df.dropna().sort_values('date')
     except: return pd.DataFrame()
+        
+def obter_vis_params_interativo(variavel: str):
+    """
+    Cria widgets do Streamlit na barra lateral (ou onde for chamado)
+    para permitir que o usuário ajuste Min e Max dinamicamente.
+    """
+    if variavel not in ERA5_VARS:
+        return {}
+
+    # 1. Pega os valores padrão definidos no dicionário
+    config_padrao = ERA5_VARS[variavel]['vis_params']
+    padrao_min = config_padrao.get('min', 0)
+    padrao_max = config_padrao.get('max', 100)
+    
+    # 2. Cria um Expander (funciona como um "botão" que abre as opções)
+    # Usamos st.sidebar para garantir que fique no menu, mas pode remover o .sidebar se preferir no corpo
+    with st.sidebar.expander(f"🎨 Ajustar Escala ({variavel})", expanded=False):
+        st.markdown(f"**Legenda:** {config_padrao.get('caption', '')}")
+        
+        col1, col2 = st.columns(2)
+        
+        # O key=f"..." é vital para o Streamlit não confundir widgets de variáveis diferentes
+        novo_min = col1.number_input(
+            "Mínimo", 
+            value=float(padrao_min), 
+            key=f"min_{variavel}"
+        )
+        
+        novo_max = col2.number_input(
+            "Máximo", 
+            value=float(padrao_max), 
+            key=f"max_{variavel}"
+        )
+        
+        # Botão de resetar (opcional, mas útil)
+        if st.button("Restaurar Padrão", key=f"reset_{variavel}"):
+             # O rerun vai forçar a recarga com os valores originais se você limpar o session state
+             # ou simplesmente o usuário ajusta manualmente. 
+             # Simplificando: apenas avisa o usuário
+             st.caption(f"Padrão: {padrao_min} a {padrao_max}")
+
+    # 3. Retorna uma cópia da configuração com os novos valores
+    nova_config = config_padrao.copy()
+    nova_config['min'] = novo_min
+    nova_config['max'] = novo_max
+    
+    return nova_config
 
 
 
