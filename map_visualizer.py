@@ -22,11 +22,12 @@ from branca.element import Template, MacroElement
 import folium 
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (Fundo Satélite Puro + Marcador)
+# 1. MAPA INTERATIVO (Fundo Google Terrain/Relevo + Marcador)
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
+        # Tenta obter os limites para o zoom
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -34,26 +35,29 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         lat_max = coords[2][1]
         bounds = [[lat_min, lon_min], [lat_max, lon_max]]
         
+        # Obtém o CENTRO com margem de erro para evitar falhas em geometrias curvas
         centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates'] 
         lon_c, lat_c = centro[0], centro[1]
     except Exception:
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
+    # Cria o mapa centralizado
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
     
-    # --- ALTERAÇÃO: FUNDO SOMENTE SATÉLITE ---
-    # lyrs=s (Satellite only), sem nomes de ruas
+    # --- FUNDO: GOOGLE TERRAIN (RELEVO) ---
+    # lyrs=p : Terrain (Mostra montanhas, topografia e rótulos)
     mapa.add_tile_layer(
-        url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        name="Google Satellite",
+        url="https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
+        name="Google Terrain (Relevo)",
         attribution="Google"
     )
 
+    # Adiciona dados e contorno
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
-    # Marcador Interativo
+    # --- MARCADOR NO CENTRO ---
     folium.Marker(
         location=[lat_c, lon_c],
         tooltip=f"Centro: {lat_c:.4f}, {lon_c:.4f}",
@@ -61,6 +65,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         icon=folium.Icon(color='red', icon='info-sign')
     ).add_to(mapa)
     
+    # Legenda
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
     if bounds:
@@ -69,44 +74,43 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Correção Ponto Central)
+# 2. MAPA ESTÁTICO (Ponto Central Visível)
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # 1. Dados
+        # 1. Visualização dos Dados
         visualized_data = ee_image.visualize(
             min=vis_params["min"], 
             max=vis_params["max"], 
             palette=vis_params["palette"]
         )
         
-        # 2. Contorno
+        # 2. Visualização do Contorno
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         outline_vis = outline.visualize(palette='000000')
 
-        # --- CORREÇÃO DO PONTO CENTRAL ---
-        # Calculamos um tamanho dinâmico para o ponto baseado no tamanho da área.
-        # Isso garante que o ponto seja visível independente do zoom.
+        # --- CORREÇÃO PONTO CENTRAL ---
+        # Cria um CÍRCULO FÍSICO (Buffer) no centro para garantir que apareça na imagem
+        # 1. Pega os limites para calcular a escala
         b = feature.geometry().bounds().getInfo()['coordinates'][0]
-        # Largura aproximada da área em graus
         width_deg = abs(b[2][0] - b[0][0]) 
-        # Define o raio do ponto como 1.5% da largura total da área (conversão aprox para metros)
-        # Multiplicamos por 111000 (graus p/ metros) e pegamos uma fração pequena
+        
+        # 2. Define o raio do ponto como 1.5% da largura da área (mínimo 50m)
         radius_m = max(50, (width_deg * 111000) * 0.015)
 
-        # Cria um círculo físico real no centro
+        # 3. Cria a geometria do ponto central
         center_geom = feature.geometry().centroid(maxError=1).buffer(radius_m)
         center_feat = ee.FeatureCollection([ee.Feature(center_geom)])
         
-        # Pinta o interior do círculo de vermelho
+        # 4. Pinta de Vermelho Sólido
         center_vis = ee.Image().paint(center_feat, 0, 0).visualize(palette=['FF0000'])
-        # ---------------------------------
+        # ------------------------------
 
         # 3. Composição: Dados -> Contorno -> Ponto
         final = visualized_data.blend(outline_vis).blend(center_vis)
 
-        # 4. Região
+        # 4. Região (Zoom)
         try:
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
             region = feature.geometry().buffer(dim * 0.05)
@@ -117,6 +121,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
+        # Processamento (Convertendo para RGBA para segurança)
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
@@ -126,6 +131,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
         
+        # Legenda
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFF", "#000"])
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
