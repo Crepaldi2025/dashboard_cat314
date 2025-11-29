@@ -22,7 +22,7 @@ from branca.element import Template, MacroElement
 import folium 
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (Fundo Google Terrain/Relevo + Marcador)
+# 1. MAPA INTERATIVO
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -35,21 +35,21 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         lat_max = coords[2][1]
         bounds = [[lat_min, lon_min], [lat_max, lon_max]]
         
-        # Obtém o CENTRO com margem de erro para evitar falhas em geometrias curvas
+        # Centro para posicionamento da câmera
         centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates'] 
         lon_c, lat_c = centro[0], centro[1]
     except Exception:
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # Cria o mapa centralizado
+    # Cria o mapa
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
     
-    # --- FUNDO: GOOGLE TERRAIN (RELEVO) ---
-    # lyrs=p : Terrain (Mostra montanhas, topografia e rótulos)
+    # --- FUNDO: GOOGLE HYBRID (Satélite + Ruas) ---
+    # Escolhi Híbrido para ficar igual ao seu print (Verde/Satélite) mas com contexto
     mapa.add_tile_layer(
-        url="https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
-        name="Google Terrain (Relevo)",
+        url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        name="Google Hybrid",
         attribution="Google"
     )
 
@@ -57,13 +57,17 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
-    # --- MARCADOR NO CENTRO ---
-    folium.Marker(
-        location=[lat_c, lon_c],
-        tooltip=f"Centro: {lat_c:.4f}, {lon_c:.4f}",
-        popup=folium.Popup(f"<b>Centro da Área</b><br>Lat: {lat_c:.5f}<br>Lon: {lon_c:.5f}", max_width=200),
-        icon=folium.Icon(color='red', icon='info-sign')
-    ).add_to(mapa)
+    # --- LÓGICA DO MARCADOR ---
+    # Só adiciona o pino se for CÍRCULO
+    tipo_local = st.session_state.get('tipo_localizacao', '')
+    
+    if tipo_local == "Círculo (Lat/Lon/Raio)":
+        folium.Marker(
+            location=[lat_c, lon_c],
+            tooltip=f"Centro: {lat_c:.4f}, {lon_c:.4f}",
+            popup=folium.Popup(f"<b>Centro da Área</b><br>Lat: {lat_c:.5f}<br>Lon: {lon_c:.5f}", max_width=200),
+            icon=folium.Icon(color='red', icon='info-sign')
+        ).add_to(mapa)
     
     # Legenda
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
@@ -74,7 +78,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Ponto Central Visível)
+# 2. MAPA ESTÁTICO
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -90,28 +94,30 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         outline_vis = outline.visualize(palette='000000')
 
-        # --- CORREÇÃO PONTO CENTRAL ---
-        # Cria um CÍRCULO FÍSICO (Buffer) no centro para garantir que apareça na imagem
-        # 1. Pega os limites para calcular a escala
-        b = feature.geometry().bounds().getInfo()['coordinates'][0]
-        width_deg = abs(b[2][0] - b[0][0]) 
-        
-        # 2. Define o raio do ponto como 1.5% da largura da área (mínimo 50m)
-        radius_m = max(50, (width_deg * 111000) * 0.015)
+        # 3. Composição Inicial: Dados -> Contorno
+        final = visualized_data.blend(outline_vis)
 
-        # 3. Cria a geometria do ponto central
-        center_geom = feature.geometry().centroid(maxError=1).buffer(radius_m)
-        center_feat = ee.FeatureCollection([ee.Feature(center_geom)])
-        
-        # 4. Pinta de Vermelho Sólido
-        center_vis = ee.Image().paint(center_feat, 0, 0).visualize(palette=['FF0000'])
-        # ------------------------------
+        # --- LÓGICA DO PONTO CENTRAL ---
+        # Só desenha o ponto vermelho se for CÍRCULO
+        tipo_local = st.session_state.get('tipo_localizacao', '')
 
-        # 3. Composição: Dados -> Contorno -> Ponto
-        final = visualized_data.blend(outline_vis).blend(center_vis)
+        if tipo_local == "Círculo (Lat/Lon/Raio)":
+            # Calcula tamanho do ponto proporcional
+            b = feature.geometry().bounds().getInfo()['coordinates'][0]
+            width_deg = abs(b[2][0] - b[0][0]) 
+            radius_m = max(50, (width_deg * 111000) * 0.015)
+
+            # Cria a bolinha vermelha
+            center_geom = feature.geometry().centroid(maxError=1).buffer(radius_m)
+            center_feat = ee.FeatureCollection([ee.Feature(center_geom)])
+            center_vis = ee.Image().paint(center_feat, 0, 0).visualize(palette=['FF0000'])
+            
+            # Adiciona o ponto à composição
+            final = final.blend(center_vis)
 
         # 4. Região (Zoom)
         try:
+            b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
             region = feature.geometry().buffer(dim * 0.05)
         except: 
@@ -121,7 +127,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
-        # Processamento (Convertendo para RGBA para segurança)
+        # Processamento
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
