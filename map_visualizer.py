@@ -8,7 +8,7 @@ import ee
 import io
 import base64
 import requests
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont # <--- NOVAS IMPORTAÇÕES
 import numpy as np
 import matplotlib.ticker as ticker
 import matplotlib
@@ -27,7 +27,6 @@ import folium
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
     try:
-        # Obtém limites para zoom
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min = coords[0][0]
         lat_min = coords[0][1]
@@ -35,43 +34,35 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         lat_max = coords[2][1]
         bounds = [[lat_min, lon_min], [lat_max, lon_max]]
         
-        # Centro
         centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates'] 
         lon_c, lat_c = centro[0], centro[1]
     except Exception:
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # --- SOLUÇÃO DEFINITIVA DO FUNDO ---
-    # Passamos a URL da Esri diretamente no 'tiles' do construtor.
-    # Isso impede que o mapa padrão (OSM) seja carregado.
-    esri_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-    esri_attr = "Esri World Imagery"
-
-    mapa = geemap.Map(
-        center=[lat_c, lon_c], 
-        zoom=4,
-        tiles=esri_url, # Força o tile da Esri como base primária
-        attr=esri_attr
-    )
+    # Inicializa sem basemap no construtor para evitar erros
+    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4)
     
-    # Adiciona dados climáticos e contorno
+    # Adiciona Fundo ESRI World Imagery (Satélite Verde/Escuro)
+    mapa.add_tile_layer(
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        name="Esri World Imagery",
+        attribution="Tiles © Esri"
+    )
+
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
     
-    # --- LÓGICA DO MARCADOR (PINO) ---
-    # Só adiciona o pino se for CÍRCULO.
+    # Marcador no Interativo (apenas para Círculo)
     tipo_local = st.session_state.get('tipo_localizacao', '')
-    
     if tipo_local == "Círculo (Lat/Lon/Raio)":
         folium.Marker(
             location=[lat_c, lon_c],
             tooltip=f"Centro: {lat_c:.4f}, {lon_c:.4f}",
-            popup=folium.Popup(f"<b>Centro da Área</b><br>Lat: {lat_c:.5f}<br>Lon: {lon_c:.5f}", max_width=200),
+            popup=folium.Popup(f"<b>Centro</b><br>Lat: {lat_c:.5f}<br>Lon: {lon_c:.5f}", max_width=200),
             icon=folium.Icon(color='red', icon='info-sign')
         ).add_to(mapa)
     
-    # Legenda
     _add_colorbar_bottomleft(mapa, vis_params, unit_label)
 
     if bounds:
@@ -80,66 +71,98 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO
+# 2. MAPA ESTÁTICO (Com Bolinha Preta + Texto Lat/Lon)
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # 1. Visualização dos Dados
-        visualized_data = ee_image.visualize(
-            min=vis_params["min"], 
-            max=vis_params["max"], 
-            palette=vis_params["palette"]
-        )
+        # 1. Dados
+        visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
         
-        # 2. Visualização do Contorno
+        # 2. Contorno
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         outline_vis = outline.visualize(palette='000000')
 
-        # 3. Composição Inicial
+        # 3. Composição (Dados + Contorno)
         final = visualized_data.blend(outline_vis)
 
-        # --- LÓGICA DO PONTO CENTRAL (VERMELHO) ---
-        # Só desenha a bolinha vermelha se for CÍRCULO.
-        tipo_local = st.session_state.get('tipo_localizacao', '')
-
-        if tipo_local == "Círculo (Lat/Lon/Raio)":
-            b = feature.geometry().bounds().getInfo()['coordinates'][0]
-            width_deg = abs(b[2][0] - b[0][0]) 
-            radius_m = max(50, (width_deg * 111000) * 0.015)
-
-            center_geom = feature.geometry().centroid(maxError=1).buffer(radius_m)
-            center_feat = ee.FeatureCollection([ee.Feature(center_geom)])
-            center_vis = ee.Image().paint(center_feat, 0, 0).visualize(palette=['FF0000'])
-            
-            final = final.blend(center_vis)
-
-        # 4. Região
+        # Região
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
             region = feature.geometry().buffer(dim * 0.05)
-        except: 
-            region = feature.geometry()
+        except: region = feature.geometry()
 
-        # 5. Download
+        # Download da Imagem Base
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         
+        # Abre imagem para edição com PIL
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        
+        # 4. DESENHO MANUAL: Bolinha Preta + Texto (Apenas se for Círculo)
+        tipo_local = st.session_state.get('tipo_localizacao', '')
+        if tipo_local == "Círculo (Lat/Lon/Raio)":
+            try:
+                # Pega as coordenadas reais
+                centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
+                lon_txt, lat_txt = centro[0], centro[1]
+
+                # Prepara o desenhista
+                draw = ImageDraw.Draw(img)
+                w, h = img.size
+                cx, cy = w / 2, h / 2  # O centro da imagem é o centro da geometria
+                
+                # Desenha a Bolinha Preta (Raio 5px)
+                r = 5
+                draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill="black", outline="white", width=1)
+                
+                # Prepara o Texto
+                texto = f"lat={lat_txt:.4f}\nlon={lon_txt:.4f}"
+                
+                # Tenta carregar uma fonte melhor, senão usa padrão
+                try:
+                    font = ImageFont.truetype("arial.ttf", 14)
+                except:
+                    font = ImageFont.load_default()
+
+                # Desenha o texto com borda branca para leitura (Stroke)
+                # Posição: um pouco à direita da bolinha
+                tx, ty = cx + 10, cy - 15
+                
+                # Borda branca (simulada desenhando várias vezes)
+                draw.text((tx-1, ty), texto, font=font, fill="white")
+                draw.text((tx+1, ty), texto, font=font, fill="white")
+                draw.text((tx, ty-1), texto, font=font, fill="white")
+                draw.text((tx, ty+1), texto, font=font, fill="white")
+                
+                # Texto Preto Principal
+                draw.text((tx, ty), texto, font=font, fill="black")
+
+            except Exception as e:
+                print(f"Erro ao desenhar marcador estático: {e}")
+
+        # Montagem final do fundo branco (para JPEG)
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
         
         buf = io.BytesIO()
         bg.convert('RGB').save(buf, format="JPEG")
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
-        png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}"
+        png = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('ascii')}" # Note: img_bytes original não tem o desenho, mas o png retornado aqui deveria ter?
         
+        # CORREÇÃO IMPORTANTE: Atualizar o PNG de retorno para incluir o desenho
+        # Precisamos salvar o 'img' editado de volta para bytes
+        buf_png = io.BytesIO()
+        img.save(buf_png, format="PNG")
+        png_editado = f"data:image/png;base64,{base64.b64encode(buf_png.getvalue()).decode('ascii')}"
+
         lbl = vis_params.get("caption", unit_label)
         pal = vis_params.get("palette", ["#FFF", "#000"])
         cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
 
-        return png, jpg, cbar
+        return png_editado, jpg, cbar
+
     except Exception as e:
         st.error(f"Erro estático: {e}")
         return None, None, None
