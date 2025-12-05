@@ -158,11 +158,7 @@ def render_analysis_results():
             # ==========================================================
             # CONTROLE DE CORES (IDENTAÇÃO CRÍTICA)
             # ==========================================================
-            # Esta linha deve estar na mesma margem do 'if tipo_mapa'
-            # e NÃO dentro dele. Assim ela aparece para ambos os modos.
-            vis_params = gee_handler.obter_vis_params_interativo(variavel)
-            # ==========================================================
-
+            
             if tipo_mapa == "Interativo":
                 with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
                     st.markdown("""
@@ -270,6 +266,7 @@ def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
         st.session_state.gee_initialized = True
+        st.toast("Conectado ao Google Earth Engine com sucesso!", icon="🌍")
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
     
@@ -284,8 +281,7 @@ def main():
         opcao_menu in ["Mapas", "Séries Temporais"] and 
         st.session_state.get('tipo_localizacao') == "Polígono"
     )
-    # ----------------------------------------------------------------
-    
+        
     is_running = st.session_state.get("analysis_triggered", False)
     has_geom = 'drawn_geometry' in st.session_state
     has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
@@ -300,3 +296,4 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
