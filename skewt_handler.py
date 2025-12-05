@@ -11,8 +11,8 @@ PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 
 
 def get_vertical_profile_data(lat, lon, date_obj, hour):
     """
-    Busca dados de perfil vertical. 
-    Usa lógica Híbrida com margem de segurança maior para evitar gaps do ERA5.
+    Busca dados de perfil vertical (Temp, UR, Vento U/V).
+    Usa componentes U/V do vento para compatibilidade total com o ERA5 Archive.
     """
     date_str = date_obj.strftime('%Y-%m-%d')
     
@@ -20,9 +20,7 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
     hoje = datetime.now().date()
     delta_dias = (hoje - date_obj).days
     
-    # ALTERAÇÃO AQUI: Aumentamos a margem para 14 dias.
-    # O ERA5 pode demorar 5-7 dias. A API Forecast segura dados passados recentes (Analysis)
-    # sem gaps. Isso evita cair no "limbo" entre o Forecast e o Archive.
+    # Margem de segurança de 14 dias para garantir dados consolidados no Archive
     if delta_dias <= 14:
         url = "https://api.open-meteo.com/v1/forecast"
         api_type = "forecast"
@@ -30,13 +28,13 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         url = "https://archive-api.open-meteo.com/v1/archive"
         api_type = "archive"
     
-    # Monta lista de variáveis
+    # Monta lista de variáveis (USANDO COMPONENTES U/V)
     variables = []
     for level in PRESSURE_LEVELS:
         variables.append(f"temperature_{level}hPa")
         variables.append(f"relative_humidity_{level}hPa")
-        variables.append(f"wind_speed_{level}hPa")
-        variables.append(f"wind_direction_{level}hPa")
+        variables.append(f"u_component_of_wind_{level}hPa")
+        variables.append(f"v_component_of_wind_{level}hPa")
     
     hourly_vars = ",".join(variables)
     
@@ -44,13 +42,12 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         "latitude": lat,
         "longitude": lon,
         "start_date": date_str,
-        "end_date": date_str, # Garante que pedimos apenas 1 dia (00h-23h)
+        "end_date": date_str, 
         "hourly": hourly_vars,
         "timeformat": "unixtime",
         "timezone": "UTC"
     }
     
-    # Se for forecast buscando passado, precisamos habilitar past_days (embora start/end resolvam na v1, é bom garantir)
     if api_type == "forecast" and delta_dias > 0:
         params["past_days"] = delta_dias + 1
 
@@ -63,49 +60,49 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
             st.warning(f"A API ({api_type}) não retornou dados.")
             return None
             
-        # O índice é simplesmente a hora solicitada.
         idx = int(hour)
-        
-        # Validação simples de limites
         timestamps = data["hourly"].get("time", [])
         if idx >= len(timestamps):
-            st.warning("Hora solicitada fora do intervalo retornado pela API.")
+            st.warning("Hora solicitada fora do intervalo retornado.")
             return None
 
         # Estrutura os dados
         profile_data = []
         for level in PRESSURE_LEVELS:
             try:
-                # Busca as listas de dados
+                # Busca as listas de dados usando nomes de variáveis corretos
                 t_list = data["hourly"].get(f"temperature_{level}hPa")
                 rh_list = data["hourly"].get(f"relative_humidity_{level}hPa")
-                ws_list = data["hourly"].get(f"wind_speed_{level}hPa")
-                wd_list = data["hourly"].get(f"wind_direction_{level}hPa")
+                u_list = data["hourly"].get(f"u_component_of_wind_{level}hPa")
+                v_list = data["hourly"].get(f"v_component_of_wind_{level}hPa")
                 
+                # Se a lista de temperatura não existir, algo crítico falhou
                 if t_list is None: continue
 
                 t = t_list[idx]
-                rh = rh_list[idx]
-                ws = ws_list[idx]
-                wd = wd_list[idx]
+                rh = rh_list[idx] if rh_list else None
+                u = u_list[idx] if u_list else None
+                v = v_list[idx] if v_list else None
                 
+                # Só adiciona se a temperatura for válida
                 if t is not None:
                     profile_data.append({
                         "pressure": level,
                         "temperature": float(t),
-                        "relative_humidity": float(rh) if rh is not None else 0,
-                        "wind_speed": float(ws) if ws is not None else 0,
-                        "wind_direction": float(wd) if wd is not None else 0
+                        "relative_humidity": float(rh) if rh is not None else 0.0,
+                        # Se vento for None (ex: subterrâneo), assume 0 para não quebrar o gráfico
+                        "u_component": float(u) if u is not None else 0.0,
+                        "v_component": float(v) if v is not None else 0.0
                     })
             except (IndexError, TypeError):
                 continue
         
         if not profile_data:
-            st.warning(f"Dados vazios para o horário {hour}:00 UTC (API: {api_type}). Tente mudar a data em +/- 1 dia.")
+            st.warning(f"Dados vazios para {date_str} {hour}:00 UTC. Tente outra data.")
             return None
         
         df = pd.DataFrame(profile_data)
-        df.attrs['source'] = "Previsão/Análise (Recente)" if api_type == "forecast" else "ERA5 (Consolidado)"
+        df.attrs['source'] = "Previsão/Análise" if api_type == "forecast" else "ERA5 (Histórico)"
         
         return df.sort_values(by="pressure", ascending=False)
         
