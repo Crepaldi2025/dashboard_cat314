@@ -8,9 +8,8 @@ import ee
 import io
 import base64
 import requests
-from PIL import Image, ImageDraw, ImageFont # Importações para editar a imagem estática
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-import matplotlib.ticker as ticker
 import matplotlib
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
@@ -42,21 +41,11 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # Inicializa o mapa sem basemap definido (para evitar BoxKeyError)
-    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False)
+    # --- CORREÇÃO AQUI ---
+    # Definimos basemap="Esri.WorldImagery" na criação. 
+    # Isso impede que o OpenStreetMap seja carregado como padrão.
+    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, basemap="Esri.WorldImagery", add_google_map=False)
     
-    # --- SOLUÇÃO DEFINITIVA DO FUNDO (TileLayer Direto) ---
-    # Adicionamos a camada Esri manualmente como um TileLayer do Folium.
-    # Isso garante que ela seja carregada ignorando dicionários do geemap.
-    esri_layer = folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-        name="Esri Satellite",
-        overlay=False, # Define como camada base (fundo)
-        control=True
-    )
-    esri_layer.add_to(mapa)
-
     # Adiciona dados climáticos
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     
