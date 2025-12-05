@@ -70,9 +70,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
+        # ATUALIZAÇÃO: Adicionado "Skew-T"
         st.radio(
             "Modo de Visualização",
-            ["Mapas", "Séries Temporais", "Sobre o Aplicativo"],
+            ["Mapas", "Séries Temporais", "Skew-T", "Sobre o Aplicativo"],
             label_visibility="collapsed", 
             key='nav_option',
             on_change=reset_analysis_state
@@ -80,7 +81,37 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         opcao = st.session_state.get('nav_option', 'Mapas')
 
-        if opcao in ["Mapas", "Séries Temporais"]:
+        if opcao == "Skew-T":
+            st.markdown("### 🌪️ Diagrama Skew-T")
+            st.info("Gera um perfil vertical da atmosfera (Sondagem) usando dados de reanálise ERA5.")
+            
+            st.divider()
+            st.markdown("#### 📍 Localização Pontual")
+            
+            c1, c2 = st.columns(2)
+            with c1: st.number_input("Lat", value=-23.55, format="%.4f", key='skew_lat')
+            with c2: st.number_input("Lon", value=-46.63, format="%.4f", key='skew_lon')
+            
+            st.divider()
+            st.markdown("#### 📅 Momento")
+            
+            hoje = datetime.now()
+            # ERA5 via Open-Meteo tem delay de ~5 dias para dados finais, mas usa ERA5T para recentes
+            data_padrao = hoje - relativedelta(days=1)
+            
+            st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY")
+            st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC.")
+
+            st.divider()
+            st.button(
+                "🚀 Gerar Skew-T", 
+                type="primary", 
+                use_container_width=True, 
+                on_click=lambda: st.session_state.update(analysis_triggered=True)
+            )
+
+        elif opcao in ["Mapas", "Séries Temporais"]:
+            # ... (CÓDIGO ORIGINAL DA UI MANTIDO AQUI PARA MAPAS/SÉRIES) ...
             st.markdown("### ⚙️ Parâmetros da Análise")
             
             # --- 3. BASE DE DADOS ---
@@ -201,7 +232,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             elif tipo_per == "Horário Específico":
                 hoje = datetime.now()
-                # --- CORREÇÃO: Data Padrão para 4 meses atrás (Dados disponíveis) ---
                 data_padrao = hoje - relativedelta(months=4)
                 
                 st.date_input("Data", value=data_padrao, min_value=min_data, max_value=max_data, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
@@ -245,76 +275,3 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v1.0.0 | 2025</div>", unsafe_allow_html=True)
         
         return opcao
-
-# -----------------------------
-# Renderizar a página principal
-# -----------------------------
-
-def renderizar_pagina_principal(opcao):
-    st.markdown("""<style>.block-container{padding-top:3rem!important;padding-bottom:5rem!important}h1{margin-top:0rem!important}.stExpander{border:1px solid #f0f2f6;border-radius:8px}</style>""", unsafe_allow_html=True)
-    fuso_br = pytz.timezone('America/Sao_Paulo')
-    agora, agora_utc = datetime.now(fuso_br), datetime.now(pytz.utc)
-    c1, c2 = st.columns([3, 1.5])
-    with c1:
-        lc, tc = st.columns([1, 5])
-        with lc: 
-            if os.path.exists("logo.png"): st.image("logo.png", width=70)
-            else: st.write("🌐")
-        with tc: st.title(f"{opcao}")
-    with c2:
-        st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
-    st.markdown("---")
-    if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state:
-        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
-
-def renderizar_resumo_selecao():
-    with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        with c1: st.markdown(f"**Variável:**\n{st.session_state.variavel}")
-        with c2:
-            tipo = st.session_state.tipo_localizacao
-            local_txt = ""
-            if tipo == "Estado": local_txt = st.session_state.estado
-            elif tipo == "Município": local_txt = f"{st.session_state.municipio} ({st.session_state.estado})"
-            elif tipo == "Círculo (Lat/Lon/Raio)": local_txt = "Área Circular"
-            elif tipo == "Polígono": local_txt = "Polígono Personalizado"
-            st.markdown(f"**Local ({tipo}):**\n{local_txt}")
-        with c3:
-            periodo = st.session_state.tipo_periodo
-            per_txt = ""
-            if periodo == "Personalizado": per_txt = f"{st.session_state.data_inicio.strftime('%d/%m/%Y')} - {st.session_state.data_fim.strftime('%d/%m/%Y')}"
-            elif periodo == "Mensal": per_txt = f"{st.session_state.mes_mensal}/{st.session_state.ano_mensal}"
-            elif periodo == "Anual": per_txt = str(st.session_state.ano_anual)
-            elif periodo == "Horário Específico":
-                 data = st.session_state.get('data_horaria')
-                 hora = st.session_state.get('hora_especifica')
-                 if data: per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
-            st.markdown(f"**Período ({periodo}):**\n{per_txt}")
-
-# -------------------------------------
-# Renderizar a opção sobre o aplicativo
-# -------------------------------------
-
-def renderizar_pagina_sobre():
-    st.title("Sobre o Clima-Cast-Crepaldi")
-    st.markdown("---")
-    url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
-    try:
-        with st.spinner("Carregando documentação..."):
-            r = requests.get(url)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-                tmp.write(r.content)
-                path = tmp.name
-        try: pypandoc.get_pandoc_version()
-        except: pypandoc.download_pandoc()
-        html = pypandoc.convert_file(path, "html", format="docx", extra_args=["--embed-resources"])
-        html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"', html)
-        html += "</div>" 
-        st.markdown(html, unsafe_allow_html=True)
-    except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
-    finally: 
-        if path and os.path.exists(path): os.remove(path)
-
-
-
-
