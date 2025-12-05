@@ -1,304 +1,228 @@
 # ==================================================================================
-# main.py 
+# ui.py
 # ==================================================================================
 import streamlit as st
-import ui
-import gee_handler
-import map_visualizer
-import charts_visualizer
-# Importar novos módulos
-import skewt_handler 
-import skewt_visualizer
-import utils
-import copy
+from datetime import datetime
+import calendar
+from dateutil.relativedelta import relativedelta
 import locale
-import base64 
-import io
-import pandas as pd
-import time
-import folium
-from folium.plugins import Draw 
-from streamlit_folium import st_folium
-from datetime import timedelta 
+import docx
+import os
+import requests
+import pypandoc
+import tempfile
+import pytz
+import re
 
-def set_background():
-    image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
-    opacity = 0.7
-    page_bg_img = f"""<style>.stApp {{background-image: linear-gradient(rgba(255, 255, 255, {opacity}), rgba(255, 255, 255, {opacity})), url("{image_url}"); background-size: cover; background-position: center center; background-repeat: no-repeat; background-attachment: fixed;}}</style>"""
-    st.markdown(page_bg_img, unsafe_allow_html=True)
+st.set_page_config(page_title="Clima-Cast-Crepaldi", layout="wide", initial_sidebar_state="expanded", page_icon="🌦️")
 
-set_background()
+try: locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
+except: pass 
 
-def get_geo_caching_key(session_state):
-    loc_type = session_state.get('tipo_localizacao')
-    key = f"loc_type:{loc_type}"
-    if loc_type == "Estado": key += f"|estado:{session_state.get('estado')}"
-    elif loc_type == "Município": key += f"|estado:{session_state.get('estado')}|municipio:{session_state.get('municipio')}"
-    elif loc_type == "Círculo (Lat/Lon/Raio)": key += f"|lat:{session_state.get('latitude')}|lon:{session_state.get('longitude')}|raio:{session_state.get('raio')}"
-    elif loc_type == "Polígono": key += f"|geojson:{hash(str(session_state.get('drawn_geometry')))}"
-    return key
+NOMES_MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
-def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
-    geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
-    if not geometry: return None 
-    
-    var_cfg = gee_handler.ERA5_VARS.get(variavel)
-    if not var_cfg: return None
-    
-    results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
-
-    if aba == "Mapas":
-        target_hour = None
-        if st.session_state.get('tipo_periodo') == "Horário Específico":
-            target_hour = st.session_state.get('hora_especifica')
-        
-        ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry, target_hour)
-        
-        if ee_image:
-            results["ee_image"] = ee_image
-            df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
-            if df_map_samples is not None: results["map_dataframe"] = df_map_samples
-            
-    elif aba == "Séries Temporais":
-        df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
-        if df is not None: results["time_series_df"] = df
-
-    return results
-
-def run_full_analysis():
-    aba = st.session_state.get("nav_option", "Mapas")
-    
-    # --- LÓGICA ESPECIAL PARA SKEW-T ---
-    if aba == "Skew-T":
-        lat = st.session_state.get("skew_lat")
-        lon = st.session_state.get("skew_lon")
-        date = st.session_state.get("skew_date")
-        hour = st.session_state.get("skew_hour")
-        
-        # Agora o handler já é híbrido (Forecast + Archive)
-        with st.spinner("Obtendo perfil vertical da atmosfera (ERA5/Forecast)..."):
-            df_skew = skewt_handler.get_vertical_profile_data(lat, lon, date, hour)
-        
-        st.session_state.skewt_results = {"df": df_skew, "params": (lat, lon, date, hour)}
-        return
-    # -----------------------------------
-
-    variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
-    tipo_per = st.session_state.tipo_periodo
-    
-    if tipo_per == "Horário Específico":
-        data_unica = st.session_state.get('data_horaria')
-        if data_unica:
-            start_date = data_unica
-            end_date = data_unica + timedelta(days=1) 
-        else: start_date, end_date = None, None
-    else:
-        start_date, end_date = utils.get_date_range(tipo_per, st.session_state)
-
-    if not (start_date and end_date):
-        st.warning("Selecione um período válido.")
-        return
-
-    geo_key = get_geo_caching_key(st.session_state)
-    
+@st.cache_data
+def _carregar_texto_docx(file_path):
+    if not os.path.exists(file_path): return None 
     try:
-        with st.spinner("Processando dados no Google Earth Engine..."):
-            analysis_data = run_analysis_logic(variavel, start_date, end_date, geo_key, aba)
+        doc = docx.Document(file_path)
+        full_text = [para.text for para in doc.paragraphs]
+        return "\n\n".join(full_text)
+    except Exception: return None
+
+def reset_analysis_state():
+    keys_to_reset = ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results']
+    for key in keys_to_reset:
+        if key in st.session_state: del st.session_state[key]
+
+def reset_analysis_results_only():
+    for key in ['analysis_triggered', 'analysis_results']:
+        if key in st.session_state: del st.session_state[key]
+
+def renderizar_sidebar(dados_geo, mapa_nomes_uf):
+    with st.sidebar:
+        st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast-Crepaldi</h2>", unsafe_allow_html=True)
+        st.markdown("---")
+        st.radio("Modo de Visualização", ["Mapas", "Séries Temporais", "Skew-T", "Sobre o Aplicativo"], label_visibility="collapsed", key='nav_option', on_change=reset_analysis_state)
         
-        if analysis_data is None:
-            st.warning("Não foi possível obter dados.")
-            st.session_state.analysis_results = None
-        else:
-            st.session_state.analysis_results = analysis_data
+        opcao = st.session_state.get('nav_option', 'Mapas')
 
-    except Exception as e:
-        st.error(f"Erro: {e}")
-        st.session_state.analysis_results = None
+        if opcao == "Skew-T":
+            st.markdown("### 🌪️ Diagrama Skew-T")
+            st.info("Gera um perfil vertical da atmosfera (Sondagem) usando dados de reanálise ERA5.")
+            st.divider()
+            st.markdown("#### 📍 Localização Pontual")
+            c1, c2 = st.columns(2)
+            with c1: st.number_input("Lat", value=-23.55, format="%.4f", key='skew_lat', on_change=reset_analysis_state)
+            with c2: st.number_input("Lon", value=-46.63, format="%.4f", key='skew_lon', on_change=reset_analysis_state)
+            st.divider()
+            st.markdown("#### 📅 Momento")
+            hoje = datetime.now()
+            data_padrao = hoje - relativedelta(days=0) 
+            # ADICIONADO on_change AQUI PARA LIMPAR O GRÁFICO ANTIGO
+            st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY", on_change=reset_analysis_state)
+            st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC.", on_change=reset_analysis_state)
+            st.caption("Nota: Datas > 14 dias atrás usam ERA5 (Arquivo). Datas recentes usam Previsão.")
+            st.divider()
+            st.button("🚀 Gerar Skew-T", type="primary", use_container_width=True, on_click=lambda: st.session_state.update(analysis_triggered=True))
 
-def render_analysis_results():
-    aba = st.session_state.get("nav_option", "Mapas")
-    
-    # --- RENDERIZAÇÃO DO SKEW-T ---
-    if aba == "Skew-T":
-        if "skewt_results" in st.session_state:
-            # === EXIBE O RESUMO IGUAL ÀS OUTRAS ABAS ===
-            ui.renderizar_resumo_selecao()
-            
-            res = st.session_state.skewt_results
-            if res["df"] is not None:
-                skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
-            else:
-                st.warning("Não foi possível gerar o Skew-T. Verifique a data ou a conexão.")
+        elif opcao in ["Mapas", "Séries Temporais"]:
+            st.markdown("### ⚙️ Parâmetros da Análise")
+            st.markdown("#### 🛰️ Base de Dados", help="Reanálise climática global de alta resolução (ECMWF).")
+            st.selectbox("Selecione a Base de Dados", ["ERA5-LAND"], key='base_de_dados', on_change=reset_analysis_state, label_visibility="collapsed")
+            st.divider()
+            st.markdown("#### 🌡️ Variável Meteorológica")
+            st.selectbox("Selecione a Variável", ["Temperatura do Ar (2m)", "Temperatura do Ponto de Orvalho (2m)", "Temperatura da Superfície (Skin)", "Precipitação Total", "Umidade Relativa (2m)", "Umidade do Solo (0-7 cm)", "Umidade do Solo (7-28 cm)", "Umidade do Solo (28-100 cm)", "Umidade do Solo (100-289 cm)", "Velocidade do Vento (10m)", "Radiação Solar Incidente"], key='variavel', on_change=reset_analysis_state, label_visibility="collapsed")
+            st.divider()
+            st.markdown("#### 📍 Localização")
+            st.selectbox("Tipo de Recorte", ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], key='tipo_localizacao', on_change=reset_analysis_state) 
+            tipo_loc = st.session_state.get('tipo_localizacao', 'Estado')
+            lista_ufs = ["Selecione..."] + [f"{mapa_nomes_uf[uf]} - {uf}" for uf in sorted(mapa_nomes_uf)]
+            if tipo_loc == "Estado":
+                if len(lista_ufs) <= 1: st.error("⚠️ Lista de estados vazia (Fallback ativo).")
+                st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
+            elif tipo_loc == "Município":
+                st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
+                estado_str = st.session_state.get('estado', 'Selecione...')
+                lista_muns = ["Selecione um estado primeiro"]
+                if estado_str != "Selecione...":
+                     uf_sigla = estado_str.split(' - ')[-1]
+                     muns = dados_geo.get(uf_sigla, [])
+                     if muns: lista_muns = ["Selecione..."] + muns
+                st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
+            elif tipo_loc == "Círculo (Lat/Lon/Raio)":
+                c1, c2 = st.columns(2)
+                with c1: st.number_input("Lat", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
+                with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
+                st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
+                with st.popover("ℹ️ Ajuda: Definindo o Círculo"): st.markdown("**Como preencher:**\n* **Lat/Lon:** Graus decimais (ex: -22.42).\n* **Raio:** Km do centro à borda.")
+            elif tipo_loc == "Polígono":
+                if st.session_state.get('drawn_geometry'): st.success("✅ Polígono Definido", icon="🛡️")
+                else: st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.</div>", unsafe_allow_html=True)
+                with st.popover("ℹ️ Guia de Ferramentas"): st.markdown("⬟ Polígono (Livre)\n⬛ Retângulo (Quadrado)\n📝 Editar\n🗑️ Lixeira")
+            st.divider()
+            st.markdown("#### 📅 Recorte Temporal")
+            opcoes_periodo = ["Personalizado", "Mensal", "Anual"]
+            if opcao == "Mapas": opcoes_periodo.append("Horário Específico")
+            if opcao == "Mapas": st.selectbox("Tipo de Período", opcoes_periodo, key='tipo_periodo', on_change=reset_analysis_state, label_visibility="collapsed")
+            else: st.session_state.tipo_periodo = "Personalizado"
+            tipo_per = st.session_state.get('tipo_periodo', 'Personalizado')
+            ano_atual = datetime.now().year
+            lista_anos = list(range(ano_atual, 1949, -1))
+            st.session_state.date_error = False
+            min_data = datetime(1950, 1, 1)
+            max_data = datetime.now()
+            if tipo_per == "Personalizado":
+                hoje = datetime.now()
+                fim_padrao = hoje.replace(day=1) - relativedelta(days=1)
+                inicio_padrao = fim_padrao.replace(day=1)
+                c1, c2 = st.columns(2)
+                with c1: st.date_input("Início", value=inicio_padrao, min_value=min_data, max_value=max_data, key='data_inicio', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                with c2: st.date_input("Fim", value=fim_padrao, min_value=min_data, max_value=max_data, key='data_fim', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                if st.session_state.data_fim < st.session_state.data_inicio:
+                    st.error("Data final anterior à inicial.")
+                    st.session_state.date_error = True
+            elif tipo_per == "Mensal":
+                c1, c2 = st.columns(2)
+                with c1: st.selectbox("Ano", lista_anos, key='ano_mensal', on_change=reset_analysis_state)
+                with c2: st.selectbox("Mês", NOMES_MESES_PT, key='mes_mensal', on_change=reset_analysis_state)
+            elif tipo_per == "Anual": st.selectbox("Ano", lista_anos, key='ano_anual', on_change=reset_analysis_state)
+            elif tipo_per == "Horário Específico":
+                hoje = datetime.now()
+                data_padrao = hoje - relativedelta(months=4)
+                st.date_input("Data", value=data_padrao, min_value=min_data, max_value=max_data, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
+                st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC (3 horas à frente de Brasília).")
+                st.info("ℹ️ **Nota:** Esta opção retorna um dado pontual (snapshot) apenas para a hora escolhida.", icon="🕒")
+            st.divider()
+            if opcao == "Mapas":
+                st.markdown("#### 🎨 Visualização")
+                st.radio("Formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_results_only, label_visibility="collapsed")
+                st.divider()
+            disable = st.session_state.get('date_error', False)
+            if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
+            elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
+            st.button("🚀 Gerar Análise", type="primary", use_container_width=True, disabled=disable, on_click=lambda: st.session_state.update(analysis_triggered=True))
+            if not disable: st.markdown("<div style='font-size:14px;margin-top:8px;'>⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar.</div>", unsafe_allow_html=True)
+            else: st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
+            st.markdown("---")
+            st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v1.0.0 | 2025</div>", unsafe_allow_html=True)
+        return opcao
+
+def renderizar_pagina_principal(opcao):
+    st.markdown("""<style>.block-container{padding-top:3rem!important;padding-bottom:5rem!important}h1{margin-top:0rem!important}.stExpander{border:1px solid #f0f2f6;border-radius:8px}</style>""", unsafe_allow_html=True)
+    fuso_br = pytz.timezone('America/Sao_Paulo')
+    agora, agora_utc = datetime.now(fuso_br), datetime.now(pytz.utc)
+    c1, c2 = st.columns([3, 1.5])
+    with c1:
+        lc, tc = st.columns([1, 5])
+        with lc: 
+            if os.path.exists("logo.png"): st.image("logo.png", width=70)
+            else: st.write("🌐")
+        with tc: st.title(f"{opcao}")
+    with c2:
+        st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
+    st.markdown("---")
+    if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state and 'skewt_results' not in st.session_state:
+        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
+
+def renderizar_resumo_selecao():
+    nav_option = st.session_state.get('nav_option')
+    if nav_option == "Skew-T":
+        with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
+            c1, c2, c3 = st.columns(3)
+            with c1: st.markdown("**Análise:**\nSondagem (Skew-T)")
+            with c2:
+                lat = st.session_state.get('skew_lat')
+                lon = st.session_state.get('skew_lon')
+                st.markdown(f"**Localização:**\nLat: {lat} | Lon: {lon}")
+            with c3:
+                date = st.session_state.get('skew_date')
+                hour = st.session_state.get('skew_hour')
+                data_str = date.strftime('%d/%m/%Y') if date else "--/--/----"
+                st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
         return
-    # ------------------------------
+    if "variavel" not in st.session_state: return
+    with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        with c1: st.markdown(f"**Variável:**\n{st.session_state.variavel}")
+        with c2:
+            tipo = st.session_state.tipo_localizacao
+            local_txt = ""
+            if tipo == "Estado": local_txt = st.session_state.estado
+            elif tipo == "Município": local_txt = f"{st.session_state.municipio} ({st.session_state.estado})"
+            elif tipo == "Círculo (Lat/Lon/Raio)": local_txt = "Área Circular"
+            elif tipo == "Polígono": local_txt = "Polígono Personalizado"
+            st.markdown(f"**Local ({tipo}):**\n{local_txt}")
+        with c3:
+            periodo = st.session_state.tipo_periodo
+            per_txt = ""
+            if periodo == "Personalizado": per_txt = f"{st.session_state.data_inicio.strftime('%d/%m/%Y')} - {st.session_state.data_fim.strftime('%d/%m/%Y')}"
+            elif periodo == "Mensal": per_txt = f"{st.session_state.mes_mensal}/{st.session_state.ano_mensal}"
+            elif periodo == "Anual": per_txt = str(st.session_state.ano_anual)
+            elif periodo == "Horário Específico":
+                 data = st.session_state.get('data_horaria')
+                 hora = st.session_state.get('hora_especifica')
+                 if data: per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
+            st.markdown(f"**Período ({periodo}):**\n{per_txt}")
 
-    if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
-        return
-
-    results = st.session_state.analysis_results
-    var_cfg = results["var_cfg"]
-
-    st.subheader("Resultado da Análise")
-    
-    # Exibe o resumo para Mapas/Séries
-    ui.renderizar_resumo_selecao() 
-
-    # --- Construção dos Títulos ---
-    variavel = st.session_state.get('variavel', '')
-    tipo_periodo = st.session_state.get('tipo_periodo', '')
-    tipo_local = st.session_state.get('tipo_localizacao', '').lower()
-    
-    periodo_str = ""
-    local_str = ""
-    
-    if tipo_periodo == "Personalizado":
-        inicio, fim = st.session_state.get('data_inicio'), st.session_state.get('data_fim')
-        if inicio and fim: periodo_str = f"de {inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
-    elif tipo_periodo == "Mensal":
-        mes, ano = st.session_state.get('mes_mensal', ''), st.session_state.get('ano_mensal', '')
-        periodo_str = f"mensal ({mes} de {ano})"
-    elif tipo_periodo == "Anual":
-        ano = st.session_state.get('ano_anual', '')
-        periodo_str = f"anual ({ano})"
-    elif tipo_periodo == "Horário Específico":
-        data = st.session_state.get('data_horaria')
-        hora = st.session_state.get('hora_especifica')
-        if data: periodo_str = f"em {data.strftime('%d/%m/%Y')} às {hora}:00 (UTC)"
-    
-    if tipo_local == "estado":
-        estado_raw = st.session_state.get('estado', '')
-        val = estado_raw.split(' - ')[0] if estado_raw else ""
-        local_str = f"no {tipo_local} de {val}"
-    elif tipo_local == "município":
-        mun = st.session_state.get('municipio', '')
-        local_str = f"no {tipo_local} de {mun}"
-    elif tipo_local == "polígono": 
-        local_str = "para a área desenhada"
-    else: 
-        local_str = "para o círculo definido"
-        
-    titulo_mapa = f"{variavel} {periodo_str} {local_str}"
-    titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
-
-    if aba == "Mapas":
-        st.markdown("---") 
-        if "ee_image" in results:
-            feature = results["feature"]
-            tipo_mapa = st.session_state.get("map_type", "Interativo")
-            st.subheader(titulo_mapa)
-            vis_params = gee_handler.obter_vis_params_interativo(variavel)
-
-            if tipo_mapa == "Interativo":
-                map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
-            elif tipo_mapa == "Estático":
-                with st.spinner("Gerando imagem estática com nova escala..."):
-                    png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(results["ee_image"], feature, vis_params, var_cfg["unit"])
-                if png_url:
-                    st.image(png_url, width=500)
-                    if colorbar_img: st.image(colorbar_img, width=500)
-                    
-                    st.markdown("### Exportar Mapas")
-                    try:
-                        title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
-                        map_png = base64.b64decode(png_url.split(",")[1])
-                        map_jpg = base64.b64decode(jpg_url.split(",")[1])
-                        cbar = base64.b64decode(colorbar_img.split(",")[1])
-                        
-                        final_png = map_visualizer._stitch_images_to_bytes(title_bytes, map_png, cbar, format='PNG')
-                        final_jpg = map_visualizer._stitch_images_to_bytes(title_bytes, map_jpg, cbar, format='JPEG')
-                        
-                        c1, c2 = st.columns(2)
-                        if final_png:
-                            with c1: st.download_button("📷 Baixar Mapa (PNG)", final_png, "mapa.png", "image/png", use_container_width=True)
-                        if final_jpg:
-                            with c2: st.download_button("📷 Baixar Mapa (JPEG)", final_jpg, "mapa.jpeg", "image/jpeg", use_container_width=True)
-                    except Exception as e: 
-                        st.error(f"Erro na exportação: {e}")
-
-        st.markdown("---") 
-        st.subheader("Tabela de Dados") 
-        if "map_dataframe" in results and not results["map_dataframe"].empty:
-             df_map = results["map_dataframe"]
-             cols = df_map.columns.tolist()
-             val_col = [c for c in cols if c not in ['Latitude', 'Longitude']][0]
-             unit = var_cfg["unit"]
-             st.dataframe(
-                df_map, 
-                use_container_width=True, 
-                hide_index=True, 
-                column_config={
-                    "Latitude": st.column_config.NumberColumn("Latitude", format="%.4f", width="small"), 
-                    "Longitude": st.column_config.NumberColumn("Longitude", format="%.4f", width="small"), 
-                    val_col: st.column_config.NumberColumn(val_col, format=f"%.2f {unit}", width="medium")
-                }
-            )
-             cd1, cd2 = st.columns(2)
-             csv = df_map.to_csv(index=False).encode('utf-8')
-             with cd1: 
-                st.download_button("Exportar CSV (Dados)", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
-             try:
-                buf = io.BytesIO()
-                with pd.ExcelWriter(buf, engine='openpyxl') as writer: 
-                    df_map.to_excel(writer, index=False, sheet_name='Dados')
-                with cd2: 
-                    st.download_button("Exportar XLSX (Dados)", buf.getvalue(), "dados_mapa.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-             except: pass
-
-    elif aba == "Séries Temporais":
-        if "time_series_df" in results:
-            st.subheader(titulo_serie)
-            charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"])
-
-def render_polygon_drawer():
-    st.subheader("Desenhe sua Área de Interesse")
-    m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
-    Draw(export=False, draw_options={"polygon": {"allowIntersection": False, "showArea": True}, "rectangle": {"allowIntersection": False, "showArea": True}, "circle": False, "marker": False, "polyline": False}, edit_options={"edit": True, "remove": True}).add_to(m)
-    map_data = st_folium(m, width=None, height=500, returned_objects=["all_drawings"])
-    if map_data and map_data.get("all_drawings"):
-        drawing = map_data["all_drawings"][-1]
-        if drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
-            if st.session_state.get('drawn_geometry') != drawing["geometry"]:
-                st.session_state.drawn_geometry = drawing["geometry"]
-                st.success("✅ Polígono capturado!")
-                st.rerun()
-    elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
-        del st.session_state['drawn_geometry']
-        st.rerun()
-
-def main():
-    if 'gee_initialized' not in st.session_state:
-        gee_handler.inicializar_gee()
-        st.session_state.gee_initialized = True
-        mensagem_container = st.empty()
-        mensagem_container.success("✅ Conectado ao Google Earth Engine com sucesso!")
-        time.sleep(5)
-        mensagem_container.empty()
-        
-    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
-    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
-    
-    if opcao_menu == "Sobre o Aplicativo":
-        ui.renderizar_pagina_sobre()
-        return
-    
-    ui.renderizar_pagina_principal(opcao_menu)
-    
-    is_polygon = (
-        opcao_menu in ["Mapas", "Séries Temporais"] and 
-        st.session_state.get('tipo_localizacao') == "Polígono"
-    )
-        
-    is_running = st.session_state.get("analysis_triggered", False)
-    has_geom = 'drawn_geometry' in st.session_state
-    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
-    
-    if is_polygon and not is_running and not has_geom and not has_res: 
-        render_polygon_drawer()
-    
-    if is_running:
-        st.session_state.analysis_triggered = False 
-        run_full_analysis() 
-    
-    render_analysis_results()
-
-if __name__ == "__main__": main()
+def renderizar_pagina_sobre():
+    st.title("Sobre o Clima-Cast-Crepaldi")
+    st.markdown("---")
+    url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
+    try:
+        with st.spinner("Carregando documentação..."):
+            r = requests.get(url)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+                tmp.write(r.content)
+                path = tmp.name
+        try: pypandoc.get_pandoc_version()
+        except: pypandoc.download_pandoc()
+        html = pypandoc.convert_file(path, "html", format="docx", extra_args=["--embed-resources"])
+        pattern = r'<img src="([^"]+)"'
+        replacement = r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"'
+        html = re.sub(pattern, replacement, html)
+        html += "</div>" 
+        st.markdown(html, unsafe_allow_html=True)
+    except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
+    finally: 
+        if path and os.path.exists(path): os.remove(path)
