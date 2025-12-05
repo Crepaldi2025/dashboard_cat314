@@ -2,6 +2,10 @@
 # ui.py
 # ==================================================================================
 
+# ----------------------
+# Bibliotecas importadas
+# ----------------------
+
 import streamlit as st
 from datetime import datetime
 import calendar
@@ -16,8 +20,9 @@ import pytz
 import re
 
 # ------------------------------
-# Configuração da Página
+# Configuração da Página e Cache
 # ------------------------------
+
 st.set_page_config(
     page_title="Clima-Cast-Crepaldi",
     layout="wide",
@@ -25,7 +30,6 @@ st.set_page_config(
     page_icon="🌦️"
 )
 
-# Tenta configurar o locale para Português (pode falhar em alguns servidores Linux, por isso o try)
 try:
     locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
 except:
@@ -34,9 +38,6 @@ except:
 NOMES_MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
                   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
-# ------------------------------
-# Funções Auxiliares
-# ------------------------------
 @st.cache_data
 def _carregar_texto_docx(file_path):
     if not os.path.exists(file_path): return None 
@@ -46,28 +47,30 @@ def _carregar_texto_docx(file_path):
         return "\n\n".join(full_text)
     except Exception: return None
 
+# -----------------------
+# Apagar dados da memória
+# -----------------------
+
 def reset_analysis_state():
-    """Limpa todos os resultados da memória para forçar nova geração."""
-    keys_to_reset = ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results']
-    for key in keys_to_reset:
-        if key in st.session_state: 
-            del st.session_state[key]
+    # Adicionado 'skewt_results' à lista de limpeza
+    for key in ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results']:
+        if key in st.session_state: del st.session_state[key]
 
 def reset_analysis_results_only():
-    """Limpa apenas resultados de mapas (mantém filtros)."""
     for key in ['analysis_triggered', 'analysis_results']:
-        if key in st.session_state: 
-            del st.session_state[key]
+        if key in st.session_state: del st.session_state[key]
 
-# ------------------------------
-# Barra Lateral (Sidebar)
-# ------------------------------
+# --------------------------
+# Renderizar a barra lateral
+# --------------------------
+
 def renderizar_sidebar(dados_geo, mapa_nomes_uf):
     with st.sidebar:
+        # --- 1. TÍTULO ---
         st.markdown("<h2 style='text-align: center;'>🌦️ Clima-Cast-Crepaldi</h2>", unsafe_allow_html=True)
         st.markdown("---")
 
-        # Seletor de Modo
+        # --- 2. NAVEGAÇÃO PRINCIPAL ---
         st.radio(
             "Modo de Visualização",
             ["Mapas", "Séries Temporais", "Skew-T", "Sobre o Aplicativo"],
@@ -78,7 +81,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         opcao = st.session_state.get('nav_option', 'Mapas')
 
-        # --- MODO SKEW-T ---
+        # --- OPÇÃO SKEW-T (INSERIDA AQUI) ---
         if opcao == "Skew-T":
             st.markdown("### 🌪️ Diagrama Skew-T")
             st.info("Gera um perfil vertical da atmosfera (Sondagem).")
@@ -87,7 +90,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("#### 📍 Localização Pontual")
             
             c1, c2 = st.columns(2)
-            # lat/lon com reset de estado ao mudar
             with c1: st.number_input("Lat", value=-23.55, format="%.4f", key='skew_lat', on_change=reset_analysis_state)
             with c2: st.number_input("Lon", value=-46.63, format="%.4f", key='skew_lon', on_change=reset_analysis_state)
             
@@ -95,14 +97,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("#### 📅 Momento")
             
             hoje = datetime.now()
-            # Padrão: Hoje (usa a lógica híbrida Forecast/Archive no handler)
-            data_padrao = hoje - relativedelta(days=0)
+            # Padrão: Hoje
+            data_padrao = hoje - relativedelta(days=0) 
             
-            # Date/Hour com reset de estado ao mudar
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY", on_change=reset_analysis_state)
             st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC.", on_change=reset_analysis_state)
-            
-            st.caption("Nota: Datas > 14 dias usam ERA5 (Arquivo). Datas recentes usam Previsão (GFS).")
+
+            st.caption("Nota: Datas antigas utilizam ERA5 (Arquivo).")
 
             st.divider()
             st.button(
@@ -112,37 +113,60 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 on_click=lambda: st.session_state.update(analysis_triggered=True)
             )
 
-        # --- MODO MAPAS / SÉRIES ---
+        # --- OPÇÕES ORIGINAIS (MANTIDAS INTACTAS) ---
         elif opcao in ["Mapas", "Séries Temporais"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
+            # --- 3. BASE DE DADOS ---
             st.markdown("#### 🛰️ Base de Dados", help="Reanálise climática global de alta resolução (ECMWF).")
-            st.selectbox("Selecione a Base de Dados", ["ERA5-LAND"], key='base_de_dados', on_change=reset_analysis_state, label_visibility="collapsed")
+            st.selectbox(
+                "Selecione a Base de Dados", 
+                ["ERA5-LAND"], 
+                key='base_de_dados', 
+                on_change=reset_analysis_state,
+                label_visibility="collapsed"
+            )
 
             st.divider()
+
+            # --- 4. VARIÁVEL ---
             st.markdown("#### 🌡️ Variável Meteorológica")
             st.selectbox(
                 "Selecione a Variável", 
                 [
-                    "Temperatura do Ar (2m)", "Temperatura do Ponto de Orvalho (2m)",
-                    "Temperatura da Superfície (Skin)", "Precipitação Total", 
-                    "Umidade Relativa (2m)", "Umidade do Solo (0-7 cm)",
-                    "Umidade do Solo (7-28 cm)", "Umidade do Solo (28-100 cm)",
-                    "Umidade do Solo (100-289 cm)", "Velocidade do Vento (10m)", 
+                    "Temperatura do Ar (2m)", 
+                    "Temperatura do Ponto de Orvalho (2m)",
+                    "Temperatura da Superfície (Skin)",
+                    "Precipitação Total", 
+                    "Umidade Relativa (2m)", 
+                    "Umidade do Solo (0-7 cm)",
+                    "Umidade do Solo (7-28 cm)",
+                    "Umidade do Solo (28-100 cm)",
+                    "Umidade do Solo (100-289 cm)",
+                    "Velocidade do Vento (10m)", 
                     "Radiação Solar Incidente"
                 ], 
-                key='variavel', on_change=reset_analysis_state, label_visibility="collapsed"
+                key='variavel', 
+                on_change=reset_analysis_state,
+                label_visibility="collapsed"
             )
             
             st.divider()
+
+            # --- 5. LOCALIZAÇÃO ---
             st.markdown("#### 📍 Localização")
-            st.selectbox("Tipo de Recorte", ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], key='tipo_localizacao', on_change=reset_analysis_state) 
+            st.selectbox(
+                "Tipo de Recorte", 
+                ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], 
+                key='tipo_localizacao', 
+                on_change=reset_analysis_state
+            ) 
             
             tipo_loc = st.session_state.get('tipo_localizacao', 'Estado')
-            # Garante que as listas de UFs estão carregadas
             lista_ufs = ["Selecione..."] + [f"{mapa_nomes_uf[uf]} - {uf}" for uf in sorted(mapa_nomes_uf)]
 
             if tipo_loc == "Estado":
+                if len(lista_ufs) <= 1: st.error("⚠️ Lista de estados vazia (Fallback ativo).")
                 st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
             
             elif tipo_loc == "Município":
@@ -171,8 +195,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             st.divider()
 
-            # --- PERÍODO ---
+            # --- 6. PERÍODO ---
             st.markdown("#### 📅 Recorte Temporal")
+            
             opcoes_periodo = ["Personalizado", "Mensal", "Anual"]
             if opcao == "Mapas": opcoes_periodo.append("Horário Específico")
             
@@ -211,18 +236,21 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             elif tipo_per == "Horário Específico":
                 hoje = datetime.now()
                 data_padrao = hoje - relativedelta(months=4)
+                
                 st.date_input("Data", value=data_padrao, min_value=min_data, max_value=max_data, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
                 st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC (3 horas à frente de Brasília).")
-                st.info("ℹ️ **Nota:** Retorna um dado pontual (snapshot).", icon="🕒")
+                
+                st.info("ℹ️ **Nota:** Esta opção retorna um dado pontual (snapshot) apenas para a hora escolhida.", icon="🕒")
             
             st.divider()
 
+            # --- 7. VISUALIZAÇÃO ---
             if opcao == "Mapas":
                 st.markdown("#### 🎨 Visualização")
                 st.radio("Formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_results_only, label_visibility="collapsed")
                 st.divider()
 
-            # Botão de Ação
+            # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
@@ -236,7 +264,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
             
             if not disable:
-                st.markdown("<div style='font-size:14px;margin-top:8px;'>⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar.</div>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div style='font-size:14px;margin-top:8px;'>"
+                    "⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>"
+                    "Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar."
+                    "</div>", 
+                    unsafe_allow_html=True
+                )
             else:
                 st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
@@ -245,9 +279,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         return opcao
 
-# ------------------------------
-# Página Principal
-# ------------------------------
+# -----------------------------
+# Renderizar a página principal
+# -----------------------------
+
 def renderizar_pagina_principal(opcao):
     st.markdown("""<style>.block-container{padding-top:3rem!important;padding-bottom:5rem!important}h1{margin-top:0rem!important}.stExpander{border:1px solid #f0f2f6;border-radius:8px}</style>""", unsafe_allow_html=True)
     fuso_br = pytz.timezone('America/Sao_Paulo')
@@ -262,38 +297,32 @@ def renderizar_pagina_principal(opcao):
     with c2:
         st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
     st.markdown("---")
-    
-    # Exibe instrução apenas se não houver resultados de NENHUMA das abas
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state and 'skewt_results' not in st.session_state:
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
-# ------------------------------
-# Resumo da Seleção
-# ------------------------------
 def renderizar_resumo_selecao():
-    # Verifica qual aba está ativa
+    # Verifica a opção selecionada para decidir qual resumo mostrar
     nav_option = st.session_state.get('nav_option')
 
-    # --- LÓGICA PARA SKEW-T ---
+    # --- SKEW-T: Resumo Diferente ---
     if nav_option == "Skew-T":
-        with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
+        with st.expander("📋 Resumo das Opções Selecionadas (Skew-T)", expanded=True):
             c1, c2, c3 = st.columns(3)
-            with c1: 
-                st.markdown("**Análise:**\nSondagem (Skew-T)")
+            with c1: st.markdown("**Análise:**\nSondagem Atmosférica")
             with c2:
                 lat = st.session_state.get('skew_lat')
                 lon = st.session_state.get('skew_lon')
                 st.markdown(f"**Localização:**\nLat: {lat} | Lon: {lon}")
             with c3:
-                date = st.session_state.get('skew_date')
-                hour = st.session_state.get('skew_hour')
-                data_str = date.strftime('%d/%m/%Y') if date else "--/--/----"
-                st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
+                dt = st.session_state.get('skew_date')
+                hr = st.session_state.get('skew_hour')
+                dt_str = dt.strftime('%d/%m/%Y') if dt else '--'
+                st.markdown(f"**Momento:**\n{dt_str} às {hr}h UTC")
         return
 
-    # --- LÓGICA PARA MAPAS E SÉRIES ---
-    if "variavel" not in st.session_state:
-        return
+    # --- MAPAS/SÉRIES: Resumo Original ---
+    # Só exibe se houver variável definida
+    if "variavel" not in st.session_state: return
 
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
         c1, c2, c3 = st.columns(3)
@@ -318,9 +347,10 @@ def renderizar_resumo_selecao():
                  if data: per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
             st.markdown(f"**Período ({periodo}):**\n{per_txt}")
 
-# ------------------------------
-# Página Sobre
-# ------------------------------
+# -------------------------------------
+# Renderizar a opção sobre o aplicativo
+# -------------------------------------
+
 def renderizar_pagina_sobre():
     st.title("Sobre o Clima-Cast-Crepaldi")
     st.markdown("---")
@@ -334,13 +364,8 @@ def renderizar_pagina_sobre():
         try: pypandoc.get_pandoc_version()
         except: pypandoc.download_pandoc()
         html = pypandoc.convert_file(path, "html", format="docx", extra_args=["--embed-resources"])
-        
-        # Regex separado para evitar erros de sintaxe em strings longas
-        pattern = r'<img src="([^"]+)"'
-        replacement = r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"'
-        html = re.sub(pattern, replacement, html)
+        html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"', html)
         html += "</div>" 
-        
         st.markdown(html, unsafe_allow_html=True)
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
