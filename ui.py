@@ -103,7 +103,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             data_padrao = hoje - relativedelta(days=0) 
             
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY")
-            st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC (3 horas à frente de Brasília).")
+            st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC.")
 
             st.caption("Nota: Datas recentes utilizam dados de previsão. Datas antigas (>5 dias) utilizam ERA5 consolidado.")
 
@@ -305,7 +305,27 @@ def renderizar_pagina_principal(opcao):
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 def renderizar_resumo_selecao():
-    # Evita erros se a variável não estiver definida (caso Skew-T)
+    # Verifica qual aba está ativa
+    nav_option = st.session_state.get('nav_option')
+
+    # --- LÓGICA PARA SKEW-T ---
+    if nav_option == "Skew-T":
+        with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
+            c1, c2, c3 = st.columns(3)
+            with c1: 
+                st.markdown("**Análise:**\nSondagem (Skew-T)")
+            with c2:
+                lat = st.session_state.get('skew_lat')
+                lon = st.session_state.get('skew_lon')
+                st.markdown(f"**Localização:**\nLat: {lat} | Lon: {lon}")
+            with c3:
+                date = st.session_state.get('skew_date')
+                hour = st.session_state.get('skew_hour')
+                data_str = date.strftime('%d/%m/%Y') if date else "--/--/----"
+                st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
+        return
+
+    # --- LÓGICA PARA MAPAS E SÉRIES ---
     if "variavel" not in st.session_state:
         return
 
@@ -349,10 +369,4 @@ def renderizar_pagina_sobre():
         try: pypandoc.get_pandoc_version()
         except: pypandoc.download_pandoc()
         html = pypandoc.convert_file(path, "html", format="docx", extra_args=["--embed-resources"])
-        html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"', html)
-        html += "</div>" 
-        st.markdown(html, unsafe_allow_html=True)
-    except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
-    finally: 
-        if path and os.path.exists(path): os.remove(path)
-
+        html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8
