@@ -12,6 +12,7 @@ import locale
 import base64 
 import io
 import pandas as pd
+import time
 import folium
 from folium.plugins import Draw 
 from streamlit_folium import st_folium
@@ -266,7 +267,19 @@ def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
         st.session_state.gee_initialized = True
-        st.toast("Conectado ao Google Earth Engine com sucesso!", icon="🌍")
+        # --- BLOCO DA MENSAGEM CENTRALIZADA ---
+        # 1. Cria um espaço reservado no topo central da página
+        mensagem_container = st.empty()
+        
+        # 2. Exibe a mensagem verde de sucesso (grande e centralizada)
+        mensagem_container.success("🌍 Conectado ao Google Earth Engine com sucesso!")
+        
+        # 3. Mantém a mensagem visível por 3 segundos (ajuste este valor como quiser)
+        time.sleep(3)
+        
+        # 4. Apaga a mensagem para liberar espaço
+        mensagem_container.empty()
+        # --------------------------------------
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
     
@@ -296,4 +309,5 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
 
