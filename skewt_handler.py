@@ -13,15 +13,15 @@ PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 
 def get_vertical_profile_data(lat, lon, date_obj, hour):
     """
     Busca dados de perfil vertical.
-    Solicita Velocidade/Direção (compatível com todas APIs) e calcula U/V manualmente.
+    CORREÇÃO: Usa nomes de variáveis com underscore (wind_speed) para compatibilidade com a API Archive.
     """
     date_str = date_obj.strftime('%Y-%m-%d')
     
-    # 1. Decisão Inteligente da Fonte de Dados (Híbrido)
+    # 1. Decisão Inteligente da Fonte de Dados
     hoje = datetime.now().date()
     delta_dias = (hoje - date_obj).days
     
-    # Margem segura de 14 dias
+    # Margem de segurança de 14 dias
     if delta_dias <= 14:
         url = "https://api.open-meteo.com/v1/forecast"
         api_type = "forecast"
@@ -29,13 +29,13 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         url = "https://archive-api.open-meteo.com/v1/archive"
         api_type = "archive"
     
-    # Monta lista de variáveis (USANDO NOMES PADRÃO ACEITOS)
+    # Monta lista de variáveis (NOMES CORRETOS: wind_speed e wind_direction com underscore)
     variables = []
     for level in PRESSURE_LEVELS:
         variables.append(f"temperature_{level}hPa")
         variables.append(f"relative_humidity_{level}hPa")
-        variables.append(f"windspeed_{level}hPa")    # Nome correto API
-        variables.append(f"winddirection_{level}hPa") # Nome correto API
+        variables.append(f"wind_speed_{level}hPa")      # Correção aqui
+        variables.append(f"wind_direction_{level}hPa")  # Correção aqui
     
     hourly_vars = ",".join(variables)
     
@@ -71,15 +71,13 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         profile_data = []
         for level in PRESSURE_LEVELS:
             try:
-                # Busca as listas de dados (Nota: Open-Meteo às vezes usa 'windspeed' ou 'wind_speed'. 
-                # A URL construída usou 'windspeed', mas o JSON de retorno geralmente usa chaves iguais à query string)
-                
-                # Tenta pegar com a chave exata da requisição
+                # Busca as listas de dados usando as chaves corretas (com underscore)
                 t_list = data["hourly"].get(f"temperature_{level}hPa")
                 rh_list = data["hourly"].get(f"relative_humidity_{level}hPa")
-                ws_list = data["hourly"].get(f"windspeed_{level}hPa")
-                wd_list = data["hourly"].get(f"winddirection_{level}hPa")
+                ws_list = data["hourly"].get(f"wind_speed_{level}hPa")      # Correção aqui
+                wd_list = data["hourly"].get(f"wind_direction_{level}hPa")  # Correção aqui
                 
+                # Se temperatura for None, algo crítico falhou para este nível
                 if t_list is None: continue
 
                 t = t_list[idx]
@@ -89,12 +87,11 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
                 
                 if t is not None:
                     # CÁLCULO MANUAL DOS COMPONENTES U E V
-                    # Se não houver vento (subterrâneo ou nulo), define como 0
+                    # Meteorologia: Direção é de onde vem o vento (graus).
+                    # U (Zonal) = -ws * sin(dir)
+                    # V (Meridional) = -ws * cos(dir)
                     u, v = 0.0, 0.0
                     if ws is not None and wd is not None:
-                        # Convertendo graus para radianos
-                        # Meteorologia: Direção é de onde vem o vento. 
-                        # u = -ws * sin(theta), v = -ws * cos(theta)
                         rad = math.radians(wd)
                         u = -ws * math.sin(rad)
                         v = -ws * math.cos(rad)
@@ -103,26 +100,22 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
                         "pressure": level,
                         "temperature": float(t),
                         "relative_humidity": float(rh) if rh is not None else 0.0,
-                        "u_component": u, # Calculado em m/s (Open-Meteo retorna km/h, convertemos se precisar no visualizer)
+                        "u_component": u, # Calculado em m/s (Open-Meteo retorna km/h)
                         "v_component": v
                     })
             except (IndexError, TypeError):
                 continue
         
         if not profile_data:
-            st.warning(f"Dados vazios para {date_str} {hour}:00 UTC. Tente outra data.")
+            st.warning(f"Dados vazios para {date_str} {hour}:00 UTC. (API: {api_type})")
             return None
         
         df = pd.DataFrame(profile_data)
         
-        # Open-Meteo retorna velocidade em km/h por padrão.
-        # Nossos componentes U/V foram calculados mantendo a magnitude original (km/h).
-        # O Visualizer espera converter m/s -> nós OU km/h -> nós.
-        # Vamos sinalizar que está em km/h na metadata se precisar, 
-        # mas o visualizer atual assume m/s. Vamos converter para m/s AQUI para padronizar.
-        
-        df['u_component'] = df['u_component'] / 3.6 # km/h para m/s
-        df['v_component'] = df['v_component'] / 3.6 # km/h para m/s
+        # Open-Meteo retorna velocidade em km/h. O cálculo manual acima preservou a magnitude.
+        # Converter para m/s para o MetPy (visualizer) usar corretamente.
+        df['u_component'] = df['u_component'] / 3.6 
+        df['v_component'] = df['v_component'] / 3.6 
 
         df.attrs['source'] = "Previsão/Análise" if api_type == "forecast" else "ERA5 (Histórico)"
         
@@ -130,6 +123,4 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         
     except Exception as e:
         st.error(f"Erro na conexão ({api_type}): {e}")
-        # Debug URL para ajudar a identificar erros futuros
-        # print(response.url) 
         return None
