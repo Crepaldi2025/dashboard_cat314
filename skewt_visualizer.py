@@ -4,6 +4,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import io
 
 try:
@@ -11,70 +12,154 @@ try:
     from metpy.units import units
     import metpy.calc as mpcalc
     METPY_AVAILABLE = True
-except: METPY_AVAILABLE = False
+except ImportError:
+    METPY_AVAILABLE = False
 
 def render_skewt_plot(df, lat, lon, date, hour):
     if not METPY_AVAILABLE:
-        st.error("Erro: Instale 'MetPy'")
+        st.error("⚠️ Biblioteca 'MetPy' não instalada.")
         return
 
-    # Unidades
-    p = df['pressure'].values * units.hPa
-    T = df['temperature'].values * units.degC
-    rh = df['relative_humidity'].values / 100.0
-    u = (df['u_component'].values * units('m/s')).to('knots')
-    v = (df['v_component'].values * units('m/s')).to('knots')
-    Td = mpcalc.dewpoint_from_relative_humidity(T, rh)
+    if df is None or df.empty:
+        st.warning("Sem dados para plotar.")
+        return
 
+    # --- 1. PREPARAÇÃO DOS DADOS (Unidades MetPy) ---
+    try:
+        p = df['pressure'].values * units.hPa
+        T = df['temperature'].values * units.degC
+        rh = df['relative_humidity'].values / 100.0
+        
+        # Componentes do vento
+        u = (df['u_component'].values * units('m/s')).to('knots')
+        v = (df['v_component'].values * units('m/s')).to('knots')
+
+        # Calcula Ponto de Orvalho
+        Td = mpcalc.dewpoint_from_relative_humidity(T, rh)
+    except Exception as e:
+        st.error(f"Erro nos dados físicos: {e}")
+        return
+
+    # --- 2. CÁLCULOS TERMODINÂMICOS AVANÇADOS ---
+    # Inicializa variáveis com None ou 0
+    cape, cin = 0 * units('J/kg'), 0 * units('J/kg')
+    lcl_p, lfc_p, el_p = None, None, None
+    li, k_idx, pw = None, None, None
+
+    try:
+        # Perfil da Parcela (Surface Based)
+        prof = mpcalc.parcel_profile(p, T[0], Td[0]).to('degC')
+        
+        # CAPE e CIN
+        cape, cin = mpcalc.surface_based_cape_cin(p, T, Td)
+        
+        # Níveis Significativos (LCL, LFC, EL)
+        lcl_p, lcl_t = mpcalc.lcl(p[0], T[0], Td[0])
+        lfc_p, lfc_t = mpcalc.lfc(p, T, Td)
+        el_p, el_t = mpcalc.el(p, T, Td)
+
+        # Índices de Instabilidade
+        li = mpcalc.lifted_index(p, T, prof)[0] # Lifted Index
+        
+        # K-Index (Requer níveis específicos, pode falhar se faltar 850/700/500)
+        try: k_idx = mpcalc.k_index(p, T, Td)
+        except: pass
+
+        # Água Precipitável
+        pw = mpcalc.precipitable_water(p, Td)
+
+    except Exception as e:
+        # print(f"Aviso Calc: {e}") # Debug silencioso
+        pass
+
+    # --- 3. EXIBIÇÃO DAS MÉTRICAS (CAIXA DESTACADA) ---
+    st.markdown("### 📊 Índices Termodinâmicos")
+    
+    with st.container(border=True):
+        # Linha 1: Energias e Níveis
+        c1, c2, c3, c4 = st.columns(4)
+        
+        c1.metric("CAPE", f"{cape.magnitude:.0f} J/kg", 
+            help="Convective Available Potential Energy.\nEnergia disponível para tempestades.\n> 1000: Moderado\n> 2500: Extremo")
+        
+        c2.metric("CIN", f"{cin.magnitude:.0f} J/kg", 
+            help="Convective Inhibition.\nEnergia que 'segura' a convecção.\nQuanto maior, mais difícil iniciar a tempestade.")
+        
+        lcl_val = f"{lcl_p.magnitude:.0f} hPa" if lcl_p else "--"
+        c3.metric("LCL", lcl_val, 
+            help="Lifted Condensation Level.\nAltura da base das nuvens.")
+        
+        lfc_val = f"{lfc_p.magnitude:.0f} hPa" if lfc_p else "--"
+        c4.metric("LFC", lfc_val, 
+            help="Level of Free Convection.\nAltitude onde a parcela fica mais quente que o ambiente e sobe sozinha.")
+
+        # Linha 2: Índices de Estabilidade e Umidade
+        c5, c6, c7, c8 = st.columns(4)
+        
+        li_val = f"{li.magnitude:.1f}" if li else "--"
+        c5.metric("Lifted Index (LI)", li_val, 
+            help="Diferença de temperatura (Ambiente - Parcela) em 500hPa.\n< 0: Instável\n< -4: Muito Instável")
+        
+        k_val = f"{k_idx.magnitude:.0f}" if k_idx else "--"
+        c6.metric("K-Index", k_val, 
+            help="Probabilidade de tempestades de massa de ar.\n> 30: Alta probabilidade\n< 20: Baixa probabilidade")
+        
+        pw_val = f"{pw.magnitude:.1f} mm" if pw else "--"
+        c7.metric("Água Precipitável", pw_val, 
+            help="Total de água na coluna atmosférica se tudo condensasse.\nIndica potencial para chuvas volumosas.")
+        
+        el_val = f"{el_p.magnitude:.0f} hPa" if el_p else "--"
+        c8.metric("Nível Equilíbrio (EL)", el_val, 
+            help="Equilibrium Level.\nLimite superior da nuvem (topo da convecção).")
+
+    # --- 4. PLOTAGEM DO GRÁFICO ---
     fig = plt.figure(figsize=(9, 9))
     skew = SkewT(fig, rotation=45)
-    skew.plot(p, T, 'r', linewidth=2, label='Temp')
-    skew.plot(p, Td, 'g', linewidth=2, label='Dewpoint')
-    
-    # Barbelas (Simplificadas para não poluir)
+
+    # Linhas principais
+    skew.plot(p, T, 'r', linewidth=2, label='Temperatura')
+    skew.plot(p, Td, 'g', linewidth=2, label='Ponto de Orvalho')
+
+    # Perfil da Parcela (Tracejado preto)
+    try:
+        skew.plot(p, prof, 'k', linewidth=1.5, linestyle='--', label='Parcela (SB)')
+        # Áreas sombreadas
+        skew.shade_cin(p, T, prof, alpha=0.2)
+        skew.shade_cape(p, T, prof, alpha=0.2)
+        # Pontos importantes
+        if lcl_p: skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', label='LCL')
+        if lfc_p: skew.plot(lfc_p, lfc_t, 'bo', markerfacecolor='blue', label='LFC')
+        if el_p: skew.plot(el_p, el_t, 'ro', markerfacecolor='red', label='EL')
+    except: pass
+
+    # Barbelas de Vento (Simplificadas)
     mask = p.m % 50 == 0 
     if not any(mask): mask = slice(None, None, 2)
     skew.plot_barbs(p[mask], u[mask], v[mask])
 
+    # Linhas de fundo
     skew.plot_dry_adiabats(alpha=0.3)
     skew.plot_moist_adiabats(alpha=0.3)
-    skew.plot_mixing_lines(linestyle='dotted')
+    skew.plot_mixing_lines(linestyle='dotted', alpha=0.4)
 
+    # Limites e Título
     skew.ax.set_ylim(1000, 100)
     skew.ax.set_xlim(-40, 50)
     
-    # Título
     real_date = df.attrs.get('real_date', date)
     src = df.attrs.get('source', '')
     date_str = real_date.strftime('%d/%m/%Y')
     
-    plt.title(f"Skew-T Log-P | {date_str} {hour}:00 UTC\nLoc: {lat}, {lon} | Fonte: {src}", loc='left', fontsize=10)
-
-    # Termodinâmica
-    cape_val, cin_val, lcl_val = 0, 0, 0
-    try:
-        prof = mpcalc.parcel_profile(p, T[0], Td[0]).to('degC')
-        skew.plot(p, prof, 'k', linestyle='--')
-        cape, cin = mpcalc.surface_based_cape_cin(p, T, Td)
-        lcl_p, _ = mpcalc.lcl(p[0], T[0], Td[0])
-        cape_val = cape.magnitude
-        cin_val = cin.magnitude
-        lcl_val = lcl_p.magnitude
-        skew.shade_cin(p, T, prof, alpha=0.2)
-        skew.shade_cape(p, T, prof, alpha=0.2)
-    except: pass
-
-    skew.ax.legend()
-    
-    # Exibe Métricas
-    c1, c2, c3 = st.columns(3)
-    c1.metric("CAPE", f"{cape_val:.0f} J/kg")
-    c2.metric("CIN", f"{cin_val:.0f} J/kg")
-    c3.metric("LCL", f"{lcl_val:.0f} hPa")
+    title_txt = (
+        f"Skew-T Log-P | {date_str} {hour}:00 UTC\n"
+        f"Local: {lat:.4f}, {lon:.4f} | Fonte: {src}"
+    )
+    plt.title(title_txt, loc='left', fontsize=10)
+    skew.ax.legend(loc='upper right')
 
     st.pyplot(fig)
     
     # Download
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-    st.download_button("📷 Baixar PNG", buf.getvalue(), "skewt.png", "image/png")
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png")
