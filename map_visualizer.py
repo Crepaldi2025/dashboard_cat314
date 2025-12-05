@@ -41,11 +41,23 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # --- CORREÇÃO AQUI ---
-    # Definimos basemap="Esri.WorldImagery" na criação. 
-    # Isso impede que o OpenStreetMap seja carregado como padrão.
-    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, basemap="Esri.WorldImagery", add_google_map=False)
+    # --- CORREÇÃO CRÍTICA DO ERRO BoxKeyError ---
+    # 1. Removemos 'basemap="Esri.WorldImagery"' daqui. Isso evita que o geemap
+    #    tente buscar a chave no dicionário interno (que está falhando).
+    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False)
     
+    # 2. Adicionamos a camada Esri manualmente via Folium. 
+    #    Isso funciona 100% das vezes e ignora o erro da biblioteca 'box'.
+    esri_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    esri_layer = folium.TileLayer(
+        tiles=esri_url,
+        attr="Esri Satellite",
+        name="Esri Satellite",
+        overlay=False, # Define como camada de fundo (base)
+        control=True
+    )
+    esri_layer.add_to(mapa)
+
     # Adiciona dados climáticos
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     
