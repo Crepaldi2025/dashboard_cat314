@@ -12,7 +12,7 @@ PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 
 def get_vertical_profile_data(lat, lon, date_obj, hour):
     """
     Busca dados de perfil vertical. 
-    Usa lógica Híbrida (Forecast/Archive) baseada em índice horário simples.
+    Usa lógica Híbrida com margem de segurança maior para evitar gaps do ERA5.
     """
     date_str = date_obj.strftime('%Y-%m-%d')
     
@@ -20,8 +20,10 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
     hoje = datetime.now().date()
     delta_dias = (hoje - date_obj).days
     
-    # Se for recente (<= 5 dias), usa Forecast (GFS/IFS). Se antigo, usa Archive (ERA5).
-    if delta_dias <= 5:
+    # ALTERAÇÃO AQUI: Aumentamos a margem para 14 dias.
+    # O ERA5 pode demorar 5-7 dias. A API Forecast segura dados passados recentes (Analysis)
+    # sem gaps. Isso evita cair no "limbo" entre o Forecast e o Archive.
+    if delta_dias <= 14:
         url = "https://api.open-meteo.com/v1/forecast"
         api_type = "forecast"
     else:
@@ -47,6 +49,10 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         "timeformat": "unixtime",
         "timezone": "UTC"
     }
+    
+    # Se for forecast buscando passado, precisamos habilitar past_days (embora start/end resolvam na v1, é bom garantir)
+    if api_type == "forecast" and delta_dias > 0:
+        params["past_days"] = delta_dias + 1
 
     try:
         response = requests.get(url, params=params)
@@ -57,7 +63,6 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
             st.warning(f"A API ({api_type}) não retornou dados.")
             return None
             
-        # Como pedimos start_date == end_date, a API retorna exatamente 24 horas (indices 0 a 23)
         # O índice é simplesmente a hora solicitada.
         idx = int(hour)
         
@@ -77,16 +82,13 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
                 ws_list = data["hourly"].get(f"wind_speed_{level}hPa")
                 wd_list = data["hourly"].get(f"wind_direction_{level}hPa")
                 
-                # Se a lista não existir, pula
                 if t_list is None: continue
 
-                # Pega o valor no índice da hora
                 t = t_list[idx]
                 rh = rh_list[idx]
                 ws = ws_list[idx]
                 wd = wd_list[idx]
                 
-                # Só adiciona se a temperatura for válida (não nula)
                 if t is not None:
                     profile_data.append({
                         "pressure": level,
@@ -99,12 +101,11 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
                 continue
         
         if not profile_data:
-            st.warning(f"Dados vazios para o horário {hour}:00 UTC (API: {api_type}). Tente outro horário.")
+            st.warning(f"Dados vazios para o horário {hour}:00 UTC (API: {api_type}). Tente mudar a data em +/- 1 dia.")
             return None
         
         df = pd.DataFrame(profile_data)
-        # Metadado para título do gráfico
-        df.attrs['source'] = "Previsão/GFS" if api_type == "forecast" else "ERA5/Histórico"
+        df.attrs['source'] = "Previsão/Análise (Recente)" if api_type == "forecast" else "ERA5 (Consolidado)"
         
         return df.sort_values(by="pressure", ascending=False)
         
