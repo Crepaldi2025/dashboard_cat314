@@ -2,10 +2,6 @@
 # ui.py
 # ==================================================================================
 
-# ----------------------
-# Bibliotecas importadas
-# ----------------------
-
 import streamlit as st
 from datetime import datetime
 import calendar
@@ -52,7 +48,6 @@ def _carregar_texto_docx(file_path):
 # -----------------------
 
 def reset_analysis_state():
-    # Adicionado 'skewt_results' à lista de limpeza
     for key in ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results']:
         if key in st.session_state: del st.session_state[key]
 
@@ -81,7 +76,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         opcao = st.session_state.get('nav_option', 'Mapas')
 
-        # --- OPÇÃO SKEW-T (INSERIDA AQUI) ---
+        # --- OPÇÃO SKEW-T (COM NOTA ATUALIZADA) ---
         if opcao == "Skew-T":
             st.markdown("### 🌪️ Diagrama Skew-T")
             st.info("Gera um perfil vertical da atmosfera (Sondagem).")
@@ -97,13 +92,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("#### 📅 Momento")
             
             hoje = datetime.now()
-            # Padrão: Hoje
             data_padrao = hoje - relativedelta(days=0) 
             
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY", on_change=reset_analysis_state)
             st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC.", on_change=reset_analysis_state)
 
-            st.caption("Nota: Datas antigas utilizam ERA5 (Arquivo).")
+            # --- NOTA EXPLICATIVA SOBRE O LIMITE DE DATA ---
+            st.caption("ℹ️ **Nota:** Dados de altitude (pressão) disponíveis apenas a partir de **23/03/2021** (limite histórico do modelo GFS). Para datas anteriores, apenas dados de superfície estão disponíveis.")
 
             st.divider()
             st.button(
@@ -113,7 +108,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 on_click=lambda: st.session_state.update(analysis_triggered=True)
             )
 
-        # --- OPÇÕES ORIGINAIS (MANTIDAS INTACTAS) ---
+        # --- OPÇÕES MAPAS E SÉRIES (MANTIDAS INTACTAS) ---
         elif opcao in ["Mapas", "Séries Temporais"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
@@ -301,28 +296,29 @@ def renderizar_pagina_principal(opcao):
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 def renderizar_resumo_selecao():
-    # Verifica a opção selecionada para decidir qual resumo mostrar
+    # Verifica qual aba está ativa para decidir o que mostrar
     nav_option = st.session_state.get('nav_option')
 
-    # --- SKEW-T: Resumo Diferente ---
+    # --- LÓGICA PARA SKEW-T ---
     if nav_option == "Skew-T":
-        with st.expander("📋 Resumo das Opções Selecionadas (Skew-T)", expanded=True):
+        with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
             c1, c2, c3 = st.columns(3)
-            with c1: st.markdown("**Análise:**\nSondagem Atmosférica")
+            with c1: 
+                st.markdown("**Análise:**\nSondagem (Skew-T)")
             with c2:
                 lat = st.session_state.get('skew_lat')
                 lon = st.session_state.get('skew_lon')
                 st.markdown(f"**Localização:**\nLat: {lat} | Lon: {lon}")
             with c3:
-                dt = st.session_state.get('skew_date')
-                hr = st.session_state.get('skew_hour')
-                dt_str = dt.strftime('%d/%m/%Y') if dt else '--'
-                st.markdown(f"**Momento:**\n{dt_str} às {hr}h UTC")
+                date = st.session_state.get('skew_date')
+                hour = st.session_state.get('skew_hour')
+                data_str = date.strftime('%d/%m/%Y') if date else "--/--/----"
+                st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
         return
 
-    # --- MAPAS/SÉRIES: Resumo Original ---
-    # Só exibe se houver variável definida
-    if "variavel" not in st.session_state: return
+    # --- LÓGICA PARA MAPAS E SÉRIES ---
+    if "variavel" not in st.session_state:
+        return
 
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
         c1, c2, c3 = st.columns(3)
