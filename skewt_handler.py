@@ -7,98 +7,129 @@ import streamlit as st
 from datetime import datetime
 import math
 
-# Níveis padrão
+# Níveis de pressão padrão
 PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
-
-def _fetch(url, params):
-    """Tenta buscar dados e retorna JSON ou None se falhar."""
-    try:
-        r = requests.get(url, params=params)
-        r.raise_for_status()
-        return r.json()
-    except: 
-        return None
 
 def get_vertical_profile_data(lat, lon, date_obj, hour):
     date_str = date_obj.strftime('%Y-%m-%d')
     delta = (datetime.now().date() - date_obj).days
     
-    # Seleção de API (Forecast vs Archive)
+    # Seleção de API
     if delta <= 14:
-        url = "https://api.open-meteo.com/v1/forecast"
+        base_url = "https://api.open-meteo.com/v1/forecast"
         api_type = "Forecast"
     else:
-        url = "https://archive-api.open-meteo.com/v1/archive"
+        base_url = "https://archive-api.open-meteo.com/v1/archive"
         api_type = "Archive"
 
-    # --- TENTATIVA 1: Variáveis com underscore (Padrão Forecast) ---
-    vars_v1 = []
+    # Montagem de Variáveis (Sintaxe Padrão Oficial: com underscore)
+    # Ex: temperature_1000hPa, wind_speed_1000hPa
+    vars_list = []
     for l in PRESSURE_LEVELS:
-        vars_v1.extend([f"temperature_{l}hPa", f"relative_humidity_{l}hPa", f"wind_speed_{l}hPa", f"wind_direction_{l}hPa"])
+        vars_list.extend([
+            f"temperature_{l}hPa", 
+            f"relative_humidity_{l}hPa", 
+            f"wind_speed_{l}hPa", 
+            f"wind_direction_{l}hPa"
+        ])
     
     params = {
-        "latitude": lat, "longitude": lon, 
-        "start_date": date_str, "end_date": date_str,
-        "hourly": ",".join(vars_v1), "timeformat": "unixtime", "timezone": "UTC"
+        "latitude": lat, 
+        "longitude": lon, 
+        "start_date": date_str, 
+        "end_date": date_str,
+        "hourly": ",".join(vars_list), 
+        "timeformat": "unixtime", 
+        "timezone": "UTC"
     }
-    if api_type == "Forecast" and delta > 0: params["past_days"] = delta + 1
+    
+    if api_type == "Forecast" and delta > 0: 
+        params["past_days"] = delta + 1
 
-    data = _fetch(url, params)
-    syntax = "v1"
+    # --- MODO DEBUG: Mostrar URL ---
+    # Constrói a URL final para o usuário poder testar no navegador
+    req = requests.Request('GET', base_url, params=params)
+    prepped = req.prepare()
+    
+    with st.expander("🐞 Debug API (Clique aqui se der erro)", expanded=False):
+        st.write(f"**Tipo de API:** {api_type}")
+        st.write("Se o gráfico não carregar, clique no link abaixo para ver o erro real da API:")
+        st.markdown(f"[🔗 Link da Requisição JSON]({prepped.url})")
 
-    # --- TENTATIVA 2: Variáveis sem underscore (Fallback Archive) ---
-    if not data:
-        vars_v2 = [v.replace("wind_", "wind") for v in vars_v1]
-        params["hourly"] = ",".join(vars_v2)
-        data = _fetch(url, params)
-        syntax = "v2"
+    try:
+        response = requests.Session().send(prepped)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        st.error(f"Erro de Conexão: {e}")
+        return None
 
-    # Se ambas falharem
-    if not data or "hourly" not in data:
-        st.error(f"Erro ao baixar dados ({api_type}). Verifique a conexão.")
+    if "hourly" not in data:
+        st.warning("A API respondeu, mas sem dados horários.")
         return None
 
     # Processamento
-    idx = int(hour)
-    ts = data["hourly"].get("time", [])
-    if idx >= len(ts): 
-        st.warning("Hora inválida.")
-        return None
-
-    # Validação de Data Retornada
-    returned_date = datetime.utcfromtimestamp(ts[idx]).date()
-    # Aviso opcional se a data for diferente
-    if returned_date != date_obj:
-        st.caption(f"ℹ️ Dados exibidos de: {returned_date}")
-
-    res = []
-    for level in PRESSURE_LEVELS:
-        # Define chaves baseadas no que funcionou (v1 ou v2)
-        k_ws = f"wind_speed_{level}hPa" if syntax == "v1" else f"windspeed_{level}hPa"
-        k_wd = f"wind_direction_{level}hPa" if syntax == "v1" else f"winddirection_{level}hPa"
+    try:
+        idx = int(hour)
+        ts = data["hourly"].get("time", [])
         
-        t = data["hourly"].get(f"temperature_{level}hPa", [None])[idx]
-        rh = data["hourly"].get(f"relative_humidity_{level}hPa", [0])[idx]
-        ws = data["hourly"].get(k_ws, [None])[idx]
-        wd = data["hourly"].get(k_wd, [None])[idx]
-
-        if t is not None:
-            u, v = 0.0, 0.0
-            if ws is not None and wd is not None:
-                rad = math.radians(wd)
-                u = -ws * math.sin(rad)
-                v = -ws * math.cos(rad)
+        # Validação de Índice
+        if idx >= len(ts): 
+            st.warning(f"Hora {hour} inválida. A API retornou apenas {len(ts)} pontos.")
+            return None
+        
+        # Validação de Data Retornada vs Pedida
+        returned_ts = ts[idx]
+        returned_date = datetime.utcfromtimestamp(returned_ts).date()
+        
+        res = []
+        for level in PRESSURE_LEVELS:
+            # Chaves com underscore (padrão oficial)
+            key_t = f"temperature_{level}hPa"
+            key_rh = f"relative_humidity_{level}hPa"
+            key_ws = f"wind_speed_{level}hPa"
+            key_wd = f"wind_direction_{level}hPa"
             
-            res.append({
-                "pressure": level, "temperature": t, "relative_humidity": rh,
-                "u_component": u/3.6, "v_component": v/3.6 # Converte km/h para m/s
-            })
+            # Extração Segura
+            t_list = data["hourly"].get(key_t)
+            rh_list = data["hourly"].get(key_rh)
+            ws_list = data["hourly"].get(key_ws)
+            wd_list = data["hourly"].get(key_wd)
 
-    if not res: 
-        st.warning("Dados vazios.")
+            # Se a lista inteira é None, pula
+            if not t_list: continue
+
+            # Pega o valor
+            t = t_list[idx]
+            rh = rh_list[idx] if rh_list else None
+            ws = ws_list[idx] if ws_list else None
+            wd = wd_list[idx] if wd_list else None
+
+            # Se Temperature é None, o dado é inválido
+            if t is not None:
+                u, v = 0.0, 0.0
+                if ws is not None and wd is not None:
+                    rad = math.radians(wd)
+                    u = -ws * math.sin(rad)
+                    v = -ws * math.cos(rad)
+                
+                res.append({
+                    "pressure": level, 
+                    "temperature": float(t), 
+                    "relative_humidity": float(rh) if rh is not None else 0.0,
+                    "u_component": u/3.6, # km/h -> m/s
+                    "v_component": v/3.6
+                })
+
+        if not res: 
+            st.warning(f"Dados vazios encontrados para {returned_date} às {hour}:00 UTC.")
+            return None
+            
+        df = pd.DataFrame(res)
+        df.attrs['source'] = f"{api_type} ({returned_date})"
+        df.attrs['real_date'] = returned_date
+        return df.sort_values("pressure", ascending=False)
+
+    except Exception as e:
+        st.error(f"Erro no processamento dos dados: {e}")
         return None
-        
-    df = pd.DataFrame(res)
-    df.attrs['source'] = f"{api_type}"
-    df.attrs['real_date'] = returned_date
-    return df.sort_values("pressure", ascending=False)
