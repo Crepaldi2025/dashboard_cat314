@@ -41,8 +41,8 @@ def render_skewt_plot(df, lat, lon, date, hour):
         return
 
     # --- 2. CÁLCULOS TERMODINÂMICOS AVANÇADOS ---
-    # Inicializa variáveis com None ou 0
-    cape, cin = 0 * units('J/kg'), 0 * units('J/kg')
+    # Inicializa variáveis com None
+    cape, cin = None, None
     lcl_p, lfc_p, el_p = None, None, None
     li, k_idx, pw = None, None, None
 
@@ -61,7 +61,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
         # Índices de Instabilidade
         li = mpcalc.lifted_index(p, T, prof)[0] # Lifted Index
         
-        # K-Index (Requer níveis específicos, pode falhar se faltar 850/700/500)
+        # K-Index (Requer níveis específicos)
         try: k_idx = mpcalc.k_index(p, T, Td)
         except: pass
 
@@ -79,36 +79,39 @@ def render_skewt_plot(df, lat, lon, date, hour):
         # Linha 1: Energias e Níveis
         c1, c2, c3, c4 = st.columns(4)
         
-        c1.metric("CAPE", f"{cape.magnitude:.0f} J/kg", 
+        # Correção do ValueError: Usar 'is not None' em vez de check booleano direto
+        cape_val = f"{cape.magnitude:.0f} J/kg" if cape is not None else "--"
+        c1.metric("CAPE", cape_val, 
             help="Convective Available Potential Energy.\nEnergia disponível para tempestades.\n> 1000: Moderado\n> 2500: Extremo")
         
-        c2.metric("CIN", f"{cin.magnitude:.0f} J/kg", 
+        cin_val = f"{cin.magnitude:.0f} J/kg" if cin is not None else "--"
+        c2.metric("CIN", cin_val, 
             help="Convective Inhibition.\nEnergia que 'segura' a convecção.\nQuanto maior, mais difícil iniciar a tempestade.")
         
-        lcl_val = f"{lcl_p.magnitude:.0f} hPa" if lcl_p else "--"
+        lcl_val = f"{lcl_p.magnitude:.0f} hPa" if lcl_p is not None else "--"
         c3.metric("LCL", lcl_val, 
             help="Lifted Condensation Level.\nAltura da base das nuvens.")
         
-        lfc_val = f"{lfc_p.magnitude:.0f} hPa" if lfc_p else "--"
+        lfc_val = f"{lfc_p.magnitude:.0f} hPa" if lfc_p is not None else "--"
         c4.metric("LFC", lfc_val, 
             help="Level of Free Convection.\nAltitude onde a parcela fica mais quente que o ambiente e sobe sozinha.")
 
         # Linha 2: Índices de Estabilidade e Umidade
         c5, c6, c7, c8 = st.columns(4)
         
-        li_val = f"{li.magnitude:.1f}" if li else "--"
+        li_val = f"{li.magnitude:.1f}" if li is not None else "--"
         c5.metric("Lifted Index (LI)", li_val, 
             help="Diferença de temperatura (Ambiente - Parcela) em 500hPa.\n< 0: Instável\n< -4: Muito Instável")
         
-        k_val = f"{k_idx.magnitude:.0f}" if k_idx else "--"
+        k_val = f"{k_idx.magnitude:.0f}" if k_idx is not None else "--"
         c6.metric("K-Index", k_val, 
             help="Probabilidade de tempestades de massa de ar.\n> 30: Alta probabilidade\n< 20: Baixa probabilidade")
         
-        pw_val = f"{pw.magnitude:.1f} mm" if pw else "--"
+        pw_val = f"{pw.magnitude:.1f} mm" if pw is not None else "--"
         c7.metric("Água Precipitável", pw_val, 
             help="Total de água na coluna atmosférica se tudo condensasse.\nIndica potencial para chuvas volumosas.")
         
-        el_val = f"{el_p.magnitude:.0f} hPa" if el_p else "--"
+        el_val = f"{el_p.magnitude:.0f} hPa" if el_p is not None else "--"
         c8.metric("Nível Equilíbrio (EL)", el_val, 
             help="Equilibrium Level.\nLimite superior da nuvem (topo da convecção).")
 
@@ -122,20 +125,30 @@ def render_skewt_plot(df, lat, lon, date, hour):
 
     # Perfil da Parcela (Tracejado preto)
     try:
-        skew.plot(p, prof, 'k', linewidth=1.5, linestyle='--', label='Parcela (SB)')
-        # Áreas sombreadas
-        skew.shade_cin(p, T, prof, alpha=0.2)
-        skew.shade_cape(p, T, prof, alpha=0.2)
+        # Só plota se tiver calculado o perfil
+        if 'prof' in locals() and prof is not None:
+            skew.plot(p, prof, 'k', linewidth=1.5, linestyle='--', label='Parcela (SB)')
+            
+            # Áreas sombreadas (CAPE/CIN)
+            if cape is not None and cape.magnitude > 0:
+                skew.shade_cape(p, T, prof, alpha=0.2)
+            if cin is not None and cin.magnitude < 0: # CIN é negativo no MetPy às vezes, ou positivo dependendo da versão
+                skew.shade_cin(p, T, prof, alpha=0.2)
+
         # Pontos importantes
-        if lcl_p: skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', label='LCL')
-        if lfc_p: skew.plot(lfc_p, lfc_t, 'bo', markerfacecolor='blue', label='LFC')
-        if el_p: skew.plot(el_p, el_t, 'ro', markerfacecolor='red', label='EL')
-    except: pass
+        if lcl_p is not None: skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', label='LCL')
+        if lfc_p is not None: skew.plot(lfc_p, lfc_t, 'bo', markerfacecolor='blue', label='LFC')
+        if el_p is not None: skew.plot(el_p, el_t, 'ro', markerfacecolor='red', label='EL')
+    except Exception as e:
+        # print(f"Erro plotagem extra: {e}")
+        pass
 
     # Barbelas de Vento (Simplificadas)
-    mask = p.m % 50 == 0 
-    if not any(mask): mask = slice(None, None, 2)
-    skew.plot_barbs(p[mask], u[mask], v[mask])
+    try:
+        mask = p.m % 50 == 0 
+        if not any(mask): mask = slice(None, None, 2)
+        skew.plot_barbs(p[mask], u[mask], v[mask])
+    except: pass
 
     # Linhas de fundo
     skew.plot_dry_adiabats(alpha=0.3)
@@ -148,7 +161,10 @@ def render_skewt_plot(df, lat, lon, date, hour):
     
     real_date = df.attrs.get('real_date', date)
     src = df.attrs.get('source', '')
-    date_str = real_date.strftime('%d/%m/%Y')
+    
+    # Formatação segura da data
+    if isinstance(real_date, (str)): date_str = real_date
+    else: date_str = real_date.strftime('%d/%m/%Y')
     
     title_txt = (
         f"Skew-T Log-P | {date_str} {hour}:00 UTC\n"
