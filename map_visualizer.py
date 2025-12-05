@@ -41,19 +41,19 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # --- CORREÇÃO CRÍTICA DO ERRO BoxKeyError ---
-    # 1. Removemos 'basemap="Esri.WorldImagery"' daqui. Isso evita que o geemap
-    #    tente buscar a chave no dicionário interno (que está falhando).
+    # --- CORREÇÃO DO ERRO BoxKeyError ---
+    # 1. Criamos o mapa SEM definir 'basemap'. Isso evita o crash da biblioteca 'box'.
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False)
     
-    # 2. Adicionamos a camada Esri manualmente via Folium. 
-    #    Isso funciona 100% das vezes e ignora o erro da biblioteca 'box'.
+    # 2. Adicionamos o Satélite (Esri) manualmente como um TileLayer do Folium.
+    #    Isso é à prova de falhas pois não depende do dicionário interno do geemap.
     esri_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    
     esri_layer = folium.TileLayer(
         tiles=esri_url,
-        attr="Esri Satellite",
-        name="Esri Satellite",
-        overlay=False, # Define como camada de fundo (base)
+        attr="Esri World Imagery",
+        name="Satélite (Esri)",
+        overlay=False, # Define como camada base (fundo)
         control=True
     )
     esri_layer.add_to(mapa)
