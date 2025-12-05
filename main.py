@@ -156,10 +156,11 @@ def render_analysis_results():
             
             st.subheader(titulo_mapa)
 
-            # ==========================================================
-            # CONTROLE DE CORES (IDENTAÇÃO CRÍTICA)
-            # ==========================================================
-            
+            # ==================================================================
+            # CORREÇÃO AQUI: Definir vis_params ANTES de usar nos ifs abaixo
+            # ==================================================================
+            vis_params = gee_handler.obter_vis_params_interativo(variavel)
+
             if tipo_mapa == "Interativo":
                 with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
                     st.markdown("""
@@ -167,15 +168,15 @@ def render_analysis_results():
                     **Ferramentas:** Linha (╱), Polígono (⬟), Retângulo (⬛), Círculo (⭕), Marcador (📍), Editar (📝), Lixeira (🗑️).
                     """)
                 
+                # Agora vis_params existe e o código não vai quebrar
                 map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
 
             elif tipo_mapa == "Estático":
-                # Gera o mapa agora, usando o 'vis_params' que acabamos de pegar dos sliders
                 with st.spinner("Gerando imagem estática com nova escala..."):
                     png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(
                         results["ee_image"], 
                         feature, 
-                        vis_params, # <--- Usa os params dos sliders
+                        vis_params,
                         var_cfg["unit"]
                     )
                 
@@ -309,6 +310,7 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
 
 
 
