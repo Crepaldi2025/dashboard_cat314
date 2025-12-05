@@ -10,7 +10,7 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     
     variable_name = variable.split(" (")[0]
     
-    # Cria o gráfico base (title=None para exibição limpa)
+    # Cria o gráfico base JÁ SEM TÍTULO (title=None)
     fig = px.line(
         df,
         x='date',
@@ -88,7 +88,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     df_clean['value'] = pd.to_numeric(df_clean['value'], errors='coerce')
     df_clean = df_clean.dropna(subset=['date', 'value']).sort_values('date')
 
-    # 1. Gráfico Interativo
+    # 1. Gráfico
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
         
@@ -99,19 +99,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
         
         st.plotly_chart(fig, use_container_width=True)
         
-    except Exception as e:
-        st.error(f"Erro ao plotar gráfico: {e}")
-        return
-
-    # 2. Botões de Download (Imagem) - COM PROTEÇÃO ANTI-CRASH
-    variable_clean = variable.split(" (")[0].lower().replace(" ", "_")
-    col_img1, col_img2, _ = st.columns([1, 1, 2])
-    
-    # --- CORREÇÃO AQUI ---
-    # Envolvemos a geração da imagem num bloco try-except genérico.
-    # Se o Kaleido falhar (erro comum no Cloud), o app NÃO trava, apenas avisa.
-    try:
-        # Prepara título para a versão estática
+        # Preparação para Download (Modifica figura na memória)
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
         data_fim = df_clean['date'].max().strftime('%d/%m/%Y')
         
@@ -119,24 +107,52 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
             title=dict(
                 text=f"<b>Série Temporal de {variable}</b><br><sup>({data_ini} a {data_fim})</sup>",
                 font=dict(size=24),
-                x=0, y=0.95, xanchor='left', yanchor='top'
+                x=0, 
+                y=0.95,
+                xanchor='left',
+                yanchor='top'
             ),
             margin=dict(t=190, l=80, r=30, b=60) 
         )
+        
+    except Exception as e:
+        st.error(f"Erro ao plotar gráfico: {e}")
+        return
 
-        # Tenta gerar imagens
+    # 2. Download Imagem
+    variable_clean = variable.split(" (")[0].lower().replace(" ", "_")
+    col_img1, col_img2, _ = st.columns([1, 1, 2])
+    
+    try:
         img_png = fig.to_image(format="png", width=1200, height=800, scale=2)
         img_jpg = fig.to_image(format="jpeg", width=1200, height=800, scale=2)
         
         with col_img1: st.download_button("📷 Baixar Gráfico (PNG)", data=img_png, file_name=f"grafico_{variable_clean}.png", mime="image/png", use_container_width=True)
         with col_img2: st.download_button("📷 Baixar Gráfico (JPG)", data=img_jpg, file_name=f"grafico_{variable_clean}.jpg", mime="image/jpeg", use_container_width=True)
     
-    except Exception:
-        # Se falhar (RuntimeError, ValueError, etc.), mostra aviso amigável
-        with col_img1: 
-            st.info("⚠️ Exportação de imagem indisponível no servidor. Use a câmera no topo do gráfico interativo.")
+    # ADICIONEI RuntimeError aqui para evitar o crash, mantendo o restante igual
+    except (ValueError, RuntimeError):
+        with col_img1: st.warning("⚠️ Instale `kaleido` ou verifique o servidor para baixar imagens.")
 
-    # 3. Estatísticas
+    # 3. GUIA DE ÍCONES E AJUDA (Restaurado)
+    with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
+        st.markdown("""
+        Ao passar o mouse sobre o canto superior direito do gráfico, você verá uma barra de ferramentas:
+        
+        * 📷 **Câmera (Download):** Baixa o gráfico atual como imagem PNG.
+        * 🔍 **Zoom (Lupa):** Clique e arraste na tela para aproximar uma área específica.
+        * ✥ **Pan (Setas):** Clique e arraste para mover o gráfico para os lados.
+        * ➕ / ➖ **Zoom In/Out:** Aproxima ou afasta a visualização centralizada.
+        * 🏠 **Casinha (Reset Axes):** Retorna o gráfico para a visualização original (reset).
+        * 🔲 **Autoscale:** Ajusta os eixos automaticamente para caber todos os dados visíveis.
+        * **⛶ Tela Cheia (Fullscreen):** Expande o gráfico para ocupar toda a tela.
+        
+        **Outras Dicas:**
+        * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
+        * **Valor Exato:** Passe o mouse sobre a linha azul para ver a data e o valor numérico exato (tooltip).
+        """)
+
+    # 4. Estatísticas
     st.markdown("#### Estatísticas do Período")
     media, maximo, minimo = df_clean['value'].mean(), df_clean['value'].max(), df_clean['value'].min()
     amplitude, desvio = maximo - minimo, df_clean['value'].std()
@@ -145,10 +161,10 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str):
     c1.metric("Média", f"{media:.1f} {unit}")
     c2.metric("Máxima", f"{maximo:.1f} {unit}")
     c3.metric("Mínima", f"{minimo:.1f} {unit}")
-    c4.metric("Amplitude", f"{amplitude:.1f} {unit}")
-    c5.metric("Desvio Padrão", f"{desvio:.1f}")
+    c4.metric("Amplitude", f"{amplitude:.1f} {unit}", help="Diferença entre Máximo e Mínimo.")
+    c5.metric("Desvio Padrão", f"{desvio:.1f}", help="Dispersão dos dados em relação à média.")
     
-    # 4. Tabela
+    # 5. Tabela Profissional
     st.markdown("---")
     st.subheader("Tabela de Dados") 
     
