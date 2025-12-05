@@ -11,10 +11,10 @@ import math
 PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
 
 def _fetch_data_from_api(url, params, syntax_type):
-    """Função auxiliar para tentar a requisição com diferentes sintaxes de variável."""
+    """Função auxiliar para tentar a requisição com diferentes sintaxes."""
     try:
         response = requests.get(url, params=params)
-        response.raise_for_status() # Lança erro se for 400/404/500
+        response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError:
         return None
@@ -24,7 +24,7 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
     hoje = datetime.now().date()
     delta_dias = (hoje - date_obj).days
     
-    # Define URL base
+    # Define URL base - Margem segura de 14 dias
     if delta_dias <= 14:
         url = "https://api.open-meteo.com/v1/forecast"
         api_type = "forecast"
@@ -33,7 +33,6 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         api_type = "archive"
 
     # --- TENTATIVA 1: SINTAXE PADRÃO (com underscore) ---
-    # Ex: wind_speed_1000hPa
     variables_v1 = []
     for level in PRESSURE_LEVELS:
         variables_v1.append(f"temperature_{level}hPa")
@@ -53,7 +52,6 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
     used_syntax = "v1"
 
     # --- TENTATIVA 2: SINTAXE ALTERNATIVA (sem underscore) ---
-    # Ex: windspeed_1000hPa (Se a v1 falhou)
     if data is None:
         variables_v2 = []
         for level in PRESSURE_LEVELS:
@@ -68,16 +66,14 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         data = _fetch_data_from_api(url, params_v2, "v2")
         used_syntax = "v2"
 
-    # Se ambas falharem
     if data is None:
-        st.error(f"Erro ao obter dados da API ({api_type}). Verifique a conexão ou a data.")
+        st.error(f"Erro ao obter dados da API ({api_type}). Verifique a conexão.")
         return None
 
     if "hourly" not in data:
         st.warning("Dados não encontrados na resposta da API.")
         return None
 
-    # Processamento dos Dados
     try:
         idx = int(hour)
         timestamps = data["hourly"].get("time", [])
@@ -85,9 +81,18 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
             st.warning("Hora solicitada inválida.")
             return None
 
+        # --- VERIFICAÇÃO DE DATA ---
+        # Verifica se o timestamp retornado realmente corresponde à data pedida
+        returned_ts = timestamps[idx]
+        returned_date = datetime.utcfromtimestamp(returned_ts).date()
+        
+        if returned_date != date_obj:
+            st.warning(f"⚠️ Atenção: A API retornou dados de {returned_date} em vez de {date_obj}. Tente outro período.")
+            # Se for crítico, pode retornar None aqui.
+            # return None
+
         profile_data = []
         for level in PRESSURE_LEVELS:
-            # Decide qual nome de chave usar baseado na sintaxe que funcionou
             ws_key = f"wind_speed_{level}hPa" if used_syntax == "v1" else f"windspeed_{level}hPa"
             wd_key = f"wind_direction_{level}hPa" if used_syntax == "v1" else f"winddirection_{level}hPa"
             
@@ -125,7 +130,9 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         df = pd.DataFrame(profile_data)
         df['u_component'] = df['u_component'] / 3.6
         df['v_component'] = df['v_component'] / 3.6
-        df.attrs['source'] = f"{api_type.capitalize()} ({used_syntax})"
+        # Guarda a data real retornada para exibir no título
+        df.attrs['source'] = f"{api_type.capitalize()}"
+        df.attrs['real_date'] = returned_date 
         
         return df.sort_values(by="pressure", ascending=False)
 
