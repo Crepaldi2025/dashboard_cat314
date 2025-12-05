@@ -5,22 +5,23 @@ import requests
 import pandas as pd
 import streamlit as st
 from datetime import datetime
+import math
 
 # Níveis de pressão padrão
 PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
 
 def get_vertical_profile_data(lat, lon, date_obj, hour):
     """
-    Busca dados de perfil vertical (Temp, UR, Vento U/V).
-    Usa componentes U/V do vento para compatibilidade total com o ERA5 Archive.
+    Busca dados de perfil vertical.
+    Solicita Velocidade/Direção (compatível com todas APIs) e calcula U/V manualmente.
     """
     date_str = date_obj.strftime('%Y-%m-%d')
     
-    # 1. Decisão Inteligente da Fonte de Dados
+    # 1. Decisão Inteligente da Fonte de Dados (Híbrido)
     hoje = datetime.now().date()
     delta_dias = (hoje - date_obj).days
     
-    # Margem de segurança de 14 dias para garantir dados consolidados no Archive
+    # Margem segura de 14 dias
     if delta_dias <= 14:
         url = "https://api.open-meteo.com/v1/forecast"
         api_type = "forecast"
@@ -28,13 +29,13 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         url = "https://archive-api.open-meteo.com/v1/archive"
         api_type = "archive"
     
-    # Monta lista de variáveis (USANDO COMPONENTES U/V)
+    # Monta lista de variáveis (USANDO NOMES PADRÃO ACEITOS)
     variables = []
     for level in PRESSURE_LEVELS:
         variables.append(f"temperature_{level}hPa")
         variables.append(f"relative_humidity_{level}hPa")
-        variables.append(f"u_component_of_wind_{level}hPa")
-        variables.append(f"v_component_of_wind_{level}hPa")
+        variables.append(f"windspeed_{level}hPa")    # Nome correto API
+        variables.append(f"winddirection_{level}hPa") # Nome correto API
     
     hourly_vars = ",".join(variables)
     
@@ -70,29 +71,40 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         profile_data = []
         for level in PRESSURE_LEVELS:
             try:
-                # Busca as listas de dados usando nomes de variáveis corretos
+                # Busca as listas de dados (Nota: Open-Meteo às vezes usa 'windspeed' ou 'wind_speed'. 
+                # A URL construída usou 'windspeed', mas o JSON de retorno geralmente usa chaves iguais à query string)
+                
+                # Tenta pegar com a chave exata da requisição
                 t_list = data["hourly"].get(f"temperature_{level}hPa")
                 rh_list = data["hourly"].get(f"relative_humidity_{level}hPa")
-                u_list = data["hourly"].get(f"u_component_of_wind_{level}hPa")
-                v_list = data["hourly"].get(f"v_component_of_wind_{level}hPa")
+                ws_list = data["hourly"].get(f"windspeed_{level}hPa")
+                wd_list = data["hourly"].get(f"winddirection_{level}hPa")
                 
-                # Se a lista de temperatura não existir, algo crítico falhou
                 if t_list is None: continue
 
                 t = t_list[idx]
                 rh = rh_list[idx] if rh_list else None
-                u = u_list[idx] if u_list else None
-                v = v_list[idx] if v_list else None
+                ws = ws_list[idx] if ws_list else None
+                wd = wd_list[idx] if wd_list else None
                 
-                # Só adiciona se a temperatura for válida
                 if t is not None:
+                    # CÁLCULO MANUAL DOS COMPONENTES U E V
+                    # Se não houver vento (subterrâneo ou nulo), define como 0
+                    u, v = 0.0, 0.0
+                    if ws is not None and wd is not None:
+                        # Convertendo graus para radianos
+                        # Meteorologia: Direção é de onde vem o vento. 
+                        # u = -ws * sin(theta), v = -ws * cos(theta)
+                        rad = math.radians(wd)
+                        u = -ws * math.sin(rad)
+                        v = -ws * math.cos(rad)
+
                     profile_data.append({
                         "pressure": level,
                         "temperature": float(t),
                         "relative_humidity": float(rh) if rh is not None else 0.0,
-                        # Se vento for None (ex: subterrâneo), assume 0 para não quebrar o gráfico
-                        "u_component": float(u) if u is not None else 0.0,
-                        "v_component": float(v) if v is not None else 0.0
+                        "u_component": u, # Calculado em m/s (Open-Meteo retorna km/h, convertemos se precisar no visualizer)
+                        "v_component": v
                     })
             except (IndexError, TypeError):
                 continue
@@ -102,10 +114,22 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
             return None
         
         df = pd.DataFrame(profile_data)
+        
+        # Open-Meteo retorna velocidade em km/h por padrão.
+        # Nossos componentes U/V foram calculados mantendo a magnitude original (km/h).
+        # O Visualizer espera converter m/s -> nós OU km/h -> nós.
+        # Vamos sinalizar que está em km/h na metadata se precisar, 
+        # mas o visualizer atual assume m/s. Vamos converter para m/s AQUI para padronizar.
+        
+        df['u_component'] = df['u_component'] / 3.6 # km/h para m/s
+        df['v_component'] = df['v_component'] / 3.6 # km/h para m/s
+
         df.attrs['source'] = "Previsão/Análise" if api_type == "forecast" else "ERA5 (Histórico)"
         
         return df.sort_values(by="pressure", ascending=False)
         
     except Exception as e:
         st.error(f"Erro na conexão ({api_type}): {e}")
+        # Debug URL para ajudar a identificar erros futuros
+        # print(response.url) 
         return None
