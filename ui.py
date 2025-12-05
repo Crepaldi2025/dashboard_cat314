@@ -52,6 +52,7 @@ def _carregar_texto_docx(file_path):
 # -----------------------
 
 def reset_analysis_state():
+    # Limpa estados tanto da análise padrão quanto do Skew-T
     for key in ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results']:
         if key in st.session_state: del st.session_state[key]
 
@@ -80,6 +81,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         opcao = st.session_state.get('nav_option', 'Mapas')
 
+        # === OPÇÃO SKEW-T ===
         if opcao == "Skew-T":
             st.markdown("### 🌪️ Diagrama Skew-T")
             st.info("Gera um perfil vertical da atmosfera (Sondagem) usando dados de reanálise ERA5.")
@@ -95,11 +97,15 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("#### 📅 Momento")
             
             hoje = datetime.now()
-            # ERA5 via Open-Meteo tem delay de ~5 dias para dados finais, mas usa ERA5T para recentes
-            data_padrao = hoje - relativedelta(days=2)
+            
+            # ATENÇÃO: Se estiver usando o handler híbrido (Forecast + Archive), 
+            # podemos usar a data de hoje/ontem.
+            data_padrao = hoje - relativedelta(days=0) 
             
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY")
             st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC.")
+
+            st.caption("Nota: Datas recentes utilizam dados de previsão. Datas antigas (>5 dias) utilizam ERA5 consolidado.")
 
             st.divider()
             st.button(
@@ -109,6 +115,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 on_click=lambda: st.session_state.update(analysis_triggered=True)
             )
 
+        # === OPÇÕES MAPAS E SÉRIES ===
         elif opcao in ["Mapas", "Séries Temporais"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
@@ -292,10 +299,16 @@ def renderizar_pagina_principal(opcao):
     with c2:
         st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
     st.markdown("---")
+    
+    # Exibe instrução apenas se não houver resultados de NENHUMA das abas
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state and 'skewt_results' not in st.session_state:
         st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
 
 def renderizar_resumo_selecao():
+    # Evita erros se a variável não estiver definida (caso Skew-T)
+    if "variavel" not in st.session_state:
+        return
+
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
         c1, c2, c3 = st.columns(3)
         with c1: st.markdown(f"**Variável:**\n{st.session_state.variavel}")
