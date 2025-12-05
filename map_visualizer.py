@@ -3,7 +3,6 @@
 # ==================================================================================
 
 import streamlit as st
-import geemap.foliumap as geemap
 import ee
 import io
 import base64
@@ -19,9 +18,10 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 import folium 
+from streamlit_folium import st_folium # Renderizador nativo
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (Satélite Esri Puro)
+# 1. MAPA INTERATIVO (Folium Puro + GEE Tile)
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -41,134 +41,115 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # --- CORREÇÃO DO ERRO BoxKeyError ---
-    # 1. Criamos o mapa SEM definir 'basemap'. Isso evita o crash da biblioteca 'box'.
-    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False)
+    # --- CORREÇÃO DEFINITIVA ---
+    # Usamos folium.Map direto (sem geemap.Map). 
+    # tiles=None garante que não carregue nada quebrado por padrão.
+    m = folium.Map(location=[lat_c, lon_c], zoom_start=4, tiles=None)
     
-    # 2. Adicionamos o Satélite (Esri) manualmente como um TileLayer do Folium.
-    #    Isso é à prova de falhas pois não depende do dicionário interno do geemap.
-    esri_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-    
-    esri_layer = folium.TileLayer(
-        tiles=esri_url,
-        attr="Esri World Imagery",
+    # 1. Adiciona Camada Base (Satélite Esri)
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri Satellite",
         name="Satélite (Esri)",
-        overlay=False, # Define como camada base (fundo)
+        overlay=False,
         control=True
-    )
-    esri_layer.add_to(mapa)
+    ).add_to(m)
 
-    # Adiciona dados climáticos
-    mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
+    # 2. Adiciona Dados Climáticos (GEE -> Folium Tile)
+    try:
+        map_id_dict = ee.Image(ee_image).getMapId(vis_params)
+        folium.TileLayer(
+            tiles=map_id_dict['tile_fetcher'].url_format,
+            attr='Google Earth Engine',
+            name='Dados Climáticos',
+            overlay=True,
+            control=True
+        ).add_to(m)
+    except Exception as e:
+        st.error(f"Erro ao processar tiles do GEE: {e}")
+
+    # 3. Adiciona Contorno
+    try:
+        outline = ee.Image().paint(ee.FeatureCollection([feature]), 0, 2)
+        outline_map_id = outline.getMapId({'palette': 'black'})
+        folium.TileLayer(
+            tiles=outline_map_id['tile_fetcher'].url_format,
+            attr='GEE',
+            name='Contorno',
+            overlay=True
+        ).add_to(m)
+    except: pass
     
-    # Adiciona contorno preto
-    mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "black"}, "Contorno")
-    
-    # --- LÓGICA DO MARCADOR (Apenas para Círculo) ---
+    # 4. Marcador (Se for Círculo)
     tipo_local = st.session_state.get('tipo_localizacao', '')
-    
     if tipo_local == "Círculo (Lat/Lon/Raio)":
         folium.Marker(
             location=[lat_c, lon_c],
             tooltip=f"Centro: {lat_c:.4f}, {lon_c:.4f}",
-            popup=folium.Popup(f"<b>Centro</b><br>Lat: {lat_c:.5f}<br>Lon: {lon_c:.5f}", max_width=200),
             icon=folium.Icon(color='red', icon='info-sign')
-        ).add_to(mapa)
+        ).add_to(m)
     
-    # Legenda
-    _add_colorbar_bottomleft(mapa, vis_params, unit_label)
+    # 5. Legenda (Adaptada para Folium)
+    _add_colorbar_bottomleft(m, vis_params, unit_label)
 
+    # 6. Ajuste de Zoom
     if bounds:
-        mapa.fit_bounds(bounds)
+        m.fit_bounds(bounds)
     
-    mapa.to_streamlit(height=500, use_container_width=True)
+    # Renderiza usando streamlit-folium
+    st_folium(m, height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Bolinha Preta + Texto Grande)
+# 2. MAPA ESTÁTICO (Mantido igual)
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
-        # 1. Dados
         visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
-        
-        # 2. Contorno
         outline = ee.Image().paint(featureCollection=ee.FeatureCollection([feature]), color=0, width=2)
         outline_vis = outline.visualize(palette='000000')
-
-        # 3. Composição
         final = visualized_data.blend(outline_vis)
 
-        # Região de recorte
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
             region = feature.geometry().buffer(dim * 0.05)
         except: region = feature.geometry()
 
-        # Download da Imagem (Fundo Transparente/Branco - Leve)
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
-        
-        # Abre imagem para edição com PIL
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         
-        # --- DESENHO MANUAL: Bolinha Preta + Texto (Apenas se for Círculo) ---
+        # Desenho no estático
         tipo_local = st.session_state.get('tipo_localizacao', '')
         if tipo_local == "Círculo (Lat/Lon/Raio)":
             try:
-                # Coordenadas do centro
                 centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates']
                 lon_txt, lat_txt = centro[0], centro[1]
-
                 draw = ImageDraw.Draw(img)
                 w, h = img.size
                 cx, cy = w / 2, h / 2
-                
-                # 1. Bolinha Preta (Raio 5)
                 r = 5
                 draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill="black", outline="white", width=1)
                 
-                # 2. Texto Lat/Lon
+                try: font = ImageFont.truetype("arial.ttf", 24)
+                except: font = ImageFont.load_default()
+
                 texto = f"lat={lat_txt:.4f}\nlon={lon_txt:.4f}"
-                
-                # --- FONTE GRANDE (TAMANHO 24) ---
-                try:
-                    # Tenta carregar fonte arial tamanho 24
-                    font = ImageFont.truetype("arial.ttf", 24)
-                except:
-                    try:
-                        # Tenta fonte linux padrão se arial falhar
-                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
-                    except:
-                        # Fallback (não muda tamanho, mas garante execução)
-                        font = ImageFont.load_default()
-
-                # Posição do texto (levemente deslocado)
                 tx, ty = cx + 12, cy - 25
-                
-                # Contorno Branco no Texto (para contraste)
-                draw.text((tx-2, ty), texto, font=font, fill="white")
-                draw.text((tx+2, ty), texto, font=font, fill="white")
-                draw.text((tx, ty-2), texto, font=font, fill="white")
-                draw.text((tx, ty+2), texto, font=font, fill="white")
-                
-                # Texto Preto Principal
+                # Borda branca
+                for off in [(-2,0), (2,0), (0,-2), (0,2)]:
+                    draw.text((tx+off[0], ty+off[1]), texto, font=font, fill="white")
                 draw.text((tx, ty), texto, font=font, fill="black")
+            except: pass
 
-            except Exception as e:
-                print(f"Erro desenho estático: {e}")
-
-        # Fundo Branco para JPEG
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
         
-        # Output JPEG
         buf = io.BytesIO()
         bg.convert('RGB').save(buf, format="JPEG")
         jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
         
-        # Output PNG (Salva a versão editada com o desenho!)
         buf_png = io.BytesIO()
         img.save(buf_png, format="PNG")
         png = f"data:image/png;base64,{base64.b64encode(buf_png.getvalue()).decode('ascii')}"
@@ -186,7 +167,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
 # 3. FUNÇÕES AUXILIARES
 # ------------------------------------------------------------------
 
-def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
+def _add_colorbar_bottomleft(mapa, vis_params: dict, unit_label: str):
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
@@ -203,10 +184,8 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
     colormap = StepColormap(colors=palette, index=index, vmin=vmin, vmax=vmax)
     colormap.fmt = fmt
-
     custom_caption = vis_params.get("caption")
-    label = custom_caption if custom_caption else unit_label
-    colormap.caption = label
+    colormap.caption = custom_caption if custom_caption else unit_label
     
     html = colormap._repr_html_()
     template = Template(f"""
@@ -220,31 +199,23 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     """)
     macro = MacroElement()
     macro._template = template
+    
+    # O método get_root() funciona tanto para geemap quanto para folium
     mapa.get_root().add_child(macro)
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     fig = plt.figure(figsize=(3.6, 0.35), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
-    
     try:
         N_STEPS = len(palette)
         boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
-        
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
-                
-        cb = ColorbarBase(
-            ax, cmap=cmap, norm=norm, boundaries=boundaries, 
-            spacing='proportional', orientation="horizontal"
-        )
-        
+        cb = ColorbarBase(ax, cmap=cmap, norm=norm, boundaries=boundaries, spacing='proportional', orientation="horizontal")
         cb.set_label(label, fontsize=7)
-        locator = ticker.MaxNLocator(nbins=6)
-        cb.locator = locator
-                
+        cb.locator = ticker.MaxNLocator(nbins=6)
         if (vmax - vmin) < 10: formatter = ticker.FormatStrFormatter('%.2f')
         else: formatter = ticker.FormatStrFormatter('%.0f')
-            
         cb.formatter = formatter
         cb.update_ticks()
         cb.ax.tick_params(labelsize=6, length=2, pad=1)
@@ -254,11 +225,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         plt.close(fig)
         buf.seek(0)
         return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
-        
-    except Exception as e:
-        st.error(f"Erro legenda: {e}")
-        plt.close(fig)
-        return None
+    except: return None
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
     try:
