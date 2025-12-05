@@ -103,7 +103,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             data_padrao = hoje - relativedelta(days=0) 
             
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY")
-            st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC.")
+            st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC (3 horas à frente de Brasília).")
 
             st.caption("Nota: Datas recentes utilizam dados de previsão. Datas antigas (>5 dias) utilizam ERA5 consolidado.")
 
@@ -355,3 +355,4 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
