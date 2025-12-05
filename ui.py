@@ -53,12 +53,15 @@ def _carregar_texto_docx(file_path):
 
 def reset_analysis_state():
     # Limpa estados tanto da análise padrão quanto do Skew-T
-    for key in ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results']:
-        if key in st.session_state: del st.session_state[key]
+    keys_to_reset = ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results']
+    for key in keys_to_reset:
+        if key in st.session_state: 
+            del st.session_state[key]
 
 def reset_analysis_results_only():
     for key in ['analysis_triggered', 'analysis_results']:
-        if key in st.session_state: del st.session_state[key]
+        if key in st.session_state: 
+            del st.session_state[key]
 
 # --------------------------
 # Renderizar a barra lateral
@@ -97,9 +100,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("#### 📅 Momento")
             
             hoje = datetime.now()
-            
-            # ATENÇÃO: Se estiver usando o handler híbrido (Forecast + Archive), 
-            # podemos usar a data de hoje/ontem.
+            # Padrão: Hoje (usa lógica híbrida Forecast/Archive no handler)
             data_padrao = hoje - relativedelta(days=0) 
             
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY")
@@ -286,7 +287,16 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
-    st.markdown("""<style>.block-container{padding-top:3rem!important;padding-bottom:5rem!important}h1{margin-top:0rem!important}.stExpander{border:1px solid #f0f2f6;border-radius:8px}</style>""", unsafe_allow_html=True)
+    # CSS Inline simplificado
+    st.markdown(
+        """<style>
+        .block-container{padding-top:3rem!important;padding-bottom:5rem!important}
+        h1{margin-top:0rem!important}
+        .stExpander{border:1px solid #f0f2f6;border-radius:8px}
+        </style>""", 
+        unsafe_allow_html=True
+    )
+    
     fuso_br = pytz.timezone('America/Sao_Paulo')
     agora, agora_utc = datetime.now(fuso_br), datetime.now(pytz.utc)
     c1, c2 = st.columns([3, 1.5])
@@ -297,7 +307,12 @@ def renderizar_pagina_principal(opcao):
             else: st.write("🌐")
         with tc: st.title(f"{opcao}")
     with c2:
-        st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'>"
+            f"<img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br>"
+            f"<span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", 
+            unsafe_allow_html=True
+        )
     st.markdown("---")
     
     # Exibe instrução apenas se não houver resultados de NENHUMA das abas
@@ -368,5 +383,17 @@ def renderizar_pagina_sobre():
                 path = tmp.name
         try: pypandoc.get_pandoc_version()
         except: pypandoc.download_pandoc()
+        
+        # Conversão de DOCX para HTML
         html = pypandoc.convert_file(path, "html", format="docx", extra_args=["--embed-resources"])
-        html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8
+        
+        # Ajuste de imagens no HTML (Regex separado para evitar erro de sintaxe)
+        pattern = r'<img src="([^"]+)"'
+        replacement = r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"'
+        html = re.sub(pattern, replacement, html)
+        html += "</div>" 
+        
+        st.markdown(html, unsafe_allow_html=True)
+    except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
+    finally: 
+        if path and os.path.exists(path): os.remove(path)
