@@ -10,23 +10,36 @@ import math
 # Níveis de pressão padrão
 PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
 
+def _fetch(url, params):
+    try:
+        r = requests.get(url, params=params)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        # Repassa o erro para ser tratado no nível superior
+        raise e
+
 def get_vertical_profile_data(lat, lon, date_obj, hour):
     date_str = date_obj.strftime('%Y-%m-%d')
     delta = (datetime.now().date() - date_obj).days
     
-    # 1. Seleção de API e FORÇAR MODELO ERA5
-    # Se não especificarmos 'models=era5', a API Archive usa ERA5-Land (que retorna null para altitude)
+    # 1. Configuração da API e Modelo
     if delta <= 14:
+        # --- DADOS RECENTES ---
         url = "https://api.open-meteo.com/v1/forecast"
         api_type = "Forecast (GFS)"
-        params = {"past_days": delta + 1} if delta > 0 else {}
+        # CORREÇÃO: Força o modelo 'gfs_seamless'. 
+        # Evita erro 400 se o modelo 'auto' não tiver níveis de pressão.
+        # Removemos 'past_days' pois start/end já definem o período.
+        extra_params = {"models": "gfs_seamless"} 
     else:
+        # --- DADOS HISTÓRICOS ---
         url = "https://archive-api.open-meteo.com/v1/archive"
         api_type = "Archive (ERA5)"
-        # O SEGREDO ESTÁ AQUI: Forçar o modelo global
-        params = {"models": "era5"} 
+        # CORREÇÃO: Força modelo 'era5' para ter dados de altitude.
+        extra_params = {"models": "era5"}
 
-    # 2. Variáveis (Sintaxe Padrão com underscore)
+    # 2. Montagem de Variáveis
     vars_list = []
     for l in PRESSURE_LEVELS:
         vars_list.extend([
@@ -36,8 +49,7 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
             f"wind_direction_{l}hPa"
         ])
     
-    # 3. Montagem dos Parâmetros Finais
-    params.update({
+    params = {
         "latitude": lat, 
         "longitude": lon, 
         "start_date": date_str, 
@@ -45,29 +57,33 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         "hourly": ",".join(vars_list), 
         "timeformat": "unixtime", 
         "timezone": "UTC"
-    })
+    }
+    # Aplica a forçagem de modelo (GFS ou ERA5)
+    params.update(extra_params)
 
-    # 4. Requisição
+    # 3. Requisição
     try:
-        # Debug para você conferir a URL
+        # Monta requisição para debug
         req = requests.Request('GET', url, params=params)
         prepped = req.prepare()
         
-        # Mostra o link se der erro (ou sempre, para testar)
-        print(f"URL Gerada: {prepped.url}") 
-        
-        response = requests.Session().send(prepped)
-        response.raise_for_status()
-        data = response.json()
+        # Link de Debug
+        with st.expander("🐞 Debug API (Se der erro, clique aqui)", expanded=False):
+            st.write(f"**API:** {api_type} | **Modelo Forçado:** {extra_params['models']}")
+            st.markdown(f"[🔗 Link JSON]({prepped.url})")
+
+        # Envia
+        data = _fetch(url, params)
+
     except Exception as e:
         st.error(f"Erro na conexão ({api_type}): {e}")
         return None
 
-    if "hourly" not in data:
+    if not data or "hourly" not in data:
         st.warning("API respondeu sem dados horários.")
         return None
 
-    # 5. Processamento dos Dados
+    # 4. Processamento
     try:
         idx = int(hour)
         ts = data["hourly"].get("time", [])
@@ -76,18 +92,17 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
             st.warning("Hora inválida.")
             return None
 
-        # Validação de Data
         returned_date = datetime.utcfromtimestamp(ts[idx]).date()
         
         res = []
         for level in PRESSURE_LEVELS:
-            # Busca segura com .get()
+            # Busca segura
             t = data["hourly"].get(f"temperature_{level}hPa", [None])[idx]
             rh = data["hourly"].get(f"relative_humidity_{level}hPa", [None])[idx]
             ws = data["hourly"].get(f"wind_speed_{level}hPa", [None])[idx]
             wd = data["hourly"].get(f"wind_direction_{level}hPa", [None])[idx]
 
-            # Se temperatura for None, o nível está vazio
+            # Se temperatura ok, processa
             if t is not None:
                 u, v = 0.0, 0.0
                 if ws is not None and wd is not None:
@@ -99,15 +114,12 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
                     "pressure": level, 
                     "temperature": float(t), 
                     "relative_humidity": float(rh) if rh is not None else 0.0,
-                    "u_component": u/3.6, # Converte km/h -> m/s
+                    "u_component": u/3.6, # km/h -> m/s
                     "v_component": v/3.6
                 })
 
         if not res: 
-            # Se cair aqui, a URL não tinha '&models=era5' ou a coord é inválida
-            st.error(f"Dados Nulos recebidos para {returned_date}. Verifique se o modelo ERA5 está ativo.")
-            with st.expander("Verificar URL (Deve conter models=era5)"):
-                st.write(prepped.url)
+            st.error(f"Dados vazios. O modelo {extra_params['models']} falhou para esta data/local.")
             return None
             
         df = pd.DataFrame(res)
@@ -116,5 +128,5 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         return df.sort_values("pressure", ascending=False)
 
     except Exception as e:
-        st.error(f"Erro processando: {e}")
+        st.error(f"Erro processando dados: {e}")
         return None
