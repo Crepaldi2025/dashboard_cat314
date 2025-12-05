@@ -272,10 +272,10 @@ def main():
         mensagem_container = st.empty()
         
         # 2. Exibe a mensagem verde de sucesso (grande e centralizada)
-        mensagem_container.success("🌍 Conectado ao Google Earth Engine com sucesso!")
+        mensagem_container.success("✅ Conectado ao Google Earth Engine com sucesso!")
         
         # 3. Mantém a mensagem visível por 3 segundos (ajuste este valor como quiser)
-        time.sleep(3)
+        time.sleep(5)
         
         # 4. Apaga a mensagem para liberar espaço
         mensagem_container.empty()
@@ -309,5 +309,6 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
 
 
