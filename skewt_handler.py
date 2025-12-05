@@ -13,7 +13,8 @@ PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 
 def get_vertical_profile_data(lat, lon, date_obj, hour):
     """
     Busca dados de perfil vertical.
-    CORREÇÃO: Usa nomes de variáveis com underscore (wind_speed) para compatibilidade com a API Archive.
+    CORREÇÃO FINAL: Variáveis de vento SEM UNDERSCORE ('windspeed', 'winddirection') 
+    para compatibilidade estrita com a API Archive.
     """
     date_str = date_obj.strftime('%Y-%m-%d')
     
@@ -29,13 +30,14 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         url = "https://archive-api.open-meteo.com/v1/archive"
         api_type = "archive"
     
-    # Monta lista de variáveis (NOMES CORRETOS: wind_speed e wind_direction com underscore)
+    # Monta lista de variáveis
+    # ATENÇÃO: 'windspeed' e 'winddirection' (tudo junto) é o padrão aceito no Archive.
     variables = []
     for level in PRESSURE_LEVELS:
         variables.append(f"temperature_{level}hPa")
         variables.append(f"relative_humidity_{level}hPa")
-        variables.append(f"wind_speed_{level}hPa")      # Correção aqui
-        variables.append(f"wind_direction_{level}hPa")  # Correção aqui
+        variables.append(f"windspeed_{level}hPa")      # SEM underscore
+        variables.append(f"winddirection_{level}hPa")  # SEM underscore
     
     hourly_vars = ",".join(variables)
     
@@ -71,13 +73,12 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         profile_data = []
         for level in PRESSURE_LEVELS:
             try:
-                # Busca as listas de dados usando as chaves corretas (com underscore)
+                # Busca usando as chaves exatas da requisição (tudo junto)
                 t_list = data["hourly"].get(f"temperature_{level}hPa")
                 rh_list = data["hourly"].get(f"relative_humidity_{level}hPa")
-                ws_list = data["hourly"].get(f"wind_speed_{level}hPa")      # Correção aqui
-                wd_list = data["hourly"].get(f"wind_direction_{level}hPa")  # Correção aqui
+                ws_list = data["hourly"].get(f"windspeed_{level}hPa")      # Chave sem underscore
+                wd_list = data["hourly"].get(f"winddirection_{level}hPa")  # Chave sem underscore
                 
-                # Se temperatura for None, algo crítico falhou para este nível
                 if t_list is None: continue
 
                 t = t_list[idx]
@@ -86,10 +87,7 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
                 wd = wd_list[idx] if wd_list else None
                 
                 if t is not None:
-                    # CÁLCULO MANUAL DOS COMPONENTES U E V
-                    # Meteorologia: Direção é de onde vem o vento (graus).
-                    # U (Zonal) = -ws * sin(dir)
-                    # V (Meridional) = -ws * cos(dir)
+                    # Cálculo U e V
                     u, v = 0.0, 0.0
                     if ws is not None and wd is not None:
                         rad = math.radians(wd)
@@ -100,7 +98,7 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
                         "pressure": level,
                         "temperature": float(t),
                         "relative_humidity": float(rh) if rh is not None else 0.0,
-                        "u_component": u, # Calculado em m/s (Open-Meteo retorna km/h)
+                        "u_component": u, 
                         "v_component": v
                     })
             except (IndexError, TypeError):
@@ -112,8 +110,7 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         
         df = pd.DataFrame(profile_data)
         
-        # Open-Meteo retorna velocidade em km/h. O cálculo manual acima preservou a magnitude.
-        # Converter para m/s para o MetPy (visualizer) usar corretamente.
+        # Converte km/h -> m/s
         df['u_component'] = df['u_component'] / 3.6 
         df['v_component'] = df['v_component'] / 3.6 
 
@@ -122,5 +119,7 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         return df.sort_values(by="pressure", ascending=False)
         
     except Exception as e:
+        # Se der erro, mostra a URL para debug (remova em produção se quiser)
+        # st.write(f"URL falha: {response.url}") 
         st.error(f"Erro na conexão ({api_type}): {e}")
         return None
