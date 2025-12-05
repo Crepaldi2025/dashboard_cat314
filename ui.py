@@ -98,7 +98,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             data_padrao = hoje - relativedelta(days=0)
             
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY", on_change=reset_analysis_state)
-            st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC.", on_change=reset_analysis_state)
+            st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC(3 a menos de Brasília).", on_change=reset_analysis_state)
             
             st.caption("Nota: Datas > 14 dias usam ERA5 (Arquivo). Datas recentes usam Previsão (GFS).")
 
@@ -342,3 +342,4 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
