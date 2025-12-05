@@ -21,7 +21,7 @@ from branca.element import Template, MacroElement
 import folium 
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (Geemap com Satélite Padrão)
+# 1. MAPA INTERATIVO (Geemap com Toolbar + Satélite)
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -41,14 +41,13 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # --- CRIAÇÃO DO MAPA (Geemap com Toolbar) ---
-    # Não definimos 'basemap' aqui para evitar o BoxKeyError.
-    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False)
+    # --- CORREÇÃO DEFINITIVA ---
+    # 1. Usamos 'tiles=None' para NÃO carregar o OpenStreetMap padrão.
+    #    Isso evita termos que usar .clear_layers() (que estava dando erro).
+    # 2. Não definimos 'basemap' para evitar o erro de BoxKeyError.
+    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False, tiles=None)
     
-    # 1. Limpa o OpenStreetMap padrão (remove o fundo cinza/branco)
-    mapa.clear_layers()
-    
-    # 2. Adiciona Satélite (Esri) manualmente como camada BASE
+    # 3. Adicionamos Satélite (Esri) manualmente como camada BASE
     esri_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
     mapa.add_tile_layer(
         url=esri_url,
@@ -57,10 +56,10 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         shown=True
     )
 
-    # 3. Adiciona Dados Climáticos (Overlay)
+    # 4. Adiciona Dados Climáticos (Overlay)
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
     
-    # 4. Adiciona Contorno
+    # 5. Adiciona Contorno
     try:
         outline = ee.Image().paint(ee.FeatureCollection([feature]), 0, 2)
         mapa.addLayer(outline, {"palette": "black"}, "Contorno")
@@ -85,7 +84,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Mantido igual - Funciona bem)
+# 2. MAPA ESTÁTICO (Mantido igual)
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -151,7 +150,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         return None, None, None
 
 # ------------------------------------------------------------------
-# 3. FUNÇÕES AUXILIARES (Legenda e Títulos)
+# 3. FUNÇÕES AUXILIARES
 # ------------------------------------------------------------------
 
 def _add_colorbar_bottomleft(mapa, vis_params: dict, unit_label: str):
