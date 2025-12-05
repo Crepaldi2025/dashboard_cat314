@@ -14,12 +14,13 @@ python-docx
 pypandoc
 openpyxl
 pytz
-kaleido
+kaleido==0.2.1
 MetPy
 scipy
 pint
 xarray
 pooch
+
 
 
 
