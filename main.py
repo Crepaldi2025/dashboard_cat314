@@ -75,7 +75,8 @@ def run_full_analysis():
         date = st.session_state.get("skew_date")
         hour = st.session_state.get("skew_hour")
         
-        with st.spinner("Obtendo perfil vertical da atmosfera (ERA5 via Open-Meteo)..."):
+        # Agora o handler já é híbrido (Forecast + Archive)
+        with st.spinner("Obtendo perfil vertical da atmosfera (ERA5/Forecast)..."):
             df_skew = skewt_handler.get_vertical_profile_data(lat, lon, date, hour)
         
         st.session_state.skewt_results = {"df": df_skew, "params": (lat, lon, date, hour)}
@@ -120,11 +121,14 @@ def render_analysis_results():
     # --- RENDERIZAÇÃO DO SKEW-T ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
+            # === EXIBE O RESUMO IGUAL ÀS OUTRAS ABAS ===
+            ui.renderizar_resumo_selecao()
+            
             res = st.session_state.skewt_results
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
             else:
-                st.warning("Não foi possível gerar o Skew-T. Verifique a data (ERA5 tem delay de 5 dias) ou a conexão.")
+                st.warning("Não foi possível gerar o Skew-T. Verifique a data ou a conexão.")
         return
     # ------------------------------
 
@@ -135,6 +139,8 @@ def render_analysis_results():
     var_cfg = results["var_cfg"]
 
     st.subheader("Resultado da Análise")
+    
+    # Exibe o resumo para Mapas/Séries
     ui.renderizar_resumo_selecao() 
 
     # --- Construção dos Títulos ---
@@ -183,18 +189,32 @@ def render_analysis_results():
             vis_params = gee_handler.obter_vis_params_interativo(variavel)
 
             if tipo_mapa == "Interativo":
-                # ... (Código Mantido) ...
                 map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
             elif tipo_mapa == "Estático":
-                # ... (Código Mantido) ...
                 with st.spinner("Gerando imagem estática com nova escala..."):
                     png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(results["ee_image"], feature, vis_params, var_cfg["unit"])
                 if png_url:
                     st.image(png_url, width=500)
                     if colorbar_img: st.image(colorbar_img, width=500)
-                    # ... (Exportação Mantida) ...
+                    
+                    st.markdown("### Exportar Mapas")
+                    try:
+                        title_bytes = map_visualizer._make_title_image(titulo_mapa, 800)
+                        map_png = base64.b64decode(png_url.split(",")[1])
+                        map_jpg = base64.b64decode(jpg_url.split(",")[1])
+                        cbar = base64.b64decode(colorbar_img.split(",")[1])
+                        
+                        final_png = map_visualizer._stitch_images_to_bytes(title_bytes, map_png, cbar, format='PNG')
+                        final_jpg = map_visualizer._stitch_images_to_bytes(title_bytes, map_jpg, cbar, format='JPEG')
+                        
+                        c1, c2 = st.columns(2)
+                        if final_png:
+                            with c1: st.download_button("📷 Baixar Mapa (PNG)", final_png, "mapa.png", "image/png", use_container_width=True)
+                        if final_jpg:
+                            with c2: st.download_button("📷 Baixar Mapa (JPEG)", final_jpg, "mapa.jpeg", "image/jpeg", use_container_width=True)
+                    except Exception as e: 
+                        st.error(f"Erro na exportação: {e}")
 
-        # ... (Tabela de Dados Mantida) ...
         st.markdown("---") 
         st.subheader("Tabela de Dados") 
         if "map_dataframe" in results and not results["map_dataframe"].empty:
@@ -212,6 +232,17 @@ def render_analysis_results():
                     val_col: st.column_config.NumberColumn(val_col, format=f"%.2f {unit}", width="medium")
                 }
             )
+             cd1, cd2 = st.columns(2)
+             csv = df_map.to_csv(index=False).encode('utf-8')
+             with cd1: 
+                st.download_button("Exportar CSV (Dados)", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
+             try:
+                buf = io.BytesIO()
+                with pd.ExcelWriter(buf, engine='openpyxl') as writer: 
+                    df_map.to_excel(writer, index=False, sheet_name='Dados')
+                with cd2: 
+                    st.download_button("Exportar XLSX (Dados)", buf.getvalue(), "dados_mapa.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+             except: pass
 
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
@@ -219,7 +250,6 @@ def render_analysis_results():
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"])
 
 def render_polygon_drawer():
-    # ... (Código Mantido) ...
     st.subheader("Desenhe sua Área de Interesse")
     m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
     Draw(export=False, draw_options={"polygon": {"allowIntersection": False, "showArea": True}, "rectangle": {"allowIntersection": False, "showArea": True}, "circle": False, "marker": False, "polyline": False}, edit_options={"edit": True, "remove": True}).add_to(m)
