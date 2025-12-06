@@ -48,7 +48,7 @@ def _carregar_texto_docx(file_path):
 # -----------------------
 
 def reset_analysis_state():
-    for key in ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results']:
+    for key in ['analysis_triggered', 'analysis_results', 'drawn_geometry', 'skewt_results', 'hydro_shape']:
         if key in st.session_state: del st.session_state[key]
 
 def reset_analysis_results_only():
@@ -66,9 +66,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
+        # (ATUALIZADO: "Hidrografia" adicionado)
         st.radio(
             "Modo de Visualização",
-            ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Séries Temporais", "Múltiplas Séries", "Skew-T", "Sobre o Aplicativo"],
+            ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia", "Séries Temporais", "Múltiplas Séries", "Skew-T", "Sobre o Aplicativo"],
             label_visibility="collapsed", 
             key='nav_option',
             on_change=reset_analysis_state
@@ -108,7 +109,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
 
         # --- OPÇÕES GERAIS ---
-        elif opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Séries Temporais", "Múltiplas Séries"]:
+        elif opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia", "Séries Temporais", "Múltiplas Séries"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
             # --- 3. BASE DE DADOS ---
@@ -156,15 +157,20 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.selectbox("1ª Camada (Base):", lista_vars, index=0, key='var_camada_1', on_change=reset_analysis_state)
                 st.selectbox("2ª Camada (Topo):", lista_vars, index=3, key='var_camada_2', on_change=reset_analysis_state)
                 
-                # --- NOVOS CONTROLES DE OPACIDADE ---
-                st.markdown("🎚️ **Transparência das Camadas**")
-                c_op1, c_op2 = st.columns(2)
-                # Note: Slider retorna valor float entre 0.0 e 1.0. reset_analysis_results_only força redesenho sem recarregar GEE.
-                with c_op1: st.slider("Base", 0.0, 1.0, 1.0, key='opacity_1', help="1.0 = Totalmente Visível", on_change=reset_analysis_results_only)
-                with c_op2: st.slider("Topo", 0.0, 1.0, 0.6, key='opacity_2', help="0.0 = Invisível", on_change=reset_analysis_results_only)
+                st.markdown("---")
                 
+                vis_mode = st.radio("Estilo de Comparação:", ["Transparência", "Split Map (Cortina)"], horizontal=True, key='overlay_mode', on_change=reset_analysis_results_only)
+                
+                if vis_mode == "Transparência":
+                    st.markdown("🎚️ **Controle de Opacidade**")
+                    c_op1, c_op2 = st.columns(2)
+                    with c_op1: st.slider("Base", 0.0, 1.0, 1.0, key='opacity_1', on_change=reset_analysis_results_only)
+                    with c_op2: st.slider("Topo", 0.0, 1.0, 0.6, key='opacity_2', on_change=reset_analysis_results_only)
+                else:
+                    st.info("ℹ️ Arraste a barra vertical no centro do mapa para comparar.")
+            
             else:
-                # Seleção Única (Padrão)
+                # Seleção Única (Padrão para Hidrografia também)
                 st.selectbox(
                     "Selecione a Variável", 
                     lista_vars, 
@@ -175,92 +181,103 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             st.divider()
 
-            # --- 5. LOCALIZAÇÃO ---
-            st.markdown("#### 📍 Localização")
-            st.selectbox(
-                "Tipo de Recorte", 
-                ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], 
-                key='tipo_localizacao', 
-                on_change=reset_analysis_state
-            ) 
-            
-            tipo_loc = st.session_state.get('tipo_localizacao', 'Estado')
-            lista_ufs = ["Selecione..."] + [f"{mapa_nomes_uf[uf]} - {uf}" for uf in sorted(mapa_nomes_uf)]
+            # --- 5. LOCALIZAÇÃO / HIDROGRAFIA ---
+            if opcao == "Hidrografia":
+                st.markdown("#### 💧 Shapefile de Hidrografia")
+                st.info("Envie um arquivo **.ZIP** contendo o shapefile (.shp, .shx, .dbf) da bacia ou rio.")
+                
+                uploaded_file = st.file_uploader("Upload ZIP", type=["zip"], key='hidro_upload', on_change=reset_analysis_state)
+                
+                if uploaded_file:
+                    st.success("Arquivo recebido! Clique em Gerar Análise.", icon="✅")
+                
+            else:
+                # --- LOCALIZAÇÃO PADRÃO PARA AS OUTRAS OPÇÕES ---
+                st.markdown("#### 📍 Localização")
+                st.selectbox(
+                    "Tipo de Recorte", 
+                    ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], 
+                    key='tipo_localizacao', 
+                    on_change=reset_analysis_state
+                ) 
+                
+                tipo_loc = st.session_state.get('tipo_localizacao', 'Estado')
+                lista_ufs = ["Selecione..."] + [f"{mapa_nomes_uf[uf]} - {uf}" for uf in sorted(mapa_nomes_uf)]
 
-            if tipo_loc == "Estado":
-                if len(lista_ufs) <= 1: st.error("⚠️ Lista de estados vazia (Fallback ativo).")
-                st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
-            
-            elif tipo_loc == "Município":
-                st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
-                estado_str = st.session_state.get('estado', 'Selecione...')
-                lista_muns = ["Selecione um estado primeiro"]
-                if estado_str != "Selecione...":
-                     uf_sigla = estado_str.split(' - ')[-1]
-                     muns = dados_geo.get(uf_sigla, [])
-                     if muns: lista_muns = ["Selecione..."] + muns
-                st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
-            
-            elif tipo_loc == "Círculo (Lat/Lon/Raio)":
-                c1, c2 = st.columns(2)
-                with c1: st.number_input("Lat", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
-                with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
-                st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
+                if tipo_loc == "Estado":
+                    if len(lista_ufs) <= 1: st.error("⚠️ Lista de estados vazia (Fallback ativo).")
+                    st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
                 
-                with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
-                    st.markdown("### 🎯 Como preencher os dados?")
-                    st.markdown("#### 1️⃣ Coordenadas (Latitude e Longitude)")
-                    st.markdown("Devem estar em **Graus Decimais** (ex: `-22.42`).\n* **Dica:** No Google Maps, clique com o botão direito no local desejado para copiar.")
-                    st.markdown("#### 2️⃣ Raio")
-                    st.markdown("Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.")
+                elif tipo_loc == "Município":
+                    st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
+                    estado_str = st.session_state.get('estado', 'Selecione...')
+                    lista_muns = ["Selecione um estado primeiro"]
+                    if estado_str != "Selecione...":
+                         uf_sigla = estado_str.split(' - ')[-1]
+                         muns = dados_geo.get(uf_sigla, [])
+                         if muns: lista_muns = ["Selecione..."] + muns
+                    st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
                 
-                st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o círculo.</div>", unsafe_allow_html=True)
-            
-            elif tipo_loc == "Polígono":
-                if st.session_state.get('drawn_geometry'): 
-                    st.success("✅ Polígono Definido", icon="🛡️")
-                else: 
-                    st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
-                
-                with st.popover("ℹ️ Guia de Ferramentas"): 
-                    st.markdown("### 🧭 Guia de Uso")
-                    st.markdown("**🎛️ Controles de Visualização**")
-                    st.markdown("* `➕` `➖` **Zoom:** Aproxima ou afasta a visão.\n* `⛶` **Tela Cheia:** Expande o mapa.\n* `🗂️` **Camadas:** Alterna entre Satélite e Mapa de Ruas.")
-                    st.markdown("---")
-                    st.markdown("**✏️ Ferramentas de Desenho**")
-                    st.markdown("* `⬟` **Polígono:** Clique ponto a ponto para fechar uma área livre.\n* `⬛` **Retângulo:** Clique e arraste para criar uma área quadrada.\n* `⭕` **Círculo:** Clique no centro e arraste para definir o raio.\n* `📍` **Marcador:** Adiciona um pino em um local específico.\n* `╱` **Linha:** Desenha uma linha (útil para medir distâncias).")
-                    st.markdown("---")
-                    st.markdown("**🛠️ Edição e Limpeza**")
-                    st.markdown("* `📝` **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.\n* `🗑️` **Lixeira:** Apaga todos os desenhos feitos no mapa.")
-                
-                with st.expander("📝 Inserir Coordenadas Manualmente"):
-                    st.caption("Cole as coordenadas abaixo (formato: `Latitude, Longitude`), uma por linha.")
-                    texto_coords = st.text_area("Coordenadas:", height=150, placeholder="-22.123, -45.123\n-22.150, -45.100\n-22.200, -45.200")
+                elif tipo_loc == "Círculo (Lat/Lon/Raio)":
+                    c1, c2 = st.columns(2)
+                    with c1: st.number_input("Lat", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
+                    with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
+                    st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                     
-                    if st.button("Processar Coordenadas"):
-                        try:
-                            pontos = []
-                            linhas = texto_coords.strip().split('\n')
-                            for linha in linhas:
-                                partes = linha.replace(';', ',').split(',')
-                                if len(partes) >= 2:
-                                    lat = float(partes[0].strip())
-                                    lon = float(partes[1].strip())
-                                    pontos.append([lon, lat])
-                            
-                            if len(pontos) < 3:
-                                st.error("⚠️ Um polígono precisa de pelo menos 3 pontos.")
-                            else:
-                                if pontos and pontos[0] != pontos[-1]:
-                                    pontos.append(pontos[0])
-                                geometria_manual = {"type": "Polygon", "coordinates": [pontos]}
-                                st.session_state.drawn_geometry = geometria_manual
-                                st.success("Polígono processado com sucesso!")
-                                st.rerun()
-                        except ValueError:
-                            st.error("❌ Erro no formato. Certifique-se de usar apenas números e vírgulas/pontos.")
-                        except Exception as e:
-                            st.error(f"❌ Erro ao processar: {e}")
+                    with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
+                        st.markdown("### 🎯 Como preencher os dados?")
+                        st.markdown("#### 1️⃣ Coordenadas (Latitude e Longitude)")
+                        st.markdown("Devem estar em **Graus Decimais** (ex: `-22.42`).\n* **Dica:** No Google Maps, clique com o botão direito no local desejado para copiar.")
+                        st.markdown("#### 2️⃣ Raio")
+                        st.markdown("Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.")
+                    
+                    st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o círculo.</div>", unsafe_allow_html=True)
+                
+                elif tipo_loc == "Polígono":
+                    if st.session_state.get('drawn_geometry'): 
+                        st.success("✅ Polígono Definido", icon="🛡️")
+                    else: 
+                        st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
+                    
+                    with st.popover("ℹ️ Guia de Ferramentas"): 
+                        st.markdown("### 🧭 Guia de Uso")
+                        st.markdown("**🎛️ Controles de Visualização**")
+                        st.markdown("* `➕` `➖` **Zoom:** Aproxima ou afasta a visão.\n* `⛶` **Tela Cheia:** Expande o mapa.\n* `🗂️` **Camadas:** Alterna entre Satélite e Mapa de Ruas.")
+                        st.markdown("---")
+                        st.markdown("**✏️ Ferramentas de Desenho**")
+                        st.markdown("* `⬟` **Polígono:** Clique ponto a ponto para fechar uma área livre.\n* `⬛` **Retângulo:** Clique e arraste para criar uma área quadrada.\n* `⭕` **Círculo:** Clique no centro e arraste para definir o raio.\n* `📍` **Marcador:** Adiciona um pino em um local específico.\n* `╱` **Linha:** Desenha uma linha (útil para medir distâncias).")
+                        st.markdown("---")
+                        st.markdown("**🛠️ Edição e Limpeza**")
+                        st.markdown("* `📝` **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.\n* `🗑️` **Lixeira:** Apaga todos os desenhos feitos no mapa.")
+                    
+                    with st.expander("📝 Inserir Coordenadas Manualmente"):
+                        st.caption("Cole as coordenadas abaixo (formato: `Latitude, Longitude`), uma por linha.")
+                        texto_coords = st.text_area("Coordenadas:", height=150, placeholder="-22.123, -45.123\n-22.150, -45.100\n-22.200, -45.200")
+                        
+                        if st.button("Processar Coordenadas"):
+                            try:
+                                pontos = []
+                                linhas = texto_coords.strip().split('\n')
+                                for linha in linhas:
+                                    partes = linha.replace(';', ',').split(',')
+                                    if len(partes) >= 2:
+                                        lat = float(partes[0].strip())
+                                        lon = float(partes[1].strip())
+                                        pontos.append([lon, lat])
+                                
+                                if len(pontos) < 3:
+                                    st.error("⚠️ Um polígono precisa de pelo menos 3 pontos.")
+                                else:
+                                    if pontos and pontos[0] != pontos[-1]:
+                                        pontos.append(pontos[0])
+                                    geometria_manual = {"type": "Polygon", "coordinates": [pontos]}
+                                    st.session_state.drawn_geometry = geometria_manual
+                                    st.success("Polígono processado com sucesso!")
+                                    st.rerun()
+                            except ValueError:
+                                st.error("❌ Erro no formato. Certifique-se de usar apenas números e vírgulas/pontos.")
+                            except Exception as e:
+                                st.error(f"❌ Erro ao processar: {e}")
             
             st.divider()
 
@@ -268,10 +285,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("#### 📅 Recorte Temporal")
             
             opcoes_periodo = ["Personalizado", "Mensal", "Anual"]
-            if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)"]: 
+            if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia"]: 
                 opcoes_periodo.append("Horário Específico")
             
-            if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)"]:
+            if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia"]:
                 st.selectbox("Tipo de Período", opcoes_periodo, key='tipo_periodo', on_change=reset_analysis_state, label_visibility="collapsed")
             else:
                 st.session_state.tipo_periodo = "Personalizado"
@@ -322,18 +339,32 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             elif opcao == "Múltiplas Séries":
                 st.info("ℹ️ Gera múltiplos gráficos simultâneos.")
             elif opcao == "Sobreposição (Camadas)":
-                st.info("ℹ️ Ajuste a transparência acima para ver as duas camadas.")
+                if st.session_state.get('overlay_mode') == "Split Map (Cortina)":
+                    st.info("ℹ️ Arraste a barra central para comparar.")
+                else:
+                    st.info("ℹ️ Ajuste a transparência para misturar.")
+            elif opcao == "Hidrografia":
+                st.info("ℹ️ Sobrepõe dados climáticos sobre o shapefile enviado.")
 
             # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
+            
+            # Lógica de bloqueio padrão
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
             
-            # Verificar se selecionou variáveis
+            # Bloqueios específicos
             if opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                 vars_sel = st.session_state.get("variaveis_multiplas", [])
-                if not vars_sel or len(vars_sel) > 4:
+                if not vars_sel or len(vars_sel) > 4: disable = True
+            
+            if opcao == "Hidrografia":
+                # Para Hidrografia, ignoramos tipo_loc, mas exigimos o arquivo upload
+                if not st.session_state.get("hidro_upload"): 
                     disable = True
+                else:
+                    # Se tiver arquivo, liberamos (a lógica de local é ignorada no backend)
+                    disable = False
 
             st.button(
                 "🚀 Gerar Análise", 
@@ -352,7 +383,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     unsafe_allow_html=True
                 )
             else:
-                if opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
+                if opcao == "Hidrografia" and not st.session_state.get("hidro_upload"):
+                    st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Faça upload do arquivo .ZIP.</div>", unsafe_allow_html=True)
+                elif opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                     vars_sel = st.session_state.get("variaveis_multiplas", [])
                     if not vars_sel:
                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
@@ -430,13 +463,16 @@ def renderizar_resumo_selecao():
         c1, c2, c3 = st.columns(3)
         with c1: st.markdown(f"**{label_titulo}** \n{var_text}")
         with c2:
-            tipo = st.session_state.tipo_localizacao
-            local_txt = ""
-            if tipo == "Estado": local_txt = st.session_state.estado
-            elif tipo == "Município": local_txt = f"{st.session_state.municipio} ({st.session_state.estado})"
-            elif tipo == "Círculo (Lat/Lon/Raio)": local_txt = "Área Circular"
-            elif tipo == "Polígono": local_txt = "Polígono Personalizado"
-            st.markdown(f"**Local ({tipo}):**\n{local_txt}")
+            if nav_option == "Hidrografia":
+                st.markdown("**Local:**\nShapefile Personalizado (Upload)")
+            else:
+                tipo = st.session_state.tipo_localizacao
+                local_txt = ""
+                if tipo == "Estado": local_txt = st.session_state.estado
+                elif tipo == "Município": local_txt = f"{st.session_state.municipio} ({st.session_state.estado})"
+                elif tipo == "Círculo (Lat/Lon/Raio)": local_txt = "Área Circular"
+                elif tipo == "Polígono": local_txt = "Polígono Personalizado"
+                st.markdown(f"**Local ({tipo}):**\n{local_txt}")
         with c3:
             periodo = st.session_state.tipo_periodo
             per_txt = ""
