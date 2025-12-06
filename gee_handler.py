@@ -81,7 +81,7 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- FUNÇÃO OTIMIZADA: CONVEX HULL (O segredo para não travar) ---
+# --- FUNÇÃO À PROVA DE BALAS: BOUNDING BOX ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
     try:
         import geopandas as gpd
@@ -123,33 +123,27 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
             elif gdf.crs != "EPSG:4326":
                 gdf = gdf.to_crs("EPSG:4326")
 
-            # 3. OTIMIZAÇÃO MAXIMA: Envelope Convexo (Convex Hull)
-            # Em vez de desenhar cada curva do rio, desenha o polígono que "embrulha" todos eles.
-            # Isso é absurdamente leve e nunca trava.
+            # 3. ABORDAGEM INFALÍVEL: Usar apenas a caixa envolvente (Bounds)
+            # Em vez de tentar converter a geometria complexa do rio para GeoJSON,
+            # pegamos apenas os limites [min_x, min_y, max_x, max_y]
+            bounds = gdf.total_bounds
             
-            # Unifica todas as linhas em uma só geometria
-            unified_geom = gdf.unary_union
+            # bounds é um array: [minx, miny, maxx, maxy]
+            # Earth Engine espera: [west, south, east, north]
+            # É a mesma ordem!
             
-            # Calcula o Convex Hull (o "elástico" em volta)
-            convex_hull = unified_geom.convex_hull
+            # Cria um retângulo simples no GEE
+            ee_geom = ee.Geometry.Rectangle([float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3])])
             
-            # Cria um GeoDataFrame simples com esse polígono
-            gdf_simple = gpd.GeoDataFrame({'geometry': [convex_hull]}, crs="EPSG:4326")
+            # Cria um Feature para visualização
+            ee_feat = ee.Feature(ee_geom, {'label': 'Area de Interesse'})
             
-            # Conversão para JSON e EE
-            geojson = json.loads(gdf_simple.to_json())
+            st.success(f"✅ Geometria processada (Área: {bounds[0]:.2f}, {bounds[1]:.2f} a {bounds[2]:.2f}, {bounds[3]:.2f})")
             
-            if not geojson.get('features'):
-                # Fallback final se até o convex hull falhar (raro): Bounding Box
-                bounds = gdf.total_bounds
-                ee_geom = ee.Geometry.Rectangle([bounds[0], bounds[1], bounds[2], bounds[3]])
-                return ee_geom, ee.Feature(ee_geom)
-
-            ee_fc = ee.FeatureCollection(geojson)
-            return ee_fc.geometry(), ee_fc.union(1).first()
+            return ee_geom, ee_feat
 
     except Exception as e:
-        st.error(f"Erro processamento leve: {e}")
+        st.error(f"Erro processamento: {e}")
         return None, None
 
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
