@@ -20,7 +20,7 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 import folium 
-import gee_handler # IMPORTANTE: Para pegar vis params
+import gee_handler # Para pegar configurações de visualização
 
 # ------------------------------------------------------------------
 # 0. MAPA DE SOBREPOSIÇÃO (OVERLAY) - NOVO
@@ -38,7 +38,6 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # Inicia mapa vazio sem tiles padrão
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False, tiles=None)
     
     esri_layer = folium.TileLayer(
@@ -50,20 +49,18 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
     )
     esri_layer.add_to(mapa)
 
-    # Pega configs visuais
     vis1 = gee_handler.obter_vis_params_interativo(name1)
     vis2 = gee_handler.obter_vis_params_interativo(name2)
 
-    # Camada 1 (Base)
+    # Camada Base (Opaca)
     mapa.addLayer(img1, vis1, f"Base: {name1}")
     
-    # Camada 2 (Topo) - Com opacidade
+    # Camada Topo (Transparente)
     mapa.addLayer(img2, vis2, f"Topo: {name2}", opacity=0.6)
 
-    # Contorno
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
     
-    # Adiciona legenda da camada do TOPO (a mais importante na comparação)
+    # Adiciona a legenda da camada superior
     _add_colorbar_bottomleft(mapa, vis2, name2)
 
     if bounds:
@@ -72,7 +69,7 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
     mapa.to_streamlit(height=600, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (Satélite Esri Puro)
+# 1. MAPA INTERATIVO
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -91,7 +88,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     
     esri_layer = folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+        attr="Tiles &copy; Esri &mdash; Source: Esri",
         name="Esri Satellite",
         overlay=False,
         control=True
@@ -118,7 +115,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Mantido Original)
+# 2. MAPA ESTÁTICO
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
