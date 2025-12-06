@@ -66,7 +66,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
-        # (ATUALIZADO: "Hidrografia" adicionado)
         st.radio(
             "Modo de Visualização",
             ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia", "Séries Temporais", "Múltiplas Séries", "Skew-T", "Sobre o Aplicativo"],
@@ -154,11 +153,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             elif opcao == "Sobreposição (Camadas)":
                 st.caption("Selecione duas variáveis para comparar:")
-                st.selectbox("1ª Camada (Base):", lista_vars, index=0, key='var_camada_1', on_change=reset_analysis_state)
-                st.selectbox("2ª Camada (Topo):", lista_vars, index=3, key='var_camada_2', on_change=reset_analysis_state)
+                st.selectbox("1ª Camada (Base/Esquerda):", lista_vars, index=0, key='var_camada_1', on_change=reset_analysis_state)
+                st.selectbox("2ª Camada (Topo/Direita):", lista_vars, index=3, key='var_camada_2', on_change=reset_analysis_state)
                 
                 st.markdown("---")
-                
                 vis_mode = st.radio("Estilo de Comparação:", ["Transparência", "Split Map (Cortina)"], horizontal=True, key='overlay_mode', on_change=reset_analysis_results_only)
                 
                 if vis_mode == "Transparência":
@@ -170,7 +168,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.info("ℹ️ Arraste a barra vertical no centro do mapa para comparar.")
             
             else:
-                # Seleção Única (Padrão para Hidrografia também)
                 st.selectbox(
                     "Selecione a Variável", 
                     lista_vars, 
@@ -182,6 +179,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.divider()
 
             # --- 5. LOCALIZAÇÃO / HIDROGRAFIA ---
+            # Inicializa tipo_loc para evitar UnboundLocalError
+            tipo_loc = "N/A" 
+
             if opcao == "Hidrografia":
                 st.markdown("#### 💧 Shapefile de Hidrografia")
                 st.info("Envie um arquivo **.ZIP** contendo o shapefile (.shp, .shx, .dbf) da bacia ou rio.")
@@ -191,8 +191,11 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if uploaded_file:
                     st.success("Arquivo recebido! Clique em Gerar Análise.", icon="✅")
                 
+                # Define para evitar erro na verificação final
+                tipo_loc = "Hidrografia" 
+                
             else:
-                # --- LOCALIZAÇÃO PADRÃO PARA AS OUTRAS OPÇÕES ---
+                # --- LOCALIZAÇÃO PADRÃO ---
                 st.markdown("#### 📍 Localização")
                 st.selectbox(
                     "Tipo de Recorte", 
@@ -349,7 +352,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
             
-            # Lógica de bloqueio padrão
+            # Bloqueio padrão
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
             
@@ -359,11 +362,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if not vars_sel or len(vars_sel) > 4: disable = True
             
             if opcao == "Hidrografia":
-                # Para Hidrografia, ignoramos tipo_loc, mas exigimos o arquivo upload
                 if not st.session_state.get("hidro_upload"): 
                     disable = True
                 else:
-                    # Se tiver arquivo, liberamos (a lógica de local é ignorada no backend)
                     disable = False
 
             st.button(
@@ -398,113 +399,3 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v1.0.0 | 2025</div>", unsafe_allow_html=True)
         
         return opcao
-
-# -----------------------------
-# Renderizar a página principal
-# -----------------------------
-
-def renderizar_pagina_principal(opcao):
-    st.markdown("""<style>.block-container{padding-top:3rem!important;padding-bottom:5rem!important}h1{margin-top:0rem!important}.stExpander{border:1px solid #f0f2f6;border-radius:8px}</style>""", unsafe_allow_html=True)
-    fuso_br = pytz.timezone('America/Sao_Paulo')
-    agora, agora_utc = datetime.now(fuso_br), datetime.now(pytz.utc)
-    c1, c2 = st.columns([3, 1.5])
-    with c1:
-        lc, tc = st.columns([1, 5])
-        with lc: 
-            if os.path.exists("logo.png"): st.image("logo.png", width=70)
-            else: st.write("🌐")
-        with tc: st.title(f"{opcao}")
-    with c2:
-        st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
-    st.markdown("---")
-    if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state and 'skewt_results' not in st.session_state:
-        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
-
-def renderizar_resumo_selecao():
-    # Verifica qual aba está ativa para decidir o que mostrar
-    nav_option = st.session_state.get('nav_option')
-
-    # --- LÓGICA PARA SKEW-T ---
-    if nav_option == "Skew-T":
-        with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
-            c1, c2, c3 = st.columns(3)
-            with c1: 
-                st.markdown("**Análise:**\nSondagem (Skew-T)")
-            with c2:
-                lat = st.session_state.get('skew_lat')
-                lon = st.session_state.get('skew_lon')
-                st.markdown(f"**Localização:**\nLat: {lat} | Lon: {lon}")
-            with c3:
-                date = st.session_state.get('skew_date')
-                hour = st.session_state.get('skew_hour')
-                data_str = date.strftime('%d/%m/%Y') if date else "--/--/----"
-                st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
-        return
-
-    # --- LÓGICA PARA MAPAS E SÉRIES ---
-    label_titulo = "Variável:"
-    var_text = ""
-    
-    if nav_option in ["Múltiplos Mapas", "Múltiplas Séries"]:
-        vars_selected = st.session_state.get("variaveis_multiplas", [])
-        if not vars_selected: return
-        var_text = "  \n".join([f"• {v}" for v in vars_selected])
-        label_titulo = "Variáveis:"
-    elif nav_option == "Sobreposição (Camadas)":
-        v1 = st.session_state.get("var_camada_1", "N/A")
-        v2 = st.session_state.get("var_camada_2", "N/A")
-        var_text = f"1. Base: {v1}  \n2. Topo: {v2}"
-        label_titulo = "Camadas:"
-    else:
-        if "variavel" not in st.session_state: return
-        var_text = st.session_state.variavel
-
-    with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        with c1: st.markdown(f"**{label_titulo}** \n{var_text}")
-        with c2:
-            if nav_option == "Hidrografia":
-                st.markdown("**Local:**\nShapefile Personalizado (Upload)")
-            else:
-                tipo = st.session_state.tipo_localizacao
-                local_txt = ""
-                if tipo == "Estado": local_txt = st.session_state.estado
-                elif tipo == "Município": local_txt = f"{st.session_state.municipio} ({st.session_state.estado})"
-                elif tipo == "Círculo (Lat/Lon/Raio)": local_txt = "Área Circular"
-                elif tipo == "Polígono": local_txt = "Polígono Personalizado"
-                st.markdown(f"**Local ({tipo}):**\n{local_txt}")
-        with c3:
-            periodo = st.session_state.tipo_periodo
-            per_txt = ""
-            if periodo == "Personalizado": per_txt = f"{st.session_state.data_inicio.strftime('%d/%m/%Y')} - {st.session_state.data_fim.strftime('%d/%m/%Y')}"
-            elif periodo == "Mensal": per_txt = f"{st.session_state.mes_mensal}/{st.session_state.ano_mensal}"
-            elif periodo == "Anual": per_txt = str(st.session_state.ano_anual)
-            elif periodo == "Horário Específico":
-                 data = st.session_state.get('data_horaria')
-                 hora = st.session_state.get('hora_especifica')
-                 if data: per_txt = f"{data.strftime('%d/%m/%Y')} às {hora}:00h (UTC)"
-            st.markdown(f"**Período ({periodo}):**\n{per_txt}")
-
-# -------------------------------------
-# Renderizar a opção sobre o aplicativo
-# -------------------------------------
-
-def renderizar_pagina_sobre():
-    st.title("Sobre o Clima-Cast-Crepaldi")
-    st.markdown("---")
-    url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
-    try:
-        with st.spinner("Carregando documentação..."):
-            r = requests.get(url)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-                tmp.write(r.content)
-                path = tmp.name
-        try: pypandoc.get_pandoc_version()
-        except: pypandoc.download_pandoc()
-        html = pypandoc.convert_file(path, "html", format="docx", extra_args=["--embed-resources"])
-        html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"', html)
-        html += "</div>" 
-        st.markdown(html, unsafe_allow_html=True)
-    except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
-    finally: 
-        if path and os.path.exists(path): os.remove(path)
