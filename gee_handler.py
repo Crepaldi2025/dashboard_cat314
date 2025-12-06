@@ -102,7 +102,7 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- FUNÇÃO OTIMIZADA E SEGURA PARA SHAPEFILE ---
+# --- FUNÇÃO CORRIGIDA PARA HIDROGRAFIA ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -150,24 +150,26 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
                     st.error(f"Erro ao converter projeção: {e}")
                     return None, None
             
-            # Correção Topológica Leve (Buffer 0) - Resolve nós soltos sem deformar
-            gdf['geometry'] = gdf.geometry.buffer(0)
+            # --- CORREÇÃO DE GEOMETRIA (O PULO DO GATO) ---
+            # Hidrografia costuma ser LINHA. GEE precisa de ÁREA para recorte.
+            # Se for linha, aplicamos um buffer (engordamos a linha)
+            if any(gdf.geom_type.isin(['LineString', 'MultiLineString'])):
+                # Buffer de aprox. 500 metros (0.005 graus) para transformar rios em polígonos
+                gdf['geometry'] = gdf.geometry.buffer(0.005)
+            else:
+                # Se já for polígono, buffer(0) corrige erros de topologia
+                gdf['geometry'] = gdf.geometry.buffer(0)
             
-            # Remove geometrias inválidas ou vazias
+            # Remove geometrias que ficaram vazias após o buffer
             gdf = gdf[~gdf.is_empty]
-            gdf = gdf[gdf.geometry.is_valid]
 
             if gdf.empty:
-                st.error("Erro: Todas as geometrias são inválidas após correção.")
+                st.error("Erro: Todas as geometrias são inválidas após a correção.")
                 return None, None
 
             # Converte para GeoJSON
             geojson = json.loads(gdf.to_json())
             
-            if not geojson.get('features'):
-                st.error("Erro: GeoJSON vazio.")
-                return None, None
-
             # Cria objeto EE
             ee_object = ee.FeatureCollection(geojson)
             
