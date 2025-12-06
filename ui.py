@@ -66,7 +66,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
-        # (ATUALIZADO: "Sobreposição (Camadas)" adicionado)
         st.radio(
             "Modo de Visualização",
             ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Séries Temporais", "Múltiplas Séries", "Skew-T", "Sobre o Aplicativo"],
@@ -124,7 +123,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             st.divider()
 
-            # --- 4. VARIÁVEL (LÓGICA ADAPTADA) ---
+            # --- 4. VARIÁVEL ---
             st.markdown("#### 🌡️ Variável Meteorológica")
             
             lista_vars = [
