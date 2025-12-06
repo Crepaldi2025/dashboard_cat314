@@ -111,7 +111,6 @@ def run_full_analysis():
                 res = run_analysis_logic(var, start_date, end_date, geo_key, aba)
                 if res: results_multi[var] = res
         
-        # Salva o modo específico (multi_map ou multi_series)
         mode_tag = "multi_series" if aba == "Múltiplas Séries" else "multi_map"
         st.session_state.analysis_results = {"mode": mode_tag, "data": results_multi}
         return
@@ -230,10 +229,21 @@ def render_analysis_results():
                     except: pass
         return
 
-    # --- RENDERIZAÇÃO MÚLTIPLAS SÉRIES (NOVO) ---
+    # --- RENDERIZAÇÃO MÚLTIPLAS SÉRIES ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Variáveis (Séries Temporais)")
         ui.renderizar_resumo_selecao()
+        
+        # --- AJUDA GERAL (APENAS UMA VEZ) ---
+        with st.expander("ℹ️ Ajuda: Ferramentas dos Gráficos"):
+            st.markdown("""
+            Passe o mouse sobre os gráficos para ver as opções:
+            * 📷 **Câmera:** Baixa imagem do gráfico.
+            * 🔍 **Zoom:** Clique e arraste na área desejada.
+            * 🏠 **Casinha:** Retorna ao zoom original.
+            """)
+        # -------------------------------------
+        
         st.markdown("---")
         
         data_dict = results["data"]
@@ -248,9 +258,9 @@ def render_analysis_results():
             
             with cols_obj[i % 2]:
                 st.markdown(f"##### {var_name}")
-                # Reutiliza o visualizador de gráficos existente
-                charts_visualizer.display_time_series_chart(df, var_name, unit)
-                st.markdown("---") # Separador visual
+                # AQUI: show_help=False para não repetir a ajuda
+                charts_visualizer.display_time_series_chart(df, var_name, unit, show_help=False)
+                st.markdown("---")
         return
 
     # --- RENDERIZAÇÃO ÚNICA (PADRÃO) ---
@@ -306,15 +316,33 @@ def render_analysis_results():
              df_map = results["map_dataframe"]
              cols = df_map.columns.tolist()
              val_col = [c for c in cols if c not in ['Latitude', 'Longitude']][0]
-             st.dataframe(df_map, use_container_width=True, hide_index=True)
+             unit = var_cfg["unit"]
+             st.dataframe(
+                df_map, 
+                use_container_width=True, 
+                hide_index=True, 
+                column_config={
+                    "Latitude": st.column_config.NumberColumn("Latitude", format="%.4f", width="small"), 
+                    "Longitude": st.column_config.NumberColumn("Longitude", format="%.4f", width="small"), 
+                    val_col: st.column_config.NumberColumn(val_col, format=f"%.2f {unit}", width="medium")
+                }
+            )
              cd1, cd2 = st.columns(2)
              csv = df_map.to_csv(index=False).encode('utf-8')
-             cd1.download_button("Exportar CSV", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
+             with cd1: st.download_button("Exportar CSV (Dados)", csv, "dados_mapa.csv", "text/csv", use_container_width=True)
+             try:
+                buf = io.BytesIO()
+                with pd.ExcelWriter(buf, engine='openpyxl') as writer: 
+                    df_map.to_excel(writer, index=False, sheet_name='Dados')
+                with cd2: 
+                    st.download_button("Exportar XLSX (Dados)", buf.getvalue(), "dados_mapa.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+             except: pass
 
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             st.subheader(titulo_serie)
-            charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"])
+            # AQUI: show_help=True (padrão) para mostrar a ajuda na série única
+            charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=True)
 
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
@@ -336,10 +364,10 @@ def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
         st.session_state.gee_initialized = True
-        msg = st.empty()
-        msg.success("✅ Conectado ao Google Earth Engine com sucesso!")
+        mensagem_container = st.empty()
+        mensagem_container.success("✅ Conectado ao Google Earth Engine com sucesso!")
         time.sleep(5)
-        msg.empty()
+        mensagem_container.empty()
         
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
