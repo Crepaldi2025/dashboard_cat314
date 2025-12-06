@@ -9,6 +9,10 @@ import os
 import geobr
 import pandas as pd
 from datetime import date, datetime
+import geopandas as gpd
+import tempfile
+import zipfile
+import shutil
 
 def inicializar_gee():
     try:
@@ -98,8 +102,69 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
+# --- NOVA FUNÇÃO: PROCESSAR SHAPEFILE (ZIP) ---
+def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
+    try:
+        # Cria diretório temporário
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Salva o zip
+            zip_path = os.path.join(tmp_dir, "uploaded.zip")
+            with open(zip_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+            
+            # Extrai
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(tmp_dir)
+            
+            # Procura o arquivo .shp
+            shp_file = None
+            for root, dirs, files in os.walk(tmp_dir):
+                for file in files:
+                    if file.endswith(".shp"):
+                        shp_file = os.path.join(root, file)
+                        break
+            
+            if not shp_file:
+                st.error("Erro: Nenhum arquivo .shp encontrado no ZIP.")
+                return None, None
+
+            # Lê com GeoPandas
+            gdf = gpd.read_file(shp_file)
+            
+            # Converte CRS para WGS84 (padrão GEE)
+            if gdf.crs != "EPSG:4326":
+                gdf = gdf.to_crs("EPSG:4326")
+            
+            # Converte para GeoJSON
+            geojson = json.loads(gdf.to_json())
+            
+            # Cria objeto EE
+            # Se for muito complexo, pode precisar simplificar, mas tentamos direto
+            ee_object = ee.FeatureCollection(geojson)
+            
+            # Retorna a geometria unificada (para recorte) e a feature collection (para desenho)
+            geometry = ee_object.geometry()
+            
+            # Para visualização, vamos pegar o primeiro feature ou unificar
+            feature_vis = ee_object.union(1).first() 
+            
+            return geometry, feature_vis
+
+    except Exception as e:
+        st.error(f"Erro ao processar Shapefile: {e}")
+        return None, None
+
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
     tipo = session_state.get('tipo_localizacao', 'Estado')
+    
+    # Se estiver na aba Hidrografia, ignoramos o tipo e pegamos o shape
+    nav_opt = session_state.get('nav_option')
+    if nav_opt == "Hidrografia":
+        uploaded = session_state.get('hidro_upload')
+        if uploaded:
+            return convert_uploaded_shapefile_to_ee(uploaded)
+        return None, None
+
     try:
         if tipo == "Estado":
             val = session_state.get('estado', '...')
@@ -137,8 +202,6 @@ def _calc_rh(img):
     return img.addBands(e.divide(es).multiply(100).rename('relative_humidity').min(100))
 
 def _calc_rad(img, hourly=False):
-    # OBS: Usada apenas para dados Diários ou ERA5-Land.
-    # Para ERA5 Horário (Fluxo), não usamos esta função.
     div = 3600 if hourly else 86400
     band = 'surface_solar_radiation_downwards' if hourly else 'surface_solar_radiation_downwards_sum'
     return img.addBands(img.select(band).divide(div).rename('radiation_wm2'))
@@ -150,20 +213,13 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
     is_hourly = target_hour is not None
     collection_id = 'ECMWF/ERA5_LAND/HOURLY' if is_hourly else 'ECMWF/ERA5_LAND/DAILY_AGGR'
     
-    # Lógica de Bandas (Fonte)
     band_raw = config.get('band')
-    
-    # --- CORREÇÃO DE RADIAÇÃO HORÁRIA ---
-    # O ERA5-Land Horário é acumulativo (soma 24h à meia-noite). 
-    # Para obter fluxo instantâneo (W/m²) sem erro, usamos o ERA5 GLOBAL.
     using_era5_global = False
     
     if is_hourly:
         if variable == "Precipitação Total": 
             band_raw = "total_precipitation"
         elif variable == "Radiação Solar Incidente": 
-            # Troca para ERA5 Global que tem a banda de fluxo médio (mean_surface_downward_short_wave_radiation_flux)
-            # Isso resolve o problema de valores 4000 W/m² à noite (acumulação).
             collection_id = 'ECMWF/ERA5/HOURLY'
             band_raw = "mean_surface_downward_short_wave_radiation_flux"
             using_era5_global = True
@@ -183,7 +239,6 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
             
         if col.size().getInfo() == 0: return None
 
-        # Cálculos Especiais
         if variable == "Velocidade do Vento (10m)":
             col = col.map(lambda img: img.addBands(
                 img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m'])
@@ -193,17 +248,13 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
             col = col.map(_calc_rh)
         elif variable == "Radiação Solar Incidente":
             if using_era5_global:
-                # Se for ERA5 Global, já vem em W/m². Só renomeia.
                 col = col.map(lambda img: img.select(band_raw).rename('radiation_wm2'))
             else:
-                # Se for Diário (Land), faz o cálculo padrão
                 col = col.map(lambda img: _calc_rad(img, is_hourly))
         
-        # Banda Final para Agregação
         band_agg = config['result_band']
         if is_hourly and variable == "Precipitação Total": band_agg = "total_precipitation"
 
-        # Agregação
         if config['aggregation'] == 'mean': 
             img_agg = col.select(band_agg).mean()
         elif config['aggregation'] == 'sum': 
@@ -213,10 +264,8 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
 
         final = img_agg.clip(geometry).float()
         
-        # Conversão de Unidades
         if config['unit'] == "°C": final = final.subtract(273.15)
         elif config['unit'] == "mm": final = final.multiply(1000)
-        # Radiação W/m² não precisa de conversão aqui se vier do ERA5 Global ou do _calc_rad
 
         if final.bandNames().size().getInfo() == 0: return None
         return final
@@ -288,4 +337,3 @@ def obter_vis_params_interativo(variavel: str):
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
     return nova_config
-
