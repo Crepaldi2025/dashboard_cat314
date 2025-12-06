@@ -20,6 +20,57 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 import folium 
+import gee_handler # Para pegar os vis params
+
+# ------------------------------------------------------------------
+# 0. MAPA DE SOBREPOSIÇÃO (OVERLAY) - NOVO
+# ------------------------------------------------------------------
+
+def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, feature: ee.Feature):
+    try:
+        coords = feature.geometry().bounds().getInfo()['coordinates'][0]
+        lon_min, lat_min = coords[0][0], coords[0][1]
+        lon_max, lat_max = coords[2][0], coords[2][1]
+        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
+        centro = feature.geometry().centroid(maxError=1).getInfo()['coordinates'] 
+        lon_c, lat_c = centro[0], centro[1]
+    except Exception:
+        bounds = None
+        lat_c, lon_c = -15.78, -47.93
+
+    mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False, tiles=None)
+    
+    esri_layer = folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Tiles &copy; Esri &mdash; Source: Esri",
+        name="Esri Satellite",
+        overlay=False,
+        control=True
+    )
+    esri_layer.add_to(mapa)
+
+    # Pega configurações de visualização para cada camada
+    vis1 = gee_handler.obter_vis_params_interativo(name1)
+    vis2 = gee_handler.obter_vis_params_interativo(name2)
+
+    # Adiciona Camada 1 (Base) - Totalmente opaca por padrão
+    mapa.addLayer(img1, vis1, f"Base: {name1}")
+    
+    # Adiciona Camada 2 (Topo) - Com opacidade reduzida para ver através
+    mapa.addLayer(img2, vis2, f"Topo: {name2}", opacity=0.6)
+
+    # Contorno
+    mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
+    
+    # Adiciona Legendas (Barras de Cores)
+    # Como são duas, vamos colocar uma na esquerda e outra na direita se possível, ou empilhadas
+    # Por simplicidade, adicionamos a legenda da camada SUPERIOR (Topo) que é o foco da comparação
+    _add_colorbar_bottomleft(mapa, vis2, name2)
+
+    if bounds:
+        mapa.fit_bounds(bounds)
+    
+    mapa.to_streamlit(height=600, use_container_width=True)
 
 # ------------------------------------------------------------------
 # 1. MAPA INTERATIVO (Satélite Esri Puro)
@@ -53,7 +104,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     esri_layer.add_to(mapa)
 
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
-    mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "yellow"}, "Contorno")
+    mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
     
     tipo_local = st.session_state.get('tipo_localizacao', '')
     if tipo_local == "Círculo (Lat/Lon/Raio)":
@@ -209,4 +260,3 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
-
