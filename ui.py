@@ -203,9 +203,33 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
                 
                 # 2. Guia de Ferramentas (Horizontal)
+                
                 with st.popover("ℹ️ Guia de Ferramentas"): 
-                    st.markdown("➕ **Zoom In** &nbsp;&nbsp; ➖ **Zoom Out** &nbsp;&nbsp; ⬟ **Polígono** &nbsp;&nbsp; ⬛ **Retângulo** &nbsp;&nbsp; ⭕ **Círculo** &nbsp;&nbsp; 📝 **Editar** &nbsp;&nbsp; 🗑️ **Lixeira**")
+                    st.markdown("### 🧭 Guia de Uso")
+                    
+                    st.markdown("**🎛️ Controles de Visualização**")
+                    st.markdown("""
+                    * `➕` `➖` **Zoom:** Aproxima ou afasta a visão.
+                    * `⛶` **Tela Cheia:** Expande o mapa para o tamanho do monitor.
+                    * `🗂️` **Camadas:** Alterna entre Satélite e Mapa de Ruas.
+                    """)
+                    
+                    st.markdown("---")
+                    st.markdown("**✏️ Ferramentas de Desenho**")
+                    st.markdown("""
+                    * `⬟` **Polígono:** Clique ponto a ponto para fechar uma área livre.
+                    * `⬛` **Retângulo:** Clique e arraste para criar uma área quadrada.
+                    * `⭕` **Círculo:** Clique no centro e arraste para definir o raio.
+                    * `📍` **Marcador:** Adiciona um pino em um local específico.
+                    * `╱` **Linha:** Desenha uma linha (útil para medir distâncias).
+                    """)
 
+                    st.markdown("---")
+                    st.markdown("**🛠️ Edição e Limpeza**")
+                    st.markdown("""
+                    * `📝` **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.
+                    * `🗑️` **Lixeira:** Apaga todos os desenhos feitos no mapa.
+                    """)
                 # 3. NOVO: INSERÇÃO MANUAL DE COORDENADAS
                
                 with st.expander("📝 Inserir Coordenadas Manualmente"):
@@ -426,6 +450,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
