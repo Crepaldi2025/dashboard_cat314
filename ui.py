@@ -199,9 +199,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 # 1. Feedback visual se já existe polígono
                 if st.session_state.get('drawn_geometry'): 
                     st.success("✅ Polígono Definido", icon="🛡️")
-                    if st.button("🗑️ Limpar Polígono", key="btn_limpar_poly"):
-                        del st.session_state['drawn_geometry']
-                        st.rerun()
                 else: 
                     st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
                 
@@ -429,6 +426,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
