@@ -61,7 +61,6 @@ ERA5_VARS = {
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
         "vis_params": {"min": 0, "max": 35, "palette": ['#FFFFFF', '#E6F5FF', '#CDE0F7', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B'], "caption": "Vento (m/s)"}
     },
-    # Solo
     "Umidade do Solo (0-7 cm)": { "band": "volumetric_soil_water_layer_1", "result_band": "volumetric_soil_water_layer_1", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (0-7cm)"} },
     "Umidade do Solo (7-28 cm)": { "band": "volumetric_soil_water_layer_2", "result_band": "volumetric_soil_water_layer_2", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (7-28cm)"} },
     "Umidade do Solo (28-100 cm)": { "band": "volumetric_soil_water_layer_3", "result_band": "volumetric_soil_water_layer_3", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (28-100cm)"} },
@@ -102,7 +101,7 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- FUNÇÃO TANK: Processamento de Shapefile à Prova de Falhas ---
+# --- FUNÇÃO BLINDADA: Tenta Geometria Real -> Falha -> Usa Bounding Box ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
     print(">>> [DEBUG] Iniciando Importação de Shapefile...")
     
@@ -118,8 +117,12 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
             with open(zip_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
             
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(tmp_dir)
+            try:
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(tmp_dir)
+            except:
+                st.error("ZIP Inválido.")
+                return None, None
             
             shp_file = None
             for root, _, files in os.walk(tmp_dir):
@@ -129,73 +132,58 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
                         break
             
             if not shp_file:
-                st.error("Erro: Arquivo .shp não encontrado no ZIP.")
+                st.error("Nenhum .shp encontrado.")
                 return None, None
 
-            print(f">>> [DEBUG] Lendo arquivo: {shp_file}")
-            
             # 1. Leitura
-            try:
-                gdf = gpd.read_file(shp_file)
-            except Exception as e:
-                st.error(f"Erro ao ler arquivo: {e}")
-                return None, None
+            gdf = gpd.read_file(shp_file)
+            if gdf.empty: return None, None
 
-            if gdf.empty:
-                st.error("Erro: Arquivo vazio.")
-                return None, None
-
-            # 2. Simplificação AGRESSIVA (Para evitar payload limit)
-            # 0.01 graus ~= 1km de precisão. Ideal para visualização macro.
-            print(">>> [DEBUG] Simplificando geometria...")
-            gdf['geometry'] = gdf.geometry.simplify(tolerance=0.01, preserve_topology=True)
-
-            # 3. Projeção (Força bruta para WGS84)
-            print(">>> [DEBUG] Convertendo CRS...")
+            # 2. Conversão de Projeção
             if not gdf.crs:
                 gdf.set_crs("EPSG:4326", inplace=True)
-            else:
+            elif gdf.crs != "EPSG:4326":
                 gdf = gdf.to_crs("EPSG:4326")
 
-            # 4. Buffer para corrigir topologia e engordar linhas
-            print(">>> [DEBUG] Aplicando Buffer...")
-            # Silencia aviso de projeção geográfica
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                # Se for linha, engorda 0.005 (~500m). Se polígono, buffer(0) corrige erros.
-                gdf['geometry'] = gdf.geometry.buffer(0.005 if any(gdf.geom_type.isin(['LineString','MultiLineString'])) else 0)
+            # 3. TENTATIVA 1: Geometria Simplificada
+            try:
+                # Simplifica bastante
+                gdf_simple = gdf.copy()
+                gdf_simple['geometry'] = gdf_simple.geometry.simplify(0.01, preserve_topology=True)
+                
+                # Buffer zero para corrigir topologia
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    gdf_simple['geometry'] = gdf_simple.geometry.buffer(0)
+                
+                # Converte para JSON
+                geojson = json.loads(gdf_simple[['geometry']].to_json())
+                
+                # Tenta criar o objeto EE. Se o JSON for gigante, isso pode falhar.
+                ee_fc = ee.FeatureCollection(geojson)
+                
+                # Testa se é válido pegando a área (ação leve)
+                _ = ee_fc.geometry().area().getInfo()
+                
+                print(">>> [DEBUG] Sucesso com geometria detalhada!")
+                return ee_fc.geometry(), ee_fc.union(1).first()
 
-            gdf = gdf[~gdf.is_empty]
-            
-            if gdf.empty:
-                st.error("Erro: Geometria inválida após processamento.")
-                return None, None
-
-            # 5. Conversão para EE (Via GeoJSON simples)
-            print(">>> [DEBUG] Convertendo para Earth Engine...")
-            # Remove colunas de dados para reduzir tamanho do JSON, mantendo apenas geometria
-            gdf_geom_only = gdf[['geometry']]
-            geojson = json.loads(gdf_geom_only.to_json())
-            
-            if not geojson.get('features'):
-                st.error("Erro: GeoJSON vazio.")
-                return None, None
-
-            # Cria FeatureCollection
-            ee_fc = ee.FeatureCollection(geojson)
-            
-            # Retorna:
-            # 1. Geometria Unificada (Para recorte/clip)
-            # 2. Feature para visualização (Para o .paint() funcionar, precisa ser um Feature, não Collection)
-            # Usamos o .union(1) com maxError alto para ser rápido
-            geom_unida = ee_fc.geometry(maxError=100)
-            feat_unida = ee.Feature(geom_unida)
-            
-            print(">>> [DEBUG] Sucesso!")
-            return geom_unida, feat_unida
+            except Exception as e:
+                print(f">>> [DEBUG] Falha na geometria detalhada: {e}")
+                print(">>> [DEBUG] Tentando Fallback para Bounding Box...")
+                
+                # 4. TENTATIVA 2 (FALLBACK): Bounding Box (Caixa envolvente)
+                # Isso NUNCA deve falhar por tamanho, pois são apenas 4 pontos.
+                bounds = gdf.total_bounds # [minx, miny, maxx, maxy]
+                
+                # Cria retângulo no GEE
+                ee_geom = ee.Geometry.Rectangle([bounds[0], bounds[1], bounds[2], bounds[3]])
+                ee_feat = ee.Feature(ee_geom, {'label': 'Bounding Box'})
+                
+                st.warning("⚠️ O arquivo shapefile é muito complexo para o navegador. Usando a área retangular envolvente (Bounding Box).")
+                return ee_geom, ee_feat
 
     except Exception as e:
-        print(f">>> [DEBUG] ERRO FATAL: {e}")
         st.error(f"Erro processamento: {e}")
         return None, None
 
@@ -381,3 +369,4 @@ def obter_vis_params_interativo(variavel: str):
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
     return nova_config
+    
