@@ -12,7 +12,7 @@ from datetime import date, datetime
 import tempfile
 import zipfile
 import shutil
-# import warnings # REMOVIDO A PEDIDO (Vamos ver os logs!)
+import warnings
 
 def inicializar_gee():
     try:
@@ -102,93 +102,100 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- FUNÇÃO OTIMIZADA E MONITORADA ---
+# --- FUNÇÃO TANK: Processamento de Shapefile à Prova de Falhas ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
-    print(">>> DEBUG: Iniciando processamento do Shapefile...")
+    print(">>> [DEBUG] Iniciando Importação de Shapefile...")
     
     try:
         import geopandas as gpd
-        print(">>> DEBUG: GeoPandas importado com sucesso.")
     except ImportError:
-        st.error("⚠️ Biblioteca `geopandas` não instalada.")
+        st.error("⚠️ Erro: GeoPandas não instalado.")
         return None, None
 
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            zip_path = os.path.join(tmp_dir, "uploaded.zip")
+            zip_path = os.path.join(tmp_dir, "data.zip")
             with open(zip_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
             
-            print(">>> DEBUG: Arquivo ZIP salvo temporariamente.")
-            
-            try:
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(tmp_dir)
-            except zipfile.BadZipFile:
-                st.error("Erro: ZIP inválido.")
-                return None, None
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(tmp_dir)
             
             shp_file = None
-            for root, dirs, files in os.walk(tmp_dir):
-                for file in files:
-                    if file.endswith(".shp"):
-                        shp_file = os.path.join(root, file)
+            for root, _, files in os.walk(tmp_dir):
+                for f in files:
+                    if f.endswith(".shp"):
+                        shp_file = os.path.join(root, f)
                         break
             
             if not shp_file:
-                st.error("Erro: Nenhum .shp encontrado.")
+                st.error("Erro: Arquivo .shp não encontrado no ZIP.")
                 return None, None
+
+            print(f">>> [DEBUG] Lendo arquivo: {shp_file}")
             
-            print(f">>> DEBUG: Lendo arquivo: {shp_file}")
-            
-            # LER APENAS GEOMETRIA PRIMEIRO (Para economizar memória)
-            # Otimização 1: Ler arquivo
-            gdf = gpd.read_file(shp_file)
+            # 1. Leitura
+            try:
+                gdf = gpd.read_file(shp_file)
+            except Exception as e:
+                st.error(f"Erro ao ler arquivo: {e}")
+                return None, None
 
             if gdf.empty:
-                st.error("Erro: Shapefile vazio.")
+                st.error("Erro: Arquivo vazio.")
                 return None, None
 
-            # Otimização 2: Simplificar ANTES de converter CRS (Reduz carga de CPU)
-            # 0.005 graus ~= 500 metros de tolerância (suficiente para visualização macro)
-            print(">>> DEBUG: Simplificando geometrias...")
-            gdf['geometry'] = gdf.geometry.simplify(0.005, preserve_topology=True)
+            # 2. Simplificação AGRESSIVA (Para evitar payload limit)
+            # 0.01 graus ~= 1km de precisão. Ideal para visualização macro.
+            print(">>> [DEBUG] Simplificando geometria...")
+            gdf['geometry'] = gdf.geometry.simplify(tolerance=0.01, preserve_topology=True)
 
-            print(">>> DEBUG: Verificando CRS...")
+            # 3. Projeção (Força bruta para WGS84)
+            print(">>> [DEBUG] Convertendo CRS...")
             if not gdf.crs:
-                st.warning("⚠️ Sem projeção. Assumindo WGS84.")
                 gdf.set_crs("EPSG:4326", inplace=True)
-            elif gdf.crs != "EPSG:4326":
-                print(">>> DEBUG: Convertendo CRS para WGS84...")
-                gdf = gdf.to_crs("EPSG:4326")
-            
-            print(">>> DEBUG: Aplicando Buffer (Buffer 0)...")
-            # Buffer 0 é mais leve e corrige topologia. Se for linha, buffer pequeno.
-            if any(gdf.geom_type.isin(['LineString', 'MultiLineString'])):
-                gdf['geometry'] = gdf.geometry.buffer(0.002) 
             else:
-                gdf['geometry'] = gdf.geometry.buffer(0)
-            
+                gdf = gdf.to_crs("EPSG:4326")
+
+            # 4. Buffer para corrigir topologia e engordar linhas
+            print(">>> [DEBUG] Aplicando Buffer...")
+            # Silencia aviso de projeção geográfica
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                # Se for linha, engorda 0.005 (~500m). Se polígono, buffer(0) corrige erros.
+                gdf['geometry'] = gdf.geometry.buffer(0.005 if any(gdf.geom_type.isin(['LineString','MultiLineString'])) else 0)
+
             gdf = gdf[~gdf.is_empty]
             
             if gdf.empty:
-                st.error("Geometria inválida.")
+                st.error("Erro: Geometria inválida após processamento.")
                 return None, None
 
-            print(">>> DEBUG: Convertendo para JSON...")
-            geojson = json.loads(gdf.to_json())
+            # 5. Conversão para EE (Via GeoJSON simples)
+            print(">>> [DEBUG] Convertendo para Earth Engine...")
+            # Remove colunas de dados para reduzir tamanho do JSON, mantendo apenas geometria
+            gdf_geom_only = gdf[['geometry']]
+            geojson = json.loads(gdf_geom_only.to_json())
             
             if not geojson.get('features'):
-                st.error("Erro conversão GeoJSON.")
+                st.error("Erro: GeoJSON vazio.")
                 return None, None
 
-            print(">>> DEBUG: Criando objeto Earth Engine...")
-            ee_object = ee.FeatureCollection(geojson)
+            # Cria FeatureCollection
+            ee_fc = ee.FeatureCollection(geojson)
             
-            return ee_object.geometry(), ee_object.union(1).first()
+            # Retorna:
+            # 1. Geometria Unificada (Para recorte/clip)
+            # 2. Feature para visualização (Para o .paint() funcionar, precisa ser um Feature, não Collection)
+            # Usamos o .union(1) com maxError alto para ser rápido
+            geom_unida = ee_fc.geometry(maxError=100)
+            feat_unida = ee.Feature(geom_unida)
+            
+            print(">>> [DEBUG] Sucesso!")
+            return geom_unida, feat_unida
 
     except Exception as e:
-        print(f">>> DEBUG: ERRO CRÍTICO: {e}")
+        print(f">>> [DEBUG] ERRO FATAL: {e}")
         st.error(f"Erro processamento: {e}")
         return None, None
 
