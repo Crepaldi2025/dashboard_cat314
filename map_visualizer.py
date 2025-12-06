@@ -20,7 +20,7 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 import folium 
-import gee_handler # Para pegar os vis params
+import gee_handler # IMPORTANTE: Para pegar vis params
 
 # ------------------------------------------------------------------
 # 0. MAPA DE SOBREPOSIÇÃO (OVERLAY) - NOVO
@@ -38,6 +38,7 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
+    # Inicia mapa vazio sem tiles padrão
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False, tiles=None)
     
     esri_layer = folium.TileLayer(
@@ -49,22 +50,20 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
     )
     esri_layer.add_to(mapa)
 
-    # Pega configurações de visualização para cada camada
+    # Pega configs visuais
     vis1 = gee_handler.obter_vis_params_interativo(name1)
     vis2 = gee_handler.obter_vis_params_interativo(name2)
 
-    # Adiciona Camada 1 (Base) - Totalmente opaca por padrão
+    # Camada 1 (Base)
     mapa.addLayer(img1, vis1, f"Base: {name1}")
     
-    # Adiciona Camada 2 (Topo) - Com opacidade reduzida para ver através
+    # Camada 2 (Topo) - Com opacidade
     mapa.addLayer(img2, vis2, f"Topo: {name2}", opacity=0.6)
 
     # Contorno
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
     
-    # Adiciona Legendas (Barras de Cores)
-    # Como são duas, vamos colocar uma na esquerda e outra na direita se possível, ou empilhadas
-    # Por simplicidade, adicionamos a legenda da camada SUPERIOR (Topo) que é o foco da comparação
+    # Adiciona legenda da camada do TOPO (a mais importante na comparação)
     _add_colorbar_bottomleft(mapa, vis2, name2)
 
     if bounds:
@@ -88,12 +87,8 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         bounds = None
         lat_c, lon_c = -15.78, -47.93
 
-    # --- CORREÇÃO AQUI (tiles=None) ---
-    # Isso inicia o mapa vazio, sem carregar o OpenStreetMap.
-    # Mantém a barra de ferramentas do geemap funcionando.
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False, tiles=None)
     
-    # Adiciona a camada Esri manualmente (que será o único fundo)
     esri_layer = folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         attr="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
