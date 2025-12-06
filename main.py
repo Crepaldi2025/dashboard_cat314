@@ -234,15 +234,27 @@ def render_analysis_results():
         st.subheader("Comparação de Variáveis (Séries Temporais)")
         ui.renderizar_resumo_selecao()
         
-        # --- AJUDA GERAL (APENAS UMA VEZ) ---
-        with st.expander("ℹ️ Ajuda: Ferramentas dos Gráficos"):
+        # --- AJUDA GERAL COMPLETA (IGUAL AO CHART_VISUALIZER) ---
+        with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas dos gráficos"):
+            st.markdown("### 📈 Guia de Ferramentas")
+            
+            st.markdown("**1️⃣ Barra de Ferramentas (Canto Superior Direito)**")
             st.markdown("""
-            Passe o mouse sobre os gráficos para ver as opções:
-            * 📷 **Câmera:** Baixa imagem do gráfico.
-            * 🔍 **Zoom:** Clique e arraste na área desejada.
-            * 🏠 **Casinha:** Retorna ao zoom original.
+            * `📷` **Câmera:** Baixa o gráfico atual como imagem (PNG).
+            * `🔍` **Zoom:** Clique e arraste na tela para aproximar uma área específica.
+            * `✥` **Pan (Mover):** Clique e arraste para mover o gráfico para os lados.
+            * `➕` / `➖` **Zoom In/Out:** Aproxima ou afasta a visualização centralizada.
+            * `🏠` **Casinha (Reset):** Retorna o gráfico para a visualização original.
+            * `🔲` **Autoscale:** Ajusta os eixos automaticamente para caber todos os dados.
             """)
-        # -------------------------------------
+            
+            st.markdown("**2️⃣ Interação e Atalhos**")
+            st.markdown("""
+            * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
+            * **Valor Exato:** Passe o mouse sobre a linha azul para ver a data e o valor exato (Tooltip).
+            * **Tela Cheia:** Passe o mouse no gráfico e procure o ícone `⛶` para expandir.
+            """)
+        # --------------------------------------------------------
         
         st.markdown("---")
         
@@ -341,7 +353,6 @@ def render_analysis_results():
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             st.subheader(titulo_serie)
-            # AQUI: show_help=True (padrão) para mostrar a ajuda na série única
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=True)
 
 def render_polygon_drawer():
