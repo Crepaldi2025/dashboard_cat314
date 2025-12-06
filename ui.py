@@ -442,18 +442,21 @@ def renderizar_resumo_selecao():
         return
 
     # --- LÓGICA PARA MAPAS (ÚNICO E MÚLTIPLO) E SÉRIES ---
-    # Se for "Múltiplos Mapas", lista explicitamente as variáveis
+    # Se for "Múltiplos Mapas", lista explicitamente as variáveis (CORRIGIDO PARA PULAR LINHA)
+    label_titulo = "Variável:"
     if nav_option == "Múltiplos Mapas":
         vars_selected = st.session_state.get("variaveis_multiplas", [])
         if not vars_selected: return
-        var_text = "\n".join([f"• {v}" for v in vars_selected])
+        # Usa dois espaços + \n para forçar quebra de linha visual no Markdown
+        var_text = "  \n".join([f"• {v}" for v in vars_selected])
+        label_titulo = "Variáveis:"
     else:
         if "variavel" not in st.session_state: return
         var_text = st.session_state.variavel
 
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
         c1, c2, c3 = st.columns(3)
-        with c1: st.markdown(f"**Variável:**\n{var_text}")
+        with c1: st.markdown(f"**{label_titulo}** \n{var_text}")
         with c2:
             tipo = st.session_state.tipo_localizacao
             local_txt = ""
