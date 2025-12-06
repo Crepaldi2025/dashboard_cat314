@@ -127,7 +127,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     try:
         # Só plota se tiver calculado o perfil
         if 'prof' in locals() and prof is not None:
-            skew.plot(p, prof, 'k', linewidth=1.5, linestyle='--', label='Parcela (SB)')
+            skew.plot(p, prof, 'k', linewidth=1.5, linestyle='--', label='Parcela')
             
             # Áreas sombreadas (CAPE/CIN)
             if cape is not None and cape.magnitude > 0:
@@ -179,3 +179,4 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png")
+
