@@ -48,8 +48,8 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
     
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
-    # Lógica compartilhada para "Mapas" e "Múltiplos Mapas"
-    if aba in ["Mapas", "Múltiplos Mapas"]:
+    # Lógica compartilhada para "Mapas", "Múltiplos Mapas" e "Sobreposição"
+    if aba in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)"]:
         target_hour = None
         if st.session_state.get('tipo_periodo') == "Horário Específico":
             target_hour = st.session_state.get('hora_especifica')
@@ -84,7 +84,36 @@ def run_full_analysis():
             st.session_state.skewt_results = {"df": df, "params": (lat, lon, date, hour)}
         return
     
-    # --- LÓGICA MÚLTIPLOS (MAPAS OU SÉRIES) ---
+    # --- LÓGICA SOBREPOSIÇÃO (NOVO) ---
+    if aba == "Sobreposição (Camadas)":
+        v1 = st.session_state.get("var_camada_1")
+        v2 = st.session_state.get("var_camada_2")
+        
+        # Datas
+        tipo_per = st.session_state.tipo_periodo
+        if tipo_per == "Horário Específico":
+            data_unica = st.session_state.get('data_horaria')
+            start_date = data_unica
+            end_date = data_unica + timedelta(days=1) if data_unica else None
+        else:
+            start_date, end_date = utils.get_date_range(tipo_per, st.session_state)
+            
+        if not (start_date and end_date): return
+        geo_key = get_geo_caching_key(st.session_state)
+        
+        with st.spinner("Gerando camadas de sobreposição..."):
+            res1 = run_analysis_logic(v1, start_date, end_date, geo_key, aba)
+            res2 = run_analysis_logic(v2, start_date, end_date, geo_key, aba)
+            
+            if res1 and res2:
+                st.session_state.analysis_results = {
+                    "mode": "overlay",
+                    "layer1": {"res": res1, "name": v1},
+                    "layer2": {"res": res2, "name": v2}
+                }
+        return
+
+    # --- LÓGICA MÚLTIPLOS ---
     if aba in ["Múltiplos Mapas", "Múltiplas Séries"]:
         variaveis = st.session_state.get("variaveis_multiplas", [])
         if not variaveis: return
@@ -92,17 +121,14 @@ def run_full_analysis():
         tipo_per = st.session_state.tipo_periodo
         if tipo_per == "Horário Específico":
             data_unica = st.session_state.get('data_horaria')
-            if data_unica:
-                start_date = data_unica
-                end_date = data_unica + timedelta(days=1) 
-            else: start_date, end_date = None, None
+            start_date = data_unica
+            end_date = data_unica + timedelta(days=1) if data_unica else None
         else:
             start_date, end_date = utils.get_date_range(tipo_per, st.session_state)
             
         if not (start_date and end_date): return
 
         geo_key = get_geo_caching_key(st.session_state)
-        
         results_multi = {}
         msg_loading = f"Gerando {len(variaveis)} gráficos..." if aba == "Múltiplas Séries" else f"Gerando {len(variaveis)} mapas..."
         
@@ -121,10 +147,8 @@ def run_full_analysis():
     
     if tipo_per == "Horário Específico":
         data_unica = st.session_state.get('data_horaria')
-        if data_unica:
-            start_date = data_unica
-            end_date = data_unica + timedelta(days=1) 
-        else: start_date, end_date = None, None
+        start_date = data_unica
+        end_date = data_unica + timedelta(days=1) if data_unica else None
     else:
         start_date, end_date = utils.get_date_range(tipo_per, st.session_state)
 
@@ -195,6 +219,31 @@ def render_analysis_results():
     elif tipo_local == "polígono": local_str = "para a área desenhada"
     else: local_str = "para o círculo definido"
 
+    # --- RENDERIZAÇÃO SOBREPOSIÇÃO (NOVO) ---
+    if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
+        st.subheader("Mapa de Sobreposição (Overlay)")
+        ui.renderizar_resumo_selecao()
+        st.markdown("---")
+        
+        # Ajuda do Overlay
+        with st.popover("ℹ️ Como ver as camadas?"):
+            st.markdown("""
+            **Use o ícone de Camadas (`🗂️`) no canto superior direito do mapa!**
+            * Lá você pode ligar/desligar a **Camada Base** e a **Camada Topo**.
+            * A transparência da camada superior permite ver correlações visuais.
+            """)
+
+        l1 = results["layer1"]
+        l2 = results["layer2"]
+        
+        # Chama a nova função do visualizador
+        map_visualizer.create_overlay_map(
+            l1["res"]["ee_image"], l1["name"],
+            l2["res"]["ee_image"], l2["name"],
+            l1["res"]["feature"]
+        )
+        return
+
     # --- RENDERIZAÇÃO MÚLTIPLOS MAPAS ---
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis (Mapas)")
@@ -234,27 +283,12 @@ def render_analysis_results():
         st.subheader("Comparação de Variáveis (Séries Temporais)")
         ui.renderizar_resumo_selecao()
         
-        # --- AJUDA GERAL COMPLETA (IGUAL AO CHART_VISUALIZER) ---
         with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas dos gráficos"):
             st.markdown("### 📈 Guia de Ferramentas")
-            
             st.markdown("**1️⃣ Barra de Ferramentas (Canto Superior Direito)**")
-            st.markdown("""
-            * `📷` **Câmera:** Baixa o gráfico atual como imagem (PNG).
-            * `🔍` **Zoom:** Clique e arraste na tela para aproximar uma área específica.
-            * `✥` **Pan (Mover):** Clique e arraste para mover o gráfico para os lados.
-            * `➕` / `➖` **Zoom In/Out:** Aproxima ou afasta a visualização centralizada.
-            * `🏠` **Casinha (Reset):** Retorna o gráfico para a visualização original.
-            * `🔲` **Autoscale:** Ajusta os eixos automaticamente para caber todos os dados.
-            """)
-            
-            st.markdown("**2️⃣ Interação e Atalhos**")
-            st.markdown("""
-            * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
-            * **Valor Exato:** Passe o mouse sobre a linha azul para ver a data e o valor exato (Tooltip).
-            * **Tela Cheia:** Passe o mouse no gráfico e procure o ícone `⛶` para expandir.
-            """)
-        # --------------------------------------------------------
+            st.markdown("* `📷` **Câmera:** Baixa imagem PNG.\n* `🔍` **Zoom:** Clique e arraste.\n* `✥` **Pan:** Mover gráfico.\n* `🏠` **Casinha:** Resetar.")
+            st.markdown("**2️⃣ Interação**")
+            st.markdown("* **Zoom Rápido:** Use botões 1m/1a.\n* **Tooltip:** Passe o mouse para ver valor.")
         
         st.markdown("---")
         
@@ -270,7 +304,6 @@ def render_analysis_results():
             
             with cols_obj[i % 2]:
                 st.markdown(f"##### {var_name}")
-                # AQUI: show_help=False para não repetir a ajuda
                 charts_visualizer.display_time_series_chart(df, var_name, unit, show_help=False)
                 st.markdown("---")
         return
@@ -391,7 +424,7 @@ def main():
     
     # Ativa desenho de polígono se necessário
     is_polygon = (
-        opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries"] and 
+        opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Sobreposição (Camadas)"] and 
         st.session_state.get('tipo_localizacao') == "Polígono"
     )
         
