@@ -1,29 +1,39 @@
-streamlit
-geemap
-earthengine-api
-folium
-streamlit-folium
-pandas
-numpy
-matplotlib
-plotly
-geopandas
-geobr
-requests
-python-docx
-pypandoc
-openpyxl
-pytz
-kaleido==0.2.1
-MetPy
+# ======================================
+# Dependencias principais (Pinadas para estabilidade)
+# ======================================
+numpy==1.26.4
+pandas==2.2.3
+matplotlib==3.8.4
+plotly==5.23.0
 scipy
-pint
 xarray
+pint
 pooch
 
+# ======================================
+# Frameworks de interface
+# ======================================
+streamlit==1.38.0
+streamlit-folium==0.22.0
+folium==0.17.0
+# kaleido fixo na 0.2.1 é crucial para exportação de imagens no Streamlit Cloud
+kaleido==0.2.1
 
+# ======================================
+# Geoprocessamento e Google Earth Engine
+# ======================================
+geemap==0.35.3
+earthengine-api==1.5.11
+geopandas==1.0.1
+geobr==0.2.2
+pyproj==3.6.1
+MetPy
 
-
-
-
-
+# ======================================
+# Utilitários e Documentação
+# ======================================
+openpyxl==3.1.5
+python-docx==1.2.0
+pypandoc==1.15
+requests==2.32.5
+pytz
