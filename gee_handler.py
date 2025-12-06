@@ -9,11 +9,10 @@ import os
 import geobr
 import pandas as pd
 from datetime import date, datetime
+# REMOVIDO: import geopandas as gpd (Causa travamento no boot)
 import tempfile
 import zipfile
 import shutil
-
-# NOTA: Removemos 'import geopandas' do topo para evitar crash na inicialização
 
 def inicializar_gee():
     try:
@@ -62,6 +61,7 @@ ERA5_VARS = {
         "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
         "vis_params": {"min": 0, "max": 35, "palette": ['#FFFFFF', '#E6F5FF', '#CDE0F7', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B'], "caption": "Vento (m/s)"}
     },
+    # Solo
     "Umidade do Solo (0-7 cm)": { "band": "volumetric_soil_water_layer_1", "result_band": "volumetric_soil_water_layer_1", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (0-7cm)"} },
     "Umidade do Solo (7-28 cm)": { "band": "volumetric_soil_water_layer_2", "result_band": "volumetric_soil_water_layer_2", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (7-28cm)"} },
     "Umidade do Solo (28-100 cm)": { "band": "volumetric_soil_water_layer_3", "result_band": "volumetric_soil_water_layer_3", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (28-100cm)"} },
@@ -102,31 +102,28 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- FUNÇÃO DE PROCESSAMENTO COM IMPORTAÇÃO SEGURA ---
+# --- FUNÇÃO OTIMIZADA COM IMPORTAÇÃO TARDIA (LAZY IMPORT) ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
     try:
-        # Importação aqui dentro para não travar o app se a biblioteca não estiver instalada
+        # Importação moveu para cá para evitar travamento inicial do app
         import geopandas as gpd
     except ImportError:
-        st.error("⚠️ Biblioteca `geopandas` não encontrada. Por favor, adicione `geopandas` ao arquivo `requirements.txt`.")
+        st.error("⚠️ Biblioteca `geopandas` não instalada. Adicione ao requirements.txt.")
         return None, None
 
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            # Salva o arquivo ZIP
             zip_path = os.path.join(tmp_dir, "uploaded.zip")
             with open(zip_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
             
-            # Descompacta
             try:
                 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                     zip_ref.extractall(tmp_dir)
             except zipfile.BadZipFile:
-                st.error("Erro: Arquivo ZIP corrompido ou inválido.")
+                st.error("Erro: ZIP inválido.")
                 return None, None
             
-            # Procura o arquivo .shp
             shp_file = None
             for root, dirs, files in os.walk(tmp_dir):
                 for file in files:
@@ -135,15 +132,11 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
                         break
             
             if not shp_file:
-                st.error("Erro: Arquivo .shp não encontrado dentro do ZIP.")
+                st.error("Erro: Nenhum .shp encontrado no ZIP.")
                 return None, None
 
             # Lê com GeoPandas
-            try:
-                gdf = gpd.read_file(shp_file)
-            except Exception as e:
-                st.error(f"Erro ao ler Shapefile: {e}")
-                return None, None
+            gdf = gpd.read_file(shp_file)
 
             if gdf.empty:
                 st.error("Erro: Shapefile vazio.")
@@ -151,40 +144,34 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
 
             # Projeção
             if not gdf.crs:
-                st.warning("⚠️ Shapefile sem projeção. Assumindo WGS84 (EPSG:4326).")
+                st.warning("⚠️ Sem projeção. Assumindo WGS84.")
                 gdf.set_crs("EPSG:4326", inplace=True)
             elif gdf.crs != "EPSG:4326":
-                try:
-                    gdf = gdf.to_crs("EPSG:4326")
-                except:
-                    st.error("Falha ao converter projeção.")
-                    return None, None
+                gdf = gdf.to_crs("EPSG:4326")
             
-            # Correção de Geometria (Buffer para Linhas -> Polígonos)
-            # Buffer de 0.002 graus (~200 metros) para ser visível mas não exagerado
+            # Buffer e Correção (Essencial para Hidrografia)
             if any(gdf.geom_type.isin(['LineString', 'MultiLineString'])):
-                gdf['geometry'] = gdf.geometry.buffer(0.002)
+                gdf['geometry'] = gdf.geometry.buffer(0.002) # Engorda rios
             else:
-                gdf['geometry'] = gdf.geometry.buffer(0)
+                gdf['geometry'] = gdf.geometry.buffer(0) # Corrige polígonos
             
             gdf = gdf[~gdf.is_empty]
             
             if gdf.empty:
-                st.error("Geometria inválida após buffer.")
+                st.error("Geometria inválida.")
                 return None, None
 
-            # Converte para GeoJSON e depois EE
             geojson = json.loads(gdf.to_json())
             
             if not geojson.get('features'):
-                st.error("Erro: GeoJSON vazio.")
+                st.error("Erro conversão GeoJSON.")
                 return None, None
 
             ee_object = ee.FeatureCollection(geojson)
             return ee_object.geometry(), ee_object.union(1).first()
 
     except Exception as e:
-        st.error(f"Erro no processamento: {e}")
+        st.error(f"Erro processamento: {e}")
         return None, None
 
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
