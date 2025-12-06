@@ -242,17 +242,17 @@ def render_analysis_results():
         ui.renderizar_resumo_selecao()
         st.markdown("---")
         cols = st.columns(2)
-        for i, var_name in enumerate(results["data"]): # CORREÇÃO: var_name aqui
+        for i, var_name in enumerate(results["data"]):
             res = results["data"][var_name]
             with cols[i % 2]:
-                st.markdown(f"**{var_name}**") # CORREÇÃO: Usar var_name
+                st.markdown(f"**{var_name}**")
                 png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_container_width=True)
                     if cbar: st.image(cbar, use_container_width=True)
                     # Botão de exportação individual
                     try:
-                        title = f"{var_name} {periodo_str} {local_str}" # CORREÇÃO: Usar var_name
+                        title = f"{var_name} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
                         mp = base64.b64decode(png.split(",")[1])
                         jp = base64.b64decode(jpg.split(",")[1])
@@ -260,9 +260,10 @@ def render_analysis_results():
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
                         sub_c1, sub_c2 = st.columns(2)
-                        var_slug = var_name.lower().replace(" ", "_") # CORREÇÃO: Usar var_name
+                        var_slug = var_name.lower().replace(" ", "_")
+                        # CORREÇÃO AQUI: sub_c1 e sub_c2
                         if fp: sub_c1.download_button("💾 PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True)
-                        if fj: c2.download_button("💾 JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True)
+                        if fj: sub_c2.download_button("💾 JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True)
                     except: pass
         return
 
@@ -273,10 +274,10 @@ def render_analysis_results():
         with st.expander("ℹ️ Ajuda dos Gráficos"): st.markdown("Use a barra no topo do gráfico para zoom e pan.")
         st.markdown("---")
         cols = st.columns(2)
-        for i, var_name in enumerate(results["data"]): # CORREÇÃO: var_name
+        for i, var_name in enumerate(results["data"]):
             res = results["data"][var_name]
             with cols[i % 2]:
-                st.markdown(f"##### {var_name}") # CORREÇÃO: var_name
+                st.markdown(f"##### {var_name}")
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
         return
 
@@ -320,7 +321,7 @@ def render_analysis_results():
         # Tabela de Dados
         st.markdown("---")
         st.subheader("Tabela de Dados")
-        if "map_dataframe" in results:
+        if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             csv = results["map_dataframe"].to_csv(index=False).encode('utf-8')
             st.download_button("💾 Exportar CSV", csv, "dados_mapa.csv", "text/csv")
@@ -330,6 +331,7 @@ def render_analysis_results():
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=True)
 
 def render_polygon_drawer():
+    # ... (Mantido código original do polígono) ...
     st.subheader("Desenhe sua Área de Interesse")
     m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
     Draw(export=False, draw_options={"polygon": {"allowIntersection": False, "showArea": True}, "rectangle": {"allowIntersection": False, "showArea": True}, "circle": False, "marker": False, "polyline": False}, edit_options={"edit": True, "remove": True}).add_to(m)
