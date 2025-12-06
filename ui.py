@@ -142,15 +142,19 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             ]
 
             if opcao == "Múltiplos Mapas":
-                # Seleção Múltipla (NOVIDADE)
-                st.multiselect(
+                # Seleção Múltipla (SEM O LIMITE NATIVO EM INGLÊS)
+                vars_sel = st.multiselect(
                     "Selecione até 4 variáveis:", 
                     lista_vars, 
                     default=["Temperatura do Ar (2m)", "Precipitação Total"],
-                    max_selections=4,
+                    # max_selections=4,  <-- REMOVIDO PARA EVITAR MENSAGEM EM INGLÊS
                     key='variaveis_multiplas',
                     on_change=reset_analysis_state
                 )
+                
+                # Validação Manual em Português
+                if len(vars_sel) > 4:
+                    st.warning(f"⚠️ Você selecionou {len(vars_sel)} variáveis. O limite recomendado é 4 para não travar o sistema.", icon="🛑")
             else:
                 # Seleção Única (PADRÃO)
                 st.selectbox(
@@ -358,9 +362,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
             
-            # Verificar se selecionou variáveis no modo múltiplo
-            if opcao == "Múltiplos Mapas" and not st.session_state.get("variaveis_multiplas"):
-                disable = True
+            # Verificar se selecionou variáveis no modo múltiplo e se respeita o limite
+            if opcao == "Múltiplos Mapas":
+                vars_sel = st.session_state.get("variaveis_multiplas", [])
+                # Bloqueia se vazio OU se tiver mais de 4
+                if not vars_sel or len(vars_sel) > 4:
+                    disable = True
 
             st.button(
                 "🚀 Gerar Análise", 
@@ -379,8 +386,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     unsafe_allow_html=True
                 )
             else:
-                if opcao == "Múltiplos Mapas" and not st.session_state.get("variaveis_multiplas"):
-                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
+                if opcao == "Múltiplos Mapas":
+                    vars_sel = st.session_state.get("variaveis_multiplas", [])
+                    if not vars_sel:
+                        st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
+                    elif len(vars_sel) > 4:
+                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Erro:</b> Remova variáveis até ficar com no máximo 4.</div>", unsafe_allow_html=True)
                 else:
                      st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
