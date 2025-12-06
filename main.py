@@ -269,8 +269,8 @@ def render_analysis_results():
                         map_png = base64.b64decode(png.split(",")[1])
                         map_jpg = base64.b64decode(jpg.split(",")[1])
                         cbar_bytes = base64.b64decode(cbar.split(",")[1]) if cbar else None
-                        final_png = map_visualizer._stitch_images_to_bytes(title_bytes, map_png, cbar_bytes, format='PNG')
-                        final_jpg = map_visualizer._stitch_images_to_bytes(title_bytes, map_jpg, cbar_bytes, format='JPEG')
+                        final_png = map_visualizer._stitch_images_to_bytes(title_bytes, map_png, cbar, format='PNG')
+                        final_jpg = map_visualizer._stitch_images_to_bytes(title_bytes, map_jpg, cbar, format='JPEG')
                         sub_c1, sub_c2 = st.columns(2)
                         var_slug = var_name.lower().replace(" ", "_")
                         if final_png: sub_c1.download_button("💾 PNG", final_png, f"{var_slug}.png", "image/png", use_container_width=True)
