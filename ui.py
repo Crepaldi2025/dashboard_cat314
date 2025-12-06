@@ -68,7 +68,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
         st.radio(
             "Modo de Visualização",
-            ["Mapas", "Séries Temporais", "Skew-T", "Sobre o Aplicativo"],
+            ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Skew-T", "Sobre o Aplicativo"],
             label_visibility="collapsed", 
             key='nav_option',
             on_change=reset_analysis_state
@@ -76,7 +76,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         opcao = st.session_state.get('nav_option', 'Mapas')
 
-        # --- OPÇÃO SKEW-T (COM NOTA ATUALIZADA) ---
+        # --- OPÇÃO SKEW-T (MANTIDA ORIGINAL) ---
         if opcao == "Skew-T":
             st.markdown("### 🌪️ Diagrama Skew-T")
             st.info("Gera um perfil vertical da atmosfera (Sondagem).")
@@ -108,8 +108,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 on_click=lambda: st.session_state.update(analysis_triggered=True)
             )
 
-        # --- OPÇÕES MAPAS E SÉRIES (MANTIDAS INTACTAS) ---
-        elif opcao in ["Mapas", "Séries Temporais"]:
+        # --- OPÇÕES MAPAS, MÚLTIPLOS E SÉRIES ---
+        elif opcao in ["Mapas", "Múltiplos Mapas", "Séries Temporais"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
             # --- 3. BASE DE DADOS ---
@@ -126,25 +126,40 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             # --- 4. VARIÁVEL ---
             st.markdown("#### 🌡️ Variável Meteorológica")
-            st.selectbox(
-                "Selecione a Variável", 
-                [
-                    "Temperatura do Ar (2m)", 
-                    "Temperatura do Ponto de Orvalho (2m)",
-                    "Temperatura da Superfície (Skin)",
-                    "Precipitação Total", 
-                    "Umidade Relativa (2m)", 
-                    "Umidade do Solo (0-7 cm)",
-                    "Umidade do Solo (7-28 cm)",
-                    "Umidade do Solo (28-100 cm)",
-                    "Umidade do Solo (100-289 cm)",
-                    "Velocidade do Vento (10m)", 
-                    "Radiação Solar Incidente"
-                ], 
-                key='variavel', 
-                on_change=reset_analysis_state,
-                label_visibility="collapsed"
-            )
+            
+            lista_vars = [
+                "Temperatura do Ar (2m)", 
+                "Temperatura do Ponto de Orvalho (2m)",
+                "Temperatura da Superfície (Skin)",
+                "Precipitação Total", 
+                "Umidade Relativa (2m)", 
+                "Umidade do Solo (0-7 cm)",
+                "Umidade do Solo (7-28 cm)",
+                "Umidade do Solo (28-100 cm)",
+                "Umidade do Solo (100-289 cm)",
+                "Velocidade do Vento (10m)", 
+                "Radiação Solar Incidente"
+            ]
+
+            if opcao == "Múltiplos Mapas":
+                # Seleção Múltipla (NOVIDADE)
+                st.multiselect(
+                    "Selecione até 4 variáveis:", 
+                    lista_vars, 
+                    default=["Temperatura do Ar (2m)", "Precipitação Total"],
+                    max_selections=4,
+                    key='variaveis_multiplas',
+                    on_change=reset_analysis_state
+                )
+            else:
+                # Seleção Única (PADRÃO)
+                st.selectbox(
+                    "Selecione a Variável", 
+                    lista_vars, 
+                    key='variavel', 
+                    on_change=reset_analysis_state,
+                    label_visibility="collapsed"
+                )
             
             st.divider()
 
@@ -179,6 +194,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 with c1: st.number_input("Lat", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
                 with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
+                
+                # --- AJUDA DIDÁTICA CÍRCULO ---
                 with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
                     st.markdown("### 🎯 Como preencher os dados?")
                     
@@ -193,6 +210,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.
                     * **Exemplo:** `10` cria uma área de 10km ao redor do ponto central.
                     """)
+                
+                # Aviso de redesenho
                 st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o círculo.</div>", unsafe_allow_html=True)
             
             elif tipo_loc == "Polígono":
@@ -252,7 +271,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                                 st.error("⚠️ Um polígono precisa de pelo menos 3 pontos.")
                             else:
                                 # Fechar o polígono se o último ponto não for igual ao primeiro
-                                if points and pontos[0] != pontos[-1]:
+                                if pontos and pontos[0] != pontos[-1]:
                                     pontos.append(pontos[0])
                                 
                                 # Cria a geometria GeoJSON
@@ -277,9 +296,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("#### 📅 Recorte Temporal")
             
             opcoes_periodo = ["Personalizado", "Mensal", "Anual"]
-            if opcao == "Mapas": opcoes_periodo.append("Horário Específico")
             
-            if opcao == "Mapas":
+            # Horário específico disponível para Mapas e Múltiplos Mapas
+            if opcao in ["Mapas", "Múltiplos Mapas"]: 
+                opcoes_periodo.append("Horário Específico")
+            
+            # Seletor de Tipo de Período
+            if opcao in ["Mapas", "Múltiplos Mapas"]:
                 st.selectbox("Tipo de Período", opcoes_periodo, key='tipo_periodo', on_change=reset_analysis_state, label_visibility="collapsed")
             else:
                 st.session_state.tipo_periodo = "Personalizado"
@@ -327,11 +350,17 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.markdown("#### 🎨 Visualização")
                 st.radio("Formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_results_only, label_visibility="collapsed")
                 st.divider()
+            elif opcao == "Múltiplos Mapas":
+                st.info("ℹ️ Modo Múltiplo gera mapas estáticos para comparação.")
 
             # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
+            
+            # Verificar se selecionou variáveis no modo múltiplo
+            if opcao == "Múltiplos Mapas" and not st.session_state.get("variaveis_multiplas"):
+                disable = True
 
             st.button(
                 "🚀 Gerar Análise", 
@@ -350,7 +379,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     unsafe_allow_html=True
                 )
             else:
-                st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
+                if opcao == "Múltiplos Mapas" and not st.session_state.get("variaveis_multiplas"):
+                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
+                else:
+                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
             st.markdown("---")
             st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v1.0.0 | 2025</div>", unsafe_allow_html=True)
@@ -399,13 +431,19 @@ def renderizar_resumo_selecao():
                 st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
         return
 
-    # --- LÓGICA PARA MAPAS E SÉRIES ---
-    if "variavel" not in st.session_state:
-        return
+    # --- LÓGICA PARA MAPAS (ÚNICO E MÚLTIPLO) E SÉRIES ---
+    # Se for "Múltiplos Mapas", ajustamos o texto da variável
+    if nav_option == "Múltiplos Mapas":
+        vars_selected = st.session_state.get("variaveis_multiplas", [])
+        if not vars_selected: return
+        var_text = f"{len(vars_selected)} variáveis selecionadas"
+    else:
+        if "variavel" not in st.session_state: return
+        var_text = st.session_state.variavel
 
     with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
         c1, c2, c3 = st.columns(3)
-        with c1: st.markdown(f"**Variável:**\n{st.session_state.variavel}")
+        with c1: st.markdown(f"**Variável:**\n{var_text}")
         with c2:
             tipo = st.session_state.tipo_localizacao
             local_txt = ""
