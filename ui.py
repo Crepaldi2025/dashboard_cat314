@@ -188,7 +188,18 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 else: 
                     #st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.</div>", unsafe_allow_html=True)
                     st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
-                with st.popover("ℹ️ Guia de Ferramentas"): st.markdown("⬟ Polígono (Livre)\n⬛ Retângulo (Quadrado)\n📝 Editar\n🗑️ Lixeira")
+                with st.popover("ℹ️ Guia de Ferramentas"): st.markdown("""
+                    **Navegação:**
+                    * ➕ **Zoom In:** Aproxima a visualização do mapa.
+                    * ➖ **Zoom Out:** Afasta a visualização do mapa.
+
+                    **Desenho:**
+                    * ⬟ **Polígono:** Clique ponto a ponto para fechar uma área livre.
+                    * ⬛ **Retângulo:** Clique e arraste para criar uma área quadrada.
+                    * ⭕ **Círculo:** Clique no centro e arraste para definir o tamanho.
+                    * 📝 **Editar:** Permite ajustar os pontos de um desenho já feito.
+                    * 🗑️ **Lixeira:** Apaga o desenho atual para começar de novo.
+                    """)
             
             st.divider()
 
@@ -368,6 +379,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
