@@ -33,7 +33,7 @@ set_background()
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
     
-    # Se for hidrografia, a chave é baseada no arquivo
+    # Se for hidrografia, a chave é baseada no nome do arquivo enviado
     if session_state.get('nav_option') == 'Hidrografia':
         uploaded = session_state.get('hidro_upload')
         return f"hidro:{uploaded.name if uploaded else 'none'}"
@@ -46,7 +46,7 @@ def get_geo_caching_key(session_state):
     return key
 
 def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
-    # Aqui, se for Hidrografia, o gee_handler vai pegar o arquivo do upload automaticamente
+    # O gee_handler já sabe lidar com o upload se a aba for Hidrografia
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     
     if not geometry: return None 
@@ -56,7 +56,7 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
     
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
-    # Lógica compartilhada para Todos os Modos de Mapa
+    # Lógica compartilhada para Todos os Modos de Mapa (incluindo Hidrografia)
     if aba in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia"]:
         target_hour = None
         if st.session_state.get('tipo_periodo') == "Horário Específico":
@@ -66,7 +66,7 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
         
         if ee_image:
             results["ee_image"] = ee_image
-            # Apenas gera tabela de dados se for mapa único ou hidro
+            # Gera tabela de dados se for mapa único ou hidro
             if aba in ["Mapas", "Hidrografia"]:
                 df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
                 if df_map_samples is not None: results["map_dataframe"] = df_map_samples
@@ -86,14 +86,17 @@ def run_full_analysis():
         lon = st.session_state.get("skew_lon")
         date = st.session_state.get("skew_date")
         hour = st.session_state.get("skew_hour")
-        with st.spinner("Gerando Skew-T..."):
+        
+        with st.spinner("Gerando Skew-T (ERA5/GFS)..."):
             df = skewt_handler.get_vertical_profile_data(lat, lon, date, hour)
             st.session_state.skewt_results = {"df": df, "params": (lat, lon, date, hour)}
         return
     
     # --- LÓGICA SOBREPOSIÇÃO ---
     if aba == "Sobreposição (Camadas)":
-        v1, v2 = st.session_state.get("var_camada_1"), st.session_state.get("var_camada_2")
+        v1 = st.session_state.get("var_camada_1")
+        v2 = st.session_state.get("var_camada_2")
+        
         tipo_per = st.session_state.tipo_periodo
         if tipo_per == "Horário Específico":
             data_unica = st.session_state.get('data_horaria')
@@ -108,8 +111,13 @@ def run_full_analysis():
         with st.spinner("Gerando camadas..."):
             res1 = run_analysis_logic(v1, start_date, end_date, geo_key, aba)
             res2 = run_analysis_logic(v2, start_date, end_date, geo_key, aba)
+            
             if res1 and res2:
-                st.session_state.analysis_results = {"mode": "overlay", "layer1": {"res": res1, "name": v1}, "layer2": {"res": res2, "name": v2}}
+                st.session_state.analysis_results = {
+                    "mode": "overlay",
+                    "layer1": {"res": res1, "name": v1},
+                    "layer2": {"res": res2, "name": v2}
+                }
         return
 
     # --- LÓGICA MÚLTIPLOS ---
@@ -129,7 +137,9 @@ def run_full_analysis():
         geo_key = get_geo_caching_key(st.session_state)
         
         results_multi = {}
-        with st.spinner(f"Gerando gráficos..."):
+        msg_loading = f"Gerando {len(variaveis)} gráficos..." if aba == "Múltiplas Séries" else f"Gerando {len(variaveis)} mapas..."
+        
+        with st.spinner(f"{msg_loading} isso pode levar alguns segundos."):
             for var in variaveis:
                 res = run_analysis_logic(var, start_date, end_date, geo_key, aba)
                 if res: results_multi[var] = res
@@ -149,15 +159,19 @@ def run_full_analysis():
     else:
         start_date, end_date = utils.get_date_range(tipo_per, st.session_state)
 
-    if not (start_date and end_date): return
+    if not (start_date and end_date):
+        st.warning("Selecione um período válido.")
+        return
+
     geo_key = get_geo_caching_key(st.session_state)
     
     try:
         with st.spinner("Processando dados no Google Earth Engine..."):
+            # O parâmetro 'aba' aqui passa 'Hidrografia' ou 'Mapas' ou 'Séries'
             analysis_data = run_analysis_logic(variavel, start_date, end_date, geo_key, aba)
         
         if analysis_data is None:
-            st.warning("Não foi possível obter dados.")
+            st.warning("Não foi possível obter dados. Verifique a área ou a data.")
             st.session_state.analysis_results = None
         else:
             st.session_state.analysis_results = analysis_data
@@ -193,8 +207,18 @@ def render_analysis_results():
     
     local_str = "Local Selecionado"
     if aba == "Hidrografia": local_str = "na Bacia Hidrográfica (Shapefile)"
+    else:
+        tipo_local = st.session_state.get('tipo_localizacao', '').lower()
+        if tipo_local == "estado":
+            val = st.session_state.get('estado', '').split(' - ')[0]
+            local_str = f"no estado de {val}"
+        elif tipo_local == "município":
+            val = st.session_state.get('municipio', '')
+            local_str = f"no município de {val}"
+        elif tipo_local == "polígono": local_str = "para a área desenhada"
+        elif "círculo" in tipo_local: local_str = "para o círculo definido"
 
-    # --- RENDERIZAÇÃO ESPECIAL ---
+    # --- RENDERIZAÇÃO ESPECIAL: SOBREPOSIÇÃO ---
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
         st.subheader("Mapa de Sobreposição (Overlay)")
         ui.renderizar_resumo_selecao()
@@ -202,9 +226,17 @@ def render_analysis_results():
         with st.popover("ℹ️ Como ver as camadas?"): st.markdown("**Use o ícone 🗂️ no canto do mapa.**")
         
         mode = st.session_state.get('overlay_mode', "Transparência")
-        map_visualizer.create_overlay_map(results["layer1"]["res"]["ee_image"], results["layer1"]["name"], results["layer2"]["res"]["ee_image"], results["layer2"]["name"], results["layer1"]["res"]["feature"], opacity1=st.session_state.get('opacity_1', 1.0), opacity2=st.session_state.get('opacity_2', 0.6), mode=mode)
+        map_visualizer.create_overlay_map(
+            results["layer1"]["res"]["ee_image"], results["layer1"]["name"], 
+            results["layer2"]["res"]["ee_image"], results["layer2"]["name"], 
+            results["layer1"]["res"]["feature"], 
+            opacity1=st.session_state.get('opacity_1', 1.0), 
+            opacity2=st.session_state.get('opacity_2', 0.6), 
+            mode=mode
+        )
         return
 
+    # --- RENDERIZAÇÃO ESPECIAL: MÚLTIPLOS MAPAS ---
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
@@ -218,11 +250,26 @@ def render_analysis_results():
                 if png:
                     st.image(png, use_container_width=True)
                     if cbar: st.image(cbar, use_container_width=True)
+                    # Botão de exportação individual
+                    try:
+                        title = f"{var} {periodo_str} {local_str}"
+                        tb = map_visualizer._make_title_image(title, 800)
+                        mp = base64.b64decode(png.split(",")[1])
+                        jp = base64.b64decode(jpg.split(",")[1])
+                        cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
+                        fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
+                        fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
+                        c1, c2 = st.columns(2)
+                        if fp: c1.download_button("💾 PNG", fp, f"{var}.png", "image/png", use_container_width=True)
+                        if fj: c2.download_button("💾 JPG", fj, f"{var}.jpg", "image/jpeg", use_container_width=True)
+                    except: pass
         return
 
+    # --- RENDERIZAÇÃO ESPECIAL: MÚLTIPLAS SÉRIES ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
+        with st.expander("ℹ️ Ajuda dos Gráficos"): st.markdown("Use a barra no topo do gráfico para zoom e pan.")
         st.markdown("---")
         cols = st.columns(2)
         for i, var in enumerate(results["data"]):
@@ -245,7 +292,8 @@ def render_analysis_results():
             
             if tipo_mapa == "Interativo":
                 # Ajuda e Mapa Interativo
-                with st.popover("ℹ️ Ajuda do Mapa"): st.markdown("Use a lateral para ferramentas de desenho e zoom.")
+                with st.popover("ℹ️ Ajuda do Mapa"): 
+                    st.markdown("**Controles:** Zoom, Tela Cheia, Camadas.\n**Ferramentas:** Marcador, Linha, Polígono, Retângulo, Círculo, Editar, Lixeira.")
                 map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
             else:
                 # Mapa Estático
@@ -254,12 +302,24 @@ def render_analysis_results():
                 if png:
                     st.image(png, width=500)
                     if cbar: st.image(cbar, width=500)
-                    # Botões de Download... (código mantido)
+                    # Exportação Mapa Único
+                    try:
+                        title = f"{st.session_state.variavel} {periodo_str} {local_str}"
+                        tb = map_visualizer._make_title_image(title, 800)
+                        mp = base64.b64decode(png.split(",")[1])
+                        jp = base64.b64decode(jpg.split(",")[1])
+                        cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
+                        fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
+                        fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
+                        c1, c2 = st.columns(2)
+                        if fp: c1.download_button("💾 PNG", fp, "mapa.png", "image/png", use_container_width=True)
+                        if fj: c2.download_button("💾 JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
+                    except: pass
 
         # Tabela de Dados
         st.markdown("---")
         st.subheader("Tabela de Dados")
-        if "map_dataframe" in results:
+        if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             csv = results["map_dataframe"].to_csv(index=False).encode('utf-8')
             st.download_button("💾 Exportar CSV", csv, "dados_mapa.csv", "text/csv")
@@ -269,7 +329,7 @@ def render_analysis_results():
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=True)
 
 def render_polygon_drawer():
-    # ... (código existente mantido) ...
+    # ... (Mantido código original do polígono) ...
     st.subheader("Desenhe sua Área de Interesse")
     m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
     Draw(export=False, draw_options={"polygon": {"allowIntersection": False, "showArea": True}, "rectangle": {"allowIntersection": False, "showArea": True}, "circle": False, "marker": False, "polyline": False}, edit_options={"edit": True, "remove": True}).add_to(m)
@@ -277,8 +337,12 @@ def render_polygon_drawer():
     if map_data and map_data.get("all_drawings"):
         drawing = map_data["all_drawings"][-1]
         if drawing["geometry"]["type"] in ["Polygon", "MultiPolygon"]:
-            st.session_state.drawn_geometry = drawing["geometry"]
-            st.success("✅ Polígono capturado!")
-            st.rerun()
+            if st.session_state.get('drawn_geometry') != drawing["geometry"]:
+                st.session_state.drawn_geometry = drawing["geometry"]
+                st.success("✅ Polígono capturado!")
+                st.rerun()
+    elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
+        del st.session_state['drawn_geometry']
+        st.rerun()
 
 if __name__ == "__main__": main()
