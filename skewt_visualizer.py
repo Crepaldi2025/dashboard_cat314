@@ -82,7 +82,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
         # Correção do ValueError: Usar 'is not None' em vez de check booleano direto
         cape_val = f"{cape.magnitude:.0f} J/kg" if cape is not None else "--"
         c1.metric("CAPE", cape_val, 
-            help="Convective Available Potential Energy.\nEnergia potencial disponível para que a parcela suba livremente; valores altos indicam ambiente mais instável.")
+            help="Convective Available Potential Energy.\nEnergia potencial disponível para que a parcela suba livremente. Valores elevados indicam ambiente mais instável.")
         
         cin_val = f"{cin.magnitude:.0f} J/kg" if cin is not None else "--"
         c2.metric("CIN", cin_val, 
@@ -101,7 +101,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
         
         li_val = f"{li.magnitude:.1f}" if li is not None else "--"
         c5.metric("LI", li_val, 
-            help="Diferença de temperatura (Ambiente - Parcela) em 500hPa.\nvalores muito negativos indicam forte instabilidade.")
+            help="Diferença de temperatura (Ambiente - Parcela) em 500hPa.\nValores muito negativos indicam forte instabilidade.")
         
         k_val = f"{k_idx.magnitude:.0f}" if k_idx is not None else "--"
         c6.metric("K-Index", k_val, 
@@ -179,6 +179,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png")
+
 
 
 
