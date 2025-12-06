@@ -9,10 +9,10 @@ import os
 import geobr
 import pandas as pd
 from datetime import date, datetime
-# REMOVIDO: import geopandas as gpd (Causa travamento no boot)
 import tempfile
 import zipfile
 import shutil
+# import warnings # REMOVIDO A PEDIDO (Vamos ver os logs!)
 
 def inicializar_gee():
     try:
@@ -102,13 +102,15 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- FUNÇÃO OTIMIZADA COM IMPORTAÇÃO TARDIA (LAZY IMPORT) ---
+# --- FUNÇÃO OTIMIZADA E MONITORADA ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
+    print(">>> DEBUG: Iniciando processamento do Shapefile...")
+    
     try:
-        # Importação moveu para cá para evitar travamento inicial do app
         import geopandas as gpd
+        print(">>> DEBUG: GeoPandas importado com sucesso.")
     except ImportError:
-        st.error("⚠️ Biblioteca `geopandas` não instalada. Adicione ao requirements.txt.")
+        st.error("⚠️ Biblioteca `geopandas` não instalada.")
         return None, None
 
     try:
@@ -116,6 +118,8 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
             zip_path = os.path.join(tmp_dir, "uploaded.zip")
             with open(zip_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
+            
+            print(">>> DEBUG: Arquivo ZIP salvo temporariamente.")
             
             try:
                 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -132,28 +136,38 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
                         break
             
             if not shp_file:
-                st.error("Erro: Nenhum .shp encontrado no ZIP.")
+                st.error("Erro: Nenhum .shp encontrado.")
                 return None, None
-
-            # Lê com GeoPandas
+            
+            print(f">>> DEBUG: Lendo arquivo: {shp_file}")
+            
+            # LER APENAS GEOMETRIA PRIMEIRO (Para economizar memória)
+            # Otimização 1: Ler arquivo
             gdf = gpd.read_file(shp_file)
 
             if gdf.empty:
                 st.error("Erro: Shapefile vazio.")
                 return None, None
 
-            # Projeção
+            # Otimização 2: Simplificar ANTES de converter CRS (Reduz carga de CPU)
+            # 0.005 graus ~= 500 metros de tolerância (suficiente para visualização macro)
+            print(">>> DEBUG: Simplificando geometrias...")
+            gdf['geometry'] = gdf.geometry.simplify(0.005, preserve_topology=True)
+
+            print(">>> DEBUG: Verificando CRS...")
             if not gdf.crs:
                 st.warning("⚠️ Sem projeção. Assumindo WGS84.")
                 gdf.set_crs("EPSG:4326", inplace=True)
             elif gdf.crs != "EPSG:4326":
+                print(">>> DEBUG: Convertendo CRS para WGS84...")
                 gdf = gdf.to_crs("EPSG:4326")
             
-            # Buffer e Correção (Essencial para Hidrografia)
+            print(">>> DEBUG: Aplicando Buffer (Buffer 0)...")
+            # Buffer 0 é mais leve e corrige topologia. Se for linha, buffer pequeno.
             if any(gdf.geom_type.isin(['LineString', 'MultiLineString'])):
-                gdf['geometry'] = gdf.geometry.buffer(0.002) # Engorda rios
+                gdf['geometry'] = gdf.geometry.buffer(0.002) 
             else:
-                gdf['geometry'] = gdf.geometry.buffer(0) # Corrige polígonos
+                gdf['geometry'] = gdf.geometry.buffer(0)
             
             gdf = gdf[~gdf.is_empty]
             
@@ -161,16 +175,20 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
                 st.error("Geometria inválida.")
                 return None, None
 
+            print(">>> DEBUG: Convertendo para JSON...")
             geojson = json.loads(gdf.to_json())
             
             if not geojson.get('features'):
                 st.error("Erro conversão GeoJSON.")
                 return None, None
 
+            print(">>> DEBUG: Criando objeto Earth Engine...")
             ee_object = ee.FeatureCollection(geojson)
+            
             return ee_object.geometry(), ee_object.union(1).first()
 
     except Exception as e:
+        print(f">>> DEBUG: ERRO CRÍTICO: {e}")
         st.error(f"Erro processamento: {e}")
         return None, None
 
