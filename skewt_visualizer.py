@@ -125,7 +125,6 @@ def render_skewt_plot(df, lat, lon, date, hour):
         | **CIN** (J/kg) | 0 a -50 | -50 a -200 | < -200 | "Tampa" que impede a subida do ar. |
         | **Lifted (LI)** | > 0 | -3 a 0 | < -6 | Instabilidade (T_amb - T_parcela). |
         | **K-Index** | < 20 | 26 a 35 | > 35 | Potencial para trovoadas/chuva. |
-        | **Total Totals** | < 45 | 45 a 55 | > 55 | Severidade geral da tempestade. |
         | **Água Prec.** (mm) | < 25 | 25 a 45 | > 50 | Umidade disponível na coluna. |
         """)
         
@@ -195,6 +194,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png")
+
 
 
 
