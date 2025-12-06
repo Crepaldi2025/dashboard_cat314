@@ -102,21 +102,17 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- NOVA FUNÇÃO: PROCESSAR SHAPEFILE (ZIP) ---
+# --- NOVA FUNÇÃO OTIMIZADA: PROCESSAR SHAPEFILE ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
     try:
-        # Cria diretório temporário
         with tempfile.TemporaryDirectory() as tmp_dir:
-            # Salva o zip
             zip_path = os.path.join(tmp_dir, "uploaded.zip")
             with open(zip_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
             
-            # Extrai
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(tmp_dir)
             
-            # Procura o arquivo .shp
             shp_file = None
             for root, dirs, files in os.walk(tmp_dir):
                 for file in files:
@@ -131,21 +127,34 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
             # Lê com GeoPandas
             gdf = gpd.read_file(shp_file)
             
-            # Converte CRS para WGS84 (padrão GEE)
+            # 1. Garante CRS WGS84
             if gdf.crs != "EPSG:4326":
                 gdf = gdf.to_crs("EPSG:4326")
             
+            # 2. Correção Topológica (buffer(0) conserta nós soltos)
+            gdf['geometry'] = gdf.geometry.buffer(0)
+            
+            # 3. Simplificação (Essencial para não estourar o GEE)
+            # 0.001 graus ~= 111 metros. Reduz drasticamente o tamanho do JSON.
+            gdf['geometry'] = gdf.geometry.simplify(tolerance=0.001, preserve_topology=True)
+            
+            # 4. Remove geometrias vazias
+            gdf = gdf[~gdf.is_empty]
+
             # Converte para GeoJSON
             geojson = json.loads(gdf.to_json())
             
+            if not geojson.get('features'):
+                st.error("Erro: Shapefile vazio ou inválido após processamento.")
+                return None, None
+
             # Cria objeto EE
-            # Se for muito complexo, pode precisar simplificar, mas tentamos direto
             ee_object = ee.FeatureCollection(geojson)
             
-            # Retorna a geometria unificada (para recorte) e a feature collection (para desenho)
+            # Retorna a geometria e o feature para desenho
             geometry = ee_object.geometry()
             
-            # Para visualização, vamos pegar o primeiro feature ou unificar
+            # Para visualização (pega o primeiro feature ou união)
             feature_vis = ee_object.union(1).first() 
             
             return geometry, feature_vis
