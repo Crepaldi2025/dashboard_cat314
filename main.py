@@ -286,7 +286,7 @@ def render_analysis_results():
         with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas dos gráficos"):
             st.markdown("### 📈 Guia de Ferramentas")
             st.markdown("**1️⃣ Barra de Ferramentas (Canto Superior Direito)**")
-            st.markdown("* `📷` **Câmera:** Baixa imagem PNG.\n* `🔍` **Zoom:** Clique e arraste.\n* `✥` **Pan:** Mover gráfico.\n* `🏠` **Casinha:** Resetar.")
+            st.markdown("* `📷` **Câmera:** Baixa o gráfico atual como imagem (PNG).\n* `🔍` **Zoom:** Clique e arraste.\n* `✥` **Pan:** Mover gráfico.\n* `🏠` **Casinha:** Resetar.")
             st.markdown("**2️⃣ Interação**")
             st.markdown("* **Zoom Rápido:** Use botões 1m/1a.\n* **Tooltip:** Passe o mouse para ver valor.")
         
