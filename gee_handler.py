@@ -33,34 +33,13 @@ def initialize_gee(): return inicializar_gee()
 
 # --- VARIÁVEIS ---
 ERA5_VARS = {
-    "Temperatura do Ar (2m)": {
-        "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean",
-        "vis_params": {"min": 0, "max": 45, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000', '#800000'], "caption": "Temperatura (°C)"}
-    },
-    "Temperatura do Ponto de Orvalho (2m)": {
-        "band": "dewpoint_temperature_2m", "result_band": "dewpoint_temperature_2m", "unit": "°C", "aggregation": "mean",
-        "vis_params": {"min": -10, "max": 30, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000'], "caption": "Ponto de Orvalho (°C)"}
-    },
-    "Temperatura da Superfície (Skin)": {
-        "band": "skin_temperature", "result_band": "skin_temperature", "unit": "°C", "aggregation": "mean",
-        "vis_params": {"min": 0, "max": 50, "palette": ['#040274', '#040281', '#0502a3', '#0502b8', '#0502ce', '#0502e6', '#0602ff', '#235cb1', '#307ef3', '#269db1', '#30c8e2', '#32d3ef', '#3be285', '#3ff38f', '#86e26f', '#3ae237', '#b5e22e', '#d6e21f', '#fff705', '#ffd611', '#ffb613', '#ff8b13', '#ff6e08', '#ff500d', '#ff0000', '#de0101', '#c21301', '#a71001', '#911003'], "caption": "Temp. Superfície (°C)"}
-    },
-    "Precipitação Total": {
-        "band": "total_precipitation_sum", "result_band": "total_precipitation_sum", "unit": "mm", "aggregation": "sum",
-        "vis_params": {"min": 0, "max": 500, "palette": ['#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476', '#31A354', '#006D2C', '#08519C', '#08306B'], "caption": "Precipitação (mm)"}
-    },
-    "Umidade Relativa (2m)": {
-        "bands": ["temperature_2m", "dewpoint_temperature_2m"], "result_band": "relative_humidity", "unit": "%", "aggregation": "mean",
-        "vis_params": {"min": 20, "max": 95, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade Relativa (%)"}
-    },
-    "Radiação Solar Incidente": {
-        "band": "surface_solar_radiation_downwards_sum", "result_band": "radiation_wm2", "unit": "W/m²", "aggregation": "mean",
-        "vis_params": {"min": 0, "max": 500, "palette": ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c'], "caption": "Radiação (W/m²)"}
-    },
-    "Velocidade do Vento (10m)": {
-        "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean",
-        "vis_params": {"min": 0, "max": 35, "palette": ['#FFFFFF', '#E6F5FF', '#CDE0F7', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B'], "caption": "Vento (m/s)"}
-    },
+    "Temperatura do Ar (2m)": { "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": 0, "max": 45, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000', '#800000'], "caption": "Temperatura (°C)"} },
+    "Temperatura do Ponto de Orvalho (2m)": { "band": "dewpoint_temperature_2m", "result_band": "dewpoint_temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": -10, "max": 30, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000'], "caption": "Ponto de Orvalho (°C)"} },
+    "Temperatura da Superfície (Skin)": { "band": "skin_temperature", "result_band": "skin_temperature", "unit": "°C", "aggregation": "mean", "vis_params": {"min": 0, "max": 50, "palette": ['#040274', '#040281', '#0502a3', '#0502b8', '#0502ce', '#0502e6', '#0602ff', '#235cb1', '#307ef3', '#269db1', '#30c8e2', '#32d3ef', '#3be285', '#3ff38f', '#86e26f', '#3ae237', '#b5e22e', '#d6e21f', '#fff705', '#ffd611', '#ffb613', '#ff8b13', '#ff6e08', '#ff500d', '#ff0000', '#de0101', '#c21301', '#a71001', '#911003'], "caption": "Temp. Superfície (°C)"} },
+    "Precipitação Total": { "band": "total_precipitation_sum", "result_band": "total_precipitation_sum", "unit": "mm", "aggregation": "sum", "vis_params": {"min": 0, "max": 500, "palette": ['#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476', '#31A354', '#006D2C', '#08519C', '#08306B'], "caption": "Precipitação (mm)"} },
+    "Umidade Relativa (2m)": { "bands": ["temperature_2m", "dewpoint_temperature_2m"], "result_band": "relative_humidity", "unit": "%", "aggregation": "mean", "vis_params": {"min": 20, "max": 95, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade Relativa (%)"} },
+    "Radiação Solar Incidente": { "band": "surface_solar_radiation_downwards_sum", "result_band": "radiation_wm2", "unit": "W/m²", "aggregation": "mean", "vis_params": {"min": 0, "max": 500, "palette": ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c'], "caption": "Radiação (W/m²)"} },
+    "Velocidade do Vento (10m)": { "bands": ['u_component_of_wind_10m', 'v_component_of_wind_10m'], "result_band": "wind_speed", "unit": "m/s", "aggregation": "mean", "vis_params": {"min": 0, "max": 35, "palette": ['#FFFFFF', '#E6F5FF', '#CDE0F7', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B'], "caption": "Vento (m/s)"} },
     "Umidade do Solo (0-7 cm)": { "band": "volumetric_soil_water_layer_1", "result_band": "volumetric_soil_water_layer_1", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (0-7cm)"} },
     "Umidade do Solo (7-28 cm)": { "band": "volumetric_soil_water_layer_2", "result_band": "volumetric_soil_water_layer_2", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (7-28cm)"} },
     "Umidade do Solo (28-100 cm)": { "band": "volumetric_soil_water_layer_3", "result_band": "volumetric_soil_water_layer_3", "unit": "m³/m³", "aggregation": "mean", "vis_params": {"min": 0.0, "max": 1.0, "palette": ['#d73027', '#f46d43', '#fdae61', '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9', '#74add1', '#4575b4'], "caption": "Umidade (28-100cm)"} },
@@ -71,10 +50,10 @@ FALLBACK_UF_MAP = {'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazona
 
 @st.cache_data
 def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
-    arquivo = "municipios_ibge.json"
-    geo_data = defaultdict(list)
-    uf_name_map = {}
     try:
+        arquivo = "municipios_ibge.json"
+        geo_data = defaultdict(list)
+        uf_name_map = {}
         if os.path.exists(arquivo):
             with open(arquivo, 'r', encoding='utf-8') as f:
                 d = json.load(f)
@@ -87,9 +66,10 @@ def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
             elif isinstance(d, dict):
                 geo_data = d.get("municipios_por_uf", {})
                 uf_name_map = d.get("nomes_estados", {})
-    except: pass
-    if not uf_name_map: uf_name_map = FALLBACK_UF_MAP
-    return {uf: sorted(geo_data[uf]) for uf in sorted(geo_data)}, uf_name_map
+        if not uf_name_map: uf_name_map = FALLBACK_UF_MAP
+        return {uf: sorted(geo_data[uf]) for uf in sorted(geo_data)}, uf_name_map
+    except:
+        return {}, FALLBACK_UF_MAP
 
 @st.cache_data
 def _load_all_states_gdf():
@@ -101,14 +81,12 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- FUNÇÃO BLINDADA: Tenta Geometria Real -> Falha -> Usa Bounding Box ---
+# --- FUNÇÃO OTIMIZADA: CONVEX HULL (O segredo para não travar) ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
-    print(">>> [DEBUG] Iniciando Importação de Shapefile...")
-    
     try:
         import geopandas as gpd
     except ImportError:
-        st.error("⚠️ Erro: GeoPandas não instalado.")
+        st.error("Biblioteca `geopandas` não instalada.")
         return None, None
 
     try:
@@ -145,46 +123,33 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
             elif gdf.crs != "EPSG:4326":
                 gdf = gdf.to_crs("EPSG:4326")
 
-            # 3. TENTATIVA 1: Geometria Simplificada
-            try:
-                # Simplifica bastante
-                gdf_simple = gdf.copy()
-                gdf_simple['geometry'] = gdf_simple.geometry.simplify(0.01, preserve_topology=True)
-                
-                # Buffer zero para corrigir topologia
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    gdf_simple['geometry'] = gdf_simple.geometry.buffer(0)
-                
-                # Converte para JSON
-                geojson = json.loads(gdf_simple[['geometry']].to_json())
-                
-                # Tenta criar o objeto EE. Se o JSON for gigante, isso pode falhar.
-                ee_fc = ee.FeatureCollection(geojson)
-                
-                # Testa se é válido pegando a área (ação leve)
-                _ = ee_fc.geometry().area().getInfo()
-                
-                print(">>> [DEBUG] Sucesso com geometria detalhada!")
-                return ee_fc.geometry(), ee_fc.union(1).first()
-
-            except Exception as e:
-                print(f">>> [DEBUG] Falha na geometria detalhada: {e}")
-                print(">>> [DEBUG] Tentando Fallback para Bounding Box...")
-                
-                # 4. TENTATIVA 2 (FALLBACK): Bounding Box (Caixa envolvente)
-                # Isso NUNCA deve falhar por tamanho, pois são apenas 4 pontos.
-                bounds = gdf.total_bounds # [minx, miny, maxx, maxy]
-                
-                # Cria retângulo no GEE
+            # 3. OTIMIZAÇÃO MAXIMA: Envelope Convexo (Convex Hull)
+            # Em vez de desenhar cada curva do rio, desenha o polígono que "embrulha" todos eles.
+            # Isso é absurdamente leve e nunca trava.
+            
+            # Unifica todas as linhas em uma só geometria
+            unified_geom = gdf.unary_union
+            
+            # Calcula o Convex Hull (o "elástico" em volta)
+            convex_hull = unified_geom.convex_hull
+            
+            # Cria um GeoDataFrame simples com esse polígono
+            gdf_simple = gpd.GeoDataFrame({'geometry': [convex_hull]}, crs="EPSG:4326")
+            
+            # Conversão para JSON e EE
+            geojson = json.loads(gdf_simple.to_json())
+            
+            if not geojson.get('features'):
+                # Fallback final se até o convex hull falhar (raro): Bounding Box
+                bounds = gdf.total_bounds
                 ee_geom = ee.Geometry.Rectangle([bounds[0], bounds[1], bounds[2], bounds[3]])
-                ee_feat = ee.Feature(ee_geom, {'label': 'Bounding Box'})
-                
-                st.warning("⚠️ O arquivo shapefile é muito complexo para o navegador. Usando a área retangular envolvente (Bounding Box).")
-                return ee_geom, ee_feat
+                return ee_geom, ee.Feature(ee_geom)
+
+            ee_fc = ee.FeatureCollection(geojson)
+            return ee_fc.geometry(), ee_fc.union(1).first()
 
     except Exception as e:
-        st.error(f"Erro processamento: {e}")
+        st.error(f"Erro processamento leve: {e}")
         return None, None
 
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
@@ -369,4 +334,3 @@ def obter_vis_params_interativo(variavel: str):
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
     return nova_config
-    
