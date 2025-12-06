@@ -242,18 +242,18 @@ def render_analysis_results():
         ui.renderizar_resumo_selecao()
         st.markdown("---")
         cols = st.columns(2)
-        for i, var_name in enumerate(results["data"]):
-            res = results["data"][var_name]
+        for i, var in enumerate(results["data"]):
+            res = results["data"][var]
             with cols[i % 2]:
-                st.markdown(f"**{var_name}**")
-                # CORREÇÃO AQUI: use_column_width=True
-                png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
+                st.markdown(f"**{var}**")
+                # CORREÇÃO AQUI: use_column_width=True para compatibilidade
+                png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_column_width=True) 
                     if cbar: st.image(cbar, use_column_width=True)
                     # Botão de exportação individual
                     try:
-                        title = f"{var_name} {periodo_str} {local_str}"
+                        title = f"{var} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
                         mp = base64.b64decode(png.split(",")[1])
                         jp = base64.b64decode(jpg.split(",")[1])
@@ -261,7 +261,7 @@ def render_analysis_results():
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
                         sub_c1, sub_c2 = st.columns(2)
-                        var_slug = var_name.lower().replace(" ", "_")
+                        var_slug = var.lower().replace(" ", "_")
                         if fp: sub_c1.download_button("💾 PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
                         if fj: sub_c2.download_button("💾 JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
                     except: pass
@@ -274,11 +274,11 @@ def render_analysis_results():
         with st.expander("ℹ️ Ajuda dos Gráficos"): st.markdown("Use a barra no topo do gráfico para zoom e pan.")
         st.markdown("---")
         cols = st.columns(2)
-        for i, var_name in enumerate(results["data"]):
-            res = results["data"][var_name]
+        for i, var in enumerate(results["data"]):
+            res = results["data"][var]
             with cols[i % 2]:
-                st.markdown(f"##### {var_name}")
-                charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
+                st.markdown(f"##### {var}")
+                charts_visualizer.display_time_series_chart(res["time_series_df"], var, res["var_cfg"]["unit"], show_help=False)
         return
 
     # --- RENDERIZAÇÃO PADRÃO (MAPA ÚNICO OU HIDROGRAFIA) ---
@@ -345,43 +345,5 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
-
-# --- ATENÇÃO: AQUI ESTÁ A FUNÇÃO MAIN, NO NÍVEL ZERO DE INDENTAÇÃO ---
-def main():
-    if 'gee_initialized' not in st.session_state:
-        gee_handler.inicializar_gee()
-        st.session_state.gee_initialized = True
-        mensagem_container = st.empty()
-        mensagem_container.success("✅ Conectado ao Google Earth Engine com sucesso!")
-        time.sleep(5)
-        mensagem_container.empty()
-        
-    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
-    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
-    
-    if opcao_menu == "Sobre o Aplicativo":
-        ui.renderizar_pagina_sobre()
-        return
-    
-    ui.renderizar_pagina_principal(opcao_menu)
-    
-    # Ativa desenho de polígono se necessário
-    is_polygon = (
-        opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Sobreposição (Camadas)"] and 
-        st.session_state.get('tipo_localizacao') == "Polígono"
-    )
-        
-    is_running = st.session_state.get("analysis_triggered", False)
-    has_geom = 'drawn_geometry' in st.session_state
-    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
-    
-    if is_polygon and not is_running and not has_geom and not has_res: 
-        render_polygon_drawer()
-    
-    if is_running:
-        st.session_state.analysis_triggered = False 
-        run_full_analysis() 
-    
-    render_analysis_results()
 
 if __name__ == "__main__": main()
