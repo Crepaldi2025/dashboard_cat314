@@ -115,6 +115,22 @@ def render_skewt_plot(df, lat, lon, date, hour):
         c8.metric("EL", el_val, 
             help="Equilibrium Level.\nNível em que a temperatura da parcela volta a igualar a do ambiente, limitando a altura da convecção..")
 
+    # --- TABELA DE REFERÊNCIA (NOVA) ---
+    st.markdown("###") # Espaçamento
+    with st.expander("📚 Tabela de Referência: Limiares de Severidade", expanded=False):
+        st.markdown("""
+        | Índice | Estável / Fraco | Moderado | Forte / Severo | Descrição Rápida |
+        | :--- | :---: | :---: | :---: | :--- |
+        | **CAPE** (J/kg) | < 1000 | 1000 a 2500 | > 2500 | Combustível para a tempestade. |
+        | **CIN** (J/kg) | 0 a -50 | -50 a -200 | < -200 | "Tampa" que impede a subida do ar. |
+        | **Lifted (LI)** | > 0 | -3 a 0 | < -6 | Instabilidade (T_amb - T_parcela). |
+        | **K-Index** | < 20 | 26 a 35 | > 35 | Potencial para trovoadas/chuva. |
+        | **Total Totals** | < 45 | 45 a 55 | > 55 | Severidade geral da tempestade. |
+        | **Água Prec.** (mm) | < 25 | 25 a 45 | > 50 | Umidade disponível na coluna. |
+        """)
+        
+        st.caption("⚠️ **Nota:** Estes valores são referências gerais. Em regiões tropicais (como a Amazônia), valores de CAPE e Água Precipitável costumam ser naturalmente mais altos sem necessariamente indicar tempestades severas.")
+
     # --- 4. PLOTAGEM DO GRÁFICO ---
     fig = plt.figure(figsize=(9, 9))
     skew = SkewT(fig, rotation=45)
@@ -179,6 +195,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png")
+
 
 
 
