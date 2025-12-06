@@ -189,12 +189,33 @@ def render_analysis_results():
             vis_params = gee_handler.obter_vis_params_interativo(variavel)
 
             if tipo_mapa == "Interativo":
-                with st.popover("ℹ️ Ajuda: Botões do Mapa Interativo"):
+                with st.popover("ℹ️ Ajuda: Como usar o Mapa"):
+                    st.markdown("### 🧭 Guia de Botões")
+                    
+                    st.markdown("**1️⃣ Navegação e Visualização**")
                     st.markdown("""
-                    **Controles:** Zoom (+/-), Tela Cheia (⛶), Camadas (🗂️).
-                    **Ferramentas:** Linha (╱), Polígono (⬟), Retângulo (⬛), Círculo (⭕), Marcador (📍), Editar (📝), Lixeira (🗑️).
+                    * `➕` / `➖` **Zoom:** Aproxima ou afasta a visão.
+                    * `⛶` **Tela Cheia:** Expande o mapa para o tamanho do monitor.
+                    * `🗂️` **Camadas:** Escolha entre visualização de **Satélite** ou **Ruas**.
                     """)
-                map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
+                    
+                    st.markdown("**2️⃣ Ferramentas de Desenho**")
+                    st.markdown("""
+                    * `📍` **Marcador:** Coloca um pino num ponto específico.
+                    * `╱` **Linha:** Desenha uma linha (útil para medir distâncias).
+                    * `⬟` **Polígono:** Desenha uma área livre (clique ponto a ponto).
+                    * `⬛` **Retângulo:** Desenha uma área quadrada (clique e arraste).
+                    * `⭕` **Círculo:** Desenha um círculo (clique no centro e arraste).
+                    """)
+                    
+                    st.markdown("**3️⃣ Edição**")
+                    st.markdown("""
+                    * `📝` **Editar:** Permite ajustar os pontos de um desenho existente.
+                    * `🗑️` **Lixeira:** Remove todos os desenhos do mapa.
+                    """)
+                
+                # Renderiza o mapa
+                map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"])
             elif tipo_mapa == "Estático":
                 with st.spinner("Gerando imagem estática com nova escala..."):
                     png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(results["ee_image"], feature, vis_params, var_cfg["unit"])
@@ -307,4 +328,5 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
 
