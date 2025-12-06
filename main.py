@@ -242,17 +242,18 @@ def render_analysis_results():
         ui.renderizar_resumo_selecao()
         st.markdown("---")
         cols = st.columns(2)
-        for i, var_name in enumerate(results["data"]):
-            res = results["data"][var_name]
+        for i, var in enumerate(results["data"]):
+            res = results["data"][var]
             with cols[i % 2]:
-                st.markdown(f"**{var_name}**")
-                # CORREÇÃO AQUI: use_column_width em vez de use_container_width
-                png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
+                st.markdown(f"**{var}**")
+                # CORREÇÃO AQUI: use_column_width=True para compatibilidade
+                png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_column_width=True) 
                     if cbar: st.image(cbar, use_column_width=True)
+                    # Botão de exportação individual
                     try:
-                        title = f"{var_name} {periodo_str} {local_str}"
+                        title = f"{var} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
                         mp = base64.b64decode(png.split(",")[1])
                         jp = base64.b64decode(jpg.split(",")[1])
@@ -260,7 +261,7 @@ def render_analysis_results():
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
                         sub_c1, sub_c2 = st.columns(2)
-                        var_slug = var_name.lower().replace(" ", "_")
+                        var_slug = var.lower().replace(" ", "_")
                         if fp: sub_c1.download_button("💾 PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
                         if fj: sub_c2.download_button("💾 JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
                     except: pass
@@ -273,11 +274,11 @@ def render_analysis_results():
         with st.expander("ℹ️ Ajuda dos Gráficos"): st.markdown("Use a barra no topo do gráfico para zoom e pan.")
         st.markdown("---")
         cols = st.columns(2)
-        for i, var_name in enumerate(results["data"]):
-            res = results["data"][var_name]
+        for i, var in enumerate(results["data"]):
+            res = results["data"][var]
             with cols[i % 2]:
-                st.markdown(f"##### {var_name}")
-                charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
+                st.markdown(f"##### {var}")
+                charts_visualizer.display_time_series_chart(res["time_series_df"], var, res["var_cfg"]["unit"], show_help=False)
         return
 
     # --- RENDERIZAÇÃO PADRÃO (MAPA ÚNICO OU HIDROGRAFIA) ---
@@ -301,9 +302,9 @@ def render_analysis_results():
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
                 if png:
-                    # CORREÇÃO AQUI: use_column_width em vez de use_container_width
-                    st.image(png, width=500) 
-                    if cbar: st.image(cbar, width=500)
+                    # CORREÇÃO AQUI: use_column_width=True
+                    st.image(png, use_column_width=True) 
+                    if cbar: st.image(cbar, use_column_width=True)
                     
                     try:
                         title = f"{st.session_state.variavel} {periodo_str} {local_str}"
