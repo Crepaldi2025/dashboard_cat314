@@ -66,9 +66,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         st.markdown("---")
 
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
+        # (ATUALIZADO: Adicionei "Múltiplas Séries")
         st.radio(
             "Modo de Visualização",
-            ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Skew-T", "Sobre o Aplicativo"],
+            ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Skew-T", "Sobre o Aplicativo"],
             label_visibility="collapsed", 
             key='nav_option',
             on_change=reset_analysis_state
@@ -76,7 +77,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         
         opcao = st.session_state.get('nav_option', 'Mapas')
 
-        # --- OPÇÃO SKEW-T (MANTIDA ORIGINAL) ---
+        # --- OPÇÃO SKEW-T ---
         if opcao == "Skew-T":
             st.markdown("### 🌪️ Diagrama Skew-T")
             st.info("Gera um perfil vertical da atmosfera (Sondagem).")
@@ -97,7 +98,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY", on_change=reset_analysis_state)
             st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC (3 horas à frente de Brasília).", on_change=reset_analysis_state)
 
-            # --- NOTA EXPLICATIVA SOBRE O LIMITE DE DATA ---
             st.caption("ℹ️ **Nota:** Dados de altitude (pressão) disponíveis apenas a partir de **23/03/2021** (limite histórico do modelo GFS). Para datas anteriores, apenas dados de superfície estão disponíveis.")
 
             st.divider()
@@ -108,8 +108,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 on_click=lambda: st.session_state.update(analysis_triggered=True)
             )
 
-        # --- OPÇÕES MAPAS, MÚLTIPLOS E SÉRIES ---
-        elif opcao in ["Mapas", "Múltiplos Mapas", "Séries Temporais"]:
+        # --- OPÇÕES GERAIS (MAPAS E SÉRIES) ---
+        elif opcao in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
             # --- 3. BASE DE DADOS ---
@@ -141,8 +141,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 "Radiação Solar Incidente"
             ]
 
-            if opcao == "Múltiplos Mapas":
-                # Seleção Múltipla (SEM O LIMITE NATIVO EM INGLÊS)
+            # Lógica de seleção múltipla ou única
+            if opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                 vars_sel = st.multiselect(
                     "Selecione até 4 variáveis:", 
                     lista_vars, 
@@ -151,11 +151,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     on_change=reset_analysis_state
                 )
                 
-                # Validação Manual em Português
                 if len(vars_sel) > 4:
-                    st.warning(f"⚠️ Você selecionou {len(vars_sel)} variáveis. O limite estabelecido para esta análise é de 4")
+                    st.warning(f"⚠️ Você selecionou {len(vars_sel)} variáveis. O limite recomendado é 4 para não travar o sistema.", icon="🛑")
             else:
-                # Seleção Única (PADRÃO)
                 st.selectbox(
                     "Selecione a Variável", 
                     lista_vars, 
@@ -198,61 +196,32 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 
-                # --- AJUDA DIDÁTICA CÍRCULO ---
                 with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
                     st.markdown("### 🎯 Como preencher os dados?")
-                    
                     st.markdown("#### 1️⃣ Coordenadas (Latitude e Longitude)")
-                    st.markdown("""
-                    Devem estar em **Graus Decimais** (ex: `-22.42`).
-                    * **Dica:** No Google Maps, clique com o botão direito no local desejado. Os primeiros números que aparecem são a Lat e Lon. Clique neles para copiar.
-                    """)
-                    
+                    st.markdown("Devem estar em **Graus Decimais** (ex: `-22.42`).\n* **Dica:** No Google Maps, clique com o botão direito no local desejado para copiar.")
                     st.markdown("#### 2️⃣ Raio")
-                    st.markdown("""
-                    Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.
-                    * **Exemplo:** `10` cria uma área de 10km ao redor do ponto central.
-                    """)
+                    st.markdown("Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.")
                 
-                # Aviso de redesenho
                 st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o círculo.</div>", unsafe_allow_html=True)
             
             elif tipo_loc == "Polígono":
-                # 1. Feedback visual se já existe polígono
                 if st.session_state.get('drawn_geometry'): 
                     st.success("✅ Polígono Definido", icon="🛡️")
                 else: 
                     st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
                 
-                # 2. Guia de Ferramentas (LISTA VERTICAL DETALHADA)
                 with st.popover("ℹ️ Guia de Ferramentas"): 
                     st.markdown("### 🧭 Guia de Uso")
-                    
                     st.markdown("**🎛️ Controles de Visualização**")
-                    st.markdown("""
-                    * `➕` `➖` **Zoom:** Aproxima ou afasta a visão.
-                    * `⛶` **Tela Cheia:** Expande o mapa para o tamanho do monitor.
-                    * `🗂️` **Camadas:** Alterna entre Satélite e Mapa de Ruas.
-                    """)
-                    
+                    st.markdown("* `➕` `➖` **Zoom:** Aproxima ou afasta a visão.\n* `⛶` **Tela Cheia:** Expande o mapa.\n* `🗂️` **Camadas:** Alterna entre Satélite e Mapa de Ruas.")
                     st.markdown("---")
                     st.markdown("**✏️ Ferramentas de Desenho**")
-                    st.markdown("""
-                    * `⬟` **Polígono:** Clique ponto a ponto para fechar uma área livre.
-                    * `⬛` **Retângulo:** Clique e arraste para criar uma área quadrada.
-                    * `⭕` **Círculo:** Clique no centro e arraste para definir o raio.
-                    * `📍` **Marcador:** Adiciona um pino em um local específico.
-                    * `╱` **Linha:** Desenha uma linha (útil para medir distâncias).
-                    """)
-
+                    st.markdown("* `⬟` **Polígono:** Clique ponto a ponto para fechar uma área livre.\n* `⬛` **Retângulo:** Clique e arraste para criar uma área quadrada.\n* `⭕` **Círculo:** Clique no centro e arraste para definir o raio.\n* `📍` **Marcador:** Adiciona um pino em um local específico.\n* `╱` **Linha:** Desenha uma linha (útil para medir distâncias).")
                     st.markdown("---")
                     st.markdown("**🛠️ Edição e Limpeza**")
-                    st.markdown("""
-                    * `📝` **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.
-                    * `🗑️` **Lixeira:** Apaga todos os desenhos feitos no mapa.
-                    """)
+                    st.markdown("* `📝` **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.\n* `🗑️` **Lixeira:** Apaga todos os desenhos feitos no mapa.")
                 
-                # 3. Inserção Manual de Coordenadas
                 with st.expander("📝 Inserir Coordenadas Manualmente"):
                     st.caption("Cole as coordenadas abaixo (formato: `Latitude, Longitude`), uma por linha.")
                     texto_coords = st.text_area("Coordenadas:", height=150, placeholder="-22.123, -45.123\n-22.150, -45.100\n-22.200, -45.200")
@@ -262,32 +231,21 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                             pontos = []
                             linhas = texto_coords.strip().split('\n')
                             for linha in linhas:
-                                # Remove espaços e quebra por vírgula ou ponto e vírgula
                                 partes = linha.replace(';', ',').split(',')
                                 if len(partes) >= 2:
                                     lat = float(partes[0].strip())
                                     lon = float(partes[1].strip())
-                                    # GeoJSON exige [Longitude, Latitude]
                                     pontos.append([lon, lat])
                             
                             if len(pontos) < 3:
                                 st.error("⚠️ Um polígono precisa de pelo menos 3 pontos.")
                             else:
-                                # Fechar o polígono se o último ponto não for igual ao primeiro
                                 if pontos and pontos[0] != pontos[-1]:
                                     pontos.append(pontos[0])
-                                
-                                # Cria a geometria GeoJSON
-                                geometria_manual = {
-                                    "type": "Polygon",
-                                    "coordinates": [pontos]
-                                }
-                                
-                                # Salva na sessão e recarrega
+                                geometria_manual = {"type": "Polygon", "coordinates": [pontos]}
                                 st.session_state.drawn_geometry = geometria_manual
                                 st.success("Polígono processado com sucesso!")
                                 st.rerun()
-                                
                         except ValueError:
                             st.error("❌ Erro no formato. Certifique-se de usar apenas números e vírgulas/pontos.")
                         except Exception as e:
@@ -300,11 +258,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             opcoes_periodo = ["Personalizado", "Mensal", "Anual"]
             
-            # Horário específico disponível para Mapas e Múltiplos Mapas
             if opcao in ["Mapas", "Múltiplos Mapas"]: 
                 opcoes_periodo.append("Horário Específico")
             
-            # Seletor de Tipo de Período
             if opcao in ["Mapas", "Múltiplos Mapas"]:
                 st.selectbox("Tipo de Período", opcoes_periodo, key='tipo_periodo', on_change=reset_analysis_state, label_visibility="collapsed")
             else:
@@ -340,10 +296,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             elif tipo_per == "Horário Específico":
                 hoje = datetime.now()
                 data_padrao = hoje - relativedelta(months=4)
-                
                 st.date_input("Data", value=data_padrao, min_value=min_data, max_value=max_data, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
                 st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC (3 horas à frente de Brasília).")
-                
                 st.info("ℹ️ **Nota:** Esta opção retorna um dado pontual (snapshot) apenas para a hora escolhida.", icon="🕒")
             
             st.divider()
@@ -355,16 +309,17 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.divider()
             elif opcao == "Múltiplos Mapas":
                 st.info("ℹ️ Modo Múltiplo gera mapas estáticos para comparação.")
+            elif opcao == "Múltiplas Séries":
+                st.info("ℹ️ Gera múltiplos gráficos simultâneos.")
 
             # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
             
-            # Verificar se selecionou variáveis no modo múltiplo e se respeita o limite
-            if opcao == "Múltiplos Mapas":
+            # Verificar se selecionou variáveis no modo múltiplo
+            if opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                 vars_sel = st.session_state.get("variaveis_multiplas", [])
-                # Bloqueia se vazio OU se tiver mais de 4
                 if not vars_sel or len(vars_sel) > 4:
                     disable = True
 
@@ -385,7 +340,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     unsafe_allow_html=True
                 )
             else:
-                if opcao == "Múltiplos Mapas":
+                if opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                     vars_sel = st.session_state.get("variaveis_multiplas", [])
                     if not vars_sel:
                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
@@ -441,13 +396,12 @@ def renderizar_resumo_selecao():
                 st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
         return
 
-    # --- LÓGICA PARA MAPAS (ÚNICO E MÚLTIPLO) E SÉRIES ---
-    # Se for "Múltiplos Mapas", lista explicitamente as variáveis (CORRIGIDO PARA PULAR LINHA)
+    # --- LÓGICA PARA MAPAS E SÉRIES ---
+    # Se for Múltiplo (Mapa ou Série), lista as variáveis
     label_titulo = "Variável:"
-    if nav_option == "Múltiplos Mapas":
+    if nav_option in ["Múltiplos Mapas", "Múltiplas Séries"]:
         vars_selected = st.session_state.get("variaveis_multiplas", [])
         if not vars_selected: return
-        # Usa dois espaços + \n para forçar quebra de linha visual no Markdown
         var_text = "  \n".join([f"• {v}" for v in vars_selected])
         label_titulo = "Variáveis:"
     else:
@@ -500,4 +454,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
