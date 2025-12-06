@@ -147,14 +147,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     "Selecione até 4 variáveis:", 
                     lista_vars, 
                     default=["Temperatura do Ar (2m)", "Precipitação Total"],
-                    # max_selections=4,  <-- REMOVIDO PARA EVITAR MENSAGEM EM INGLÊS
                     key='variaveis_multiplas',
                     on_change=reset_analysis_state
                 )
                 
                 # Validação Manual em Português
                 if len(vars_sel) > 4:
-                    st.warning(f"⚠️ Você selecionou {len(vars_sel)} variáveis. O limite recomendado é 4")
+                    st.warning(f"⚠️ Você selecionou {len(vars_sel)} variáveis. O limite recomendado é 4 para não travar o sistema.", icon="🛑")
             else:
                 # Seleção Única (PADRÃO)
                 st.selectbox(
@@ -443,11 +442,11 @@ def renderizar_resumo_selecao():
         return
 
     # --- LÓGICA PARA MAPAS (ÚNICO E MÚLTIPLO) E SÉRIES ---
-    # Se for "Múltiplos Mapas", ajustamos o texto da variável
+    # Se for "Múltiplos Mapas", lista explicitamente as variáveis
     if nav_option == "Múltiplos Mapas":
         vars_selected = st.session_state.get("variaveis_multiplas", [])
         if not vars_selected: return
-        var_text = f"{len(vars_selected)} variáveis selecionadas"
+        var_text = "\n".join([f"• {v}" for v in vars_selected])
     else:
         if "variavel" not in st.session_state: return
         var_text = st.session_state.variavel
@@ -498,4 +497,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
