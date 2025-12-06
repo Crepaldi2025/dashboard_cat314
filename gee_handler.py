@@ -102,7 +102,7 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- NOVA FUNÇÃO OTIMIZADA: PROCESSAR SHAPEFILE ---
+# --- FUNÇÃO OTIMIZADA E SEGURA PARA SHAPEFILE ---
 def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -110,8 +110,12 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
             with open(zip_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
             
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(tmp_dir)
+            try:
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(tmp_dir)
+            except zipfile.BadZipFile:
+                st.error("Erro: O arquivo enviado não é um ZIP válido.")
+                return None, None
             
             shp_file = None
             for root, dirs, files in os.walk(tmp_dir):
@@ -121,31 +125,47 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
                         break
             
             if not shp_file:
-                st.error("Erro: Nenhum arquivo .shp encontrado no ZIP.")
+                st.error("Erro: Nenhum arquivo .shp encontrado dentro do ZIP.")
                 return None, None
 
             # Lê com GeoPandas
-            gdf = gpd.read_file(shp_file)
+            try:
+                gdf = gpd.read_file(shp_file)
+            except Exception as e:
+                st.error(f"Erro ao ler o shapefile (Geopandas): {e}")
+                return None, None
+
+            if gdf.empty:
+                st.error("Erro: O arquivo Shapefile está vazio (0 feições).")
+                return None, None
+
+            # Tratamento de CRS (Projeção)
+            if not gdf.crs:
+                st.warning("⚠️ Shapefile sem projeção (.prj). Assumindo WGS84 (EPSG:4326).")
+                gdf.set_crs("EPSG:4326", inplace=True)
+            elif gdf.crs != "EPSG:4326":
+                try:
+                    gdf = gdf.to_crs("EPSG:4326")
+                except Exception as e:
+                    st.error(f"Erro ao converter projeção: {e}")
+                    return None, None
             
-            # 1. Garante CRS WGS84
-            if gdf.crs != "EPSG:4326":
-                gdf = gdf.to_crs("EPSG:4326")
-            
-            # 2. Correção Topológica (buffer(0) conserta nós soltos)
+            # Correção Topológica Leve (Buffer 0) - Resolve nós soltos sem deformar
             gdf['geometry'] = gdf.geometry.buffer(0)
             
-            # 3. Simplificação (Essencial para não estourar o GEE)
-            # 0.001 graus ~= 111 metros. Reduz drasticamente o tamanho do JSON.
-            gdf['geometry'] = gdf.geometry.simplify(tolerance=0.001, preserve_topology=True)
-            
-            # 4. Remove geometrias vazias
+            # Remove geometrias inválidas ou vazias
             gdf = gdf[~gdf.is_empty]
+            gdf = gdf[gdf.geometry.is_valid]
+
+            if gdf.empty:
+                st.error("Erro: Todas as geometrias são inválidas após correção.")
+                return None, None
 
             # Converte para GeoJSON
             geojson = json.loads(gdf.to_json())
             
             if not geojson.get('features'):
-                st.error("Erro: Shapefile vazio ou inválido após processamento.")
+                st.error("Erro: GeoJSON vazio.")
                 return None, None
 
             # Cria objeto EE
@@ -153,14 +173,12 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
             
             # Retorna a geometria e o feature para desenho
             geometry = ee_object.geometry()
-            
-            # Para visualização (pega o primeiro feature ou união)
             feature_vis = ee_object.union(1).first() 
             
             return geometry, feature_vis
 
     except Exception as e:
-        st.error(f"Erro ao processar Shapefile: {e}")
+        st.error(f"Erro genérico no processamento: {e}")
         return None, None
 
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
