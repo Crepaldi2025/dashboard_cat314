@@ -202,8 +202,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 else: 
                     st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
                 
-                # 2. Guia de Ferramentas (Horizontal)
-                
+                # 2. Guia de Ferramentas (LISTA VERTICAL DETALHADA)
                 with st.popover("ℹ️ Guia de Ferramentas"): 
                     st.markdown("### 🧭 Guia de Uso")
                     
@@ -230,6 +229,43 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     * `📝` **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.
                     * `🗑️` **Lixeira:** Apaga todos os desenhos feitos no mapa.
                     """)
+                
+                # 3. Inserção Manual de Coordenadas
+                with st.expander("📝 Inserir Coordenadas Manualmente"):
+                    st.caption("Cole as coordenadas abaixo (formato: `Latitude, Longitude`), uma por linha.")
+                    texto_coords = st.text_area("Coordenadas:", height=150, placeholder="-22.123, -45.123\n-22.150, -45.100\n-22.200, -45.200")
+                    
+                    if st.button("Processar Coordenadas"):
+                        try:
+                            pontos = []
+                            linhas = texto_coords.strip().split('\n')
+                            for linha in linhas:
+                                partes = linha.replace(';', ',').split(',')
+                                if len(partes) >= 2:
+                                    lat = float(partes[0].strip())
+                                    lon = float(partes[1].strip())
+                                    pontos.append([lon, lat])
+                            
+                            if len(pontos) < 3:
+                                st.error("⚠️ Um polígono precisa de pelo menos 3 pontos.")
+                            else:
+                                if pontos and pontos[0] != pontos[-1]:
+                                    pontos.append(pontos[0])
+                                
+                                geometria_manual = {
+                                    "type": "Polygon",
+                                    "coordinates": [pontos]
+                                }
+                                st.session_state.drawn_geometry = geometria_manual
+                                st.success("Polígono processado com sucesso!")
+                                st.rerun()
+                                
+                        except ValueError:
+                            st.error("❌ Erro no formato. Use apenas números e vírgulas/pontos.")
+                        except Exception as e:
+                            st.error(f"❌ Erro ao processar: {e}")
+            st.divider()
+                
                 # 3. NOVO: INSERÇÃO MANUAL DE COORDENADAS
                
                 with st.expander("📝 Inserir Coordenadas Manualmente"):
@@ -450,6 +486,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
