@@ -156,6 +156,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.selectbox("1ª Camada (Base):", lista_vars, index=0, key='var_camada_1', on_change=reset_analysis_state)
                 st.selectbox("2ª Camada (Topo):", lista_vars, index=3, key='var_camada_2', on_change=reset_analysis_state)
                 
+                # --- NOVOS CONTROLES DE OPACIDADE ---
+                st.markdown("🎚️ **Transparência das Camadas**")
+                c_op1, c_op2 = st.columns(2)
+                # Note: Slider retorna valor float entre 0.0 e 1.0. reset_analysis_results_only força redesenho sem recarregar GEE.
+                with c_op1: st.slider("Base", 0.0, 1.0, 1.0, key='opacity_1', help="1.0 = Totalmente Visível", on_change=reset_analysis_results_only)
+                with c_op2: st.slider("Topo", 0.0, 1.0, 0.6, key='opacity_2', help="0.0 = Invisível", on_change=reset_analysis_results_only)
+                
             else:
                 # Seleção Única (Padrão)
                 st.selectbox(
@@ -315,7 +322,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             elif opcao == "Múltiplas Séries":
                 st.info("ℹ️ Gera múltiplos gráficos simultâneos.")
             elif opcao == "Sobreposição (Camadas)":
-                st.info("ℹ️ Permite ver duas variáveis juntas com transparência.")
+                st.info("ℹ️ Ajuste a transparência acima para ver as duas camadas.")
 
             # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
