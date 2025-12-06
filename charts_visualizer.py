@@ -64,7 +64,6 @@ def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
         df.to_excel(writer, index=False, sheet_name='Dados')
     return excel_buffer.getvalue()
 
-# --- ATUALIZAÇÃO AQUI: show_help adicionado ---
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_help: bool = True):
     st.markdown("""<style>div[data-testid="stMetricValue"] { font-size: 1.1rem; }</style>""", unsafe_allow_html=True)
     
@@ -92,13 +91,26 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     # 1. Gráfico
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
+        
+        # Ajuste de margem
         fig.update_layout(margin=dict(t=40, l=60, r=30, b=60))
+        
         st.plotly_chart(fig, use_container_width=True)
         
-        # Título para Download
+        # Preparação para Download (Modifica figura na memória)
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
         data_fim = df_clean['date'].max().strftime('%d/%m/%Y')
-        fig.update_layout(title=dict(text=f"<b>Série Temporal de {variable}</b><br><sup>({data_ini} a {data_fim})</sup>", font=dict(size=24), x=0, y=0.95))
+        
+        fig.update_layout(
+            title=dict(
+                text=f"<b>Série Temporal de {variable}</b><br><sup>({data_ini} a {data_fim})</sup>",
+                font=dict(size=24),
+                x=0, 
+                y=0.95,
+                xanchor='left',
+                yanchor='top'
+            )
+        )
         
     except Exception as e:
         st.error(f"Erro ao plotar gráfico: {e}")
@@ -111,33 +123,77 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     try:
         img_png = fig.to_image(format="png", width=1200, height=800, scale=2)
         img_jpg = fig.to_image(format="jpeg", width=1200, height=800, scale=2)
-        with col_img1: st.download_button("📷 Baixar (PNG)", data=img_png, file_name=f"grafico_{variable_clean}.png", mime="image/png", use_container_width=True)
-        with col_img2: st.download_button("📷 Baixar (JPG)", data=img_jpg, file_name=f"grafico_{variable_clean}.jpg", mime="image/jpeg", use_container_width=True)
+        
+        with col_img1: st.download_button("📷 Baixar Gráfico (PNG)", data=img_png, file_name=f"grafico_{variable_clean}.png", mime="image/png", use_container_width=True)
+        with col_img2: st.download_button("📷 Baixar Gráfico (JPG)", data=img_jpg, file_name=f"grafico_{variable_clean}.jpg", mime="image/jpeg", use_container_width=True)
     except (ValueError, RuntimeError):
-        with col_img1: st.warning("⚠️ Erro no servidor de imagem.")
+        with col_img1: st.warning("⚠️ Instale `kaleido` ou verifique o servidor para baixar imagens.")
 
-    # 3. GUIA DE ÍCONES (CONDICIONAL)
+    # 3. GUIA DE ÍCONES E AJUDA (COMPLETO E DETALHADO)
     if show_help:
-        with st.expander("ℹ️ Ajuda: Entenda os ícones do gráfico"):
+        with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
+            st.markdown("### 📈 Guia de Ferramentas")
+            
+            st.markdown("**1️⃣ Barra de Ferramentas (Canto Superior Direito)**")
             st.markdown("""
-            Ao passar o mouse sobre o gráfico (canto superior direito):
-            * 📷 **Câmera:** Baixa imagem PNG.
-            * 🔍 **Zoom:** Clique e arraste para aproximar.
-            * 🏠 **Casinha:** Reseta o gráfico para o original.
-            * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `1a` (Ano) ou `Tudo`.
+            * `📷` **Câmera:** Baixa o gráfico atual como imagem (PNG).
+            * `🔍` **Zoom:** Clique e arraste na tela para aproximar uma área específica.
+            * `✥` **Pan (Mover):** Clique e arraste para mover o gráfico para os lados.
+            * `➕` / `➖` **Zoom In/Out:** Aproxima ou afasta a visualização centralizada.
+            * `🏠` **Casinha (Reset):** Retorna o gráfico para a visualização original.
+            * `🔲` **Autoscale:** Ajusta os eixos automaticamente para caber todos os dados.
+            """)
+            
+            st.markdown("**2️⃣ Interação e Atalhos**")
+            st.markdown("""
+            * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
+            * **Valor Exato:** Passe o mouse sobre a linha azul para ver a data e o valor exato (Tooltip).
+            * **Tela Cheia:** Passe o mouse no gráfico e procure o ícone `⛶` para expandir.
             """)
 
-    # 4. Estatísticas
-    if show_help: # Opcional: esconder stats simples nas múltiplas se quiser, mas vou manter
-        st.markdown("#### Estatísticas")
+    # 4. Estatísticas (Sempre visível em séries únicas, opcional ocultar se quiser nas múltiplas)
+    if show_help:
+        st.markdown("#### Estatísticas do Período")
         media, maximo, minimo = df_clean['value'].mean(), df_clean['value'].max(), df_clean['value'].min()
-        c1, c2, c3 = st.columns(3)
+        amplitude, desvio = maximo - minimo, df_clean['value'].std()
+
+        c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Média", f"{media:.1f} {unit}")
         c2.metric("Máxima", f"{maximo:.1f} {unit}")
         c3.metric("Mínima", f"{minimo:.1f} {unit}")
+        c4.metric("Amplitude", f"{amplitude:.1f} {unit}", help="Diferença entre Máximo e Mínimo.")
+        c5.metric("Desvio Padrão", f"{desvio:.1f}", help="Dispersão dos dados em relação à média.")
     
-    # 5. Exportar Dados (CSV/Excel)
-    if show_help: # Nas multiplas, talvez não queira 4 tabelas gigantes, mas o botão de download é util
-        st.caption("Exportar Dados:")
-        csv_data = df_clean.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
-        st.download_button("💾 CSV", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv")
+    # 5. Tabela Profissional e Exportação
+    if show_help:
+        st.markdown("---")
+        st.subheader("Tabela de Dados") 
+        
+        variable_label = variable.split(" (")[0]
+        col_name_display = f"{variable_label} ({unit})"
+        
+        df_export = df_clean.rename(columns={'date': 'Data', 'value': col_name_display})
+        
+        if pd.api.types.is_datetime64tz_dtype(df_export['Data']):
+            df_export['Data'] = df_export['Data'].dt.tz_localize(None)
+        
+        st.dataframe(
+            df_export,
+            use_container_width=True,
+            height=400,
+            hide_index=True,
+            column_config={
+                "Data": st.column_config.DateColumn("Data da Leitura", format="DD/MM/YYYY", width="medium"),
+                col_name_display: st.column_config.NumberColumn(col_name_display, format="%.2f " + unit, width="medium")
+            }
+        )
+
+        st.subheader("Exportar Dados")
+        csv_data = df_export.to_csv(index=False, encoding='utf-8-sig', date_format='%d/%m/%Y')
+        try: excel_data = _convert_df_to_excel(df_export)
+        except: excel_data = None
+        
+        cex1, cex2 = st.columns(2)
+        with cex1: st.download_button("Exportar CSV (Dados)", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
+        with cex2: 
+            if excel_data: st.download_button("Exportar XLSX (Dados)", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
