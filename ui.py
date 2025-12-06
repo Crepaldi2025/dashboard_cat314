@@ -207,7 +207,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.markdown("⬟ **Polígono (Livre)** &nbsp;&nbsp; ⬛ **Retângulo (Quadrado)** &nbsp;&nbsp; 📝 **Editar** &nbsp;&nbsp; 🗑️ **Lixeira**")
 
                 # 3. NOVO: INSERÇÃO MANUAL DE COORDENADAS
-                st.markdown("---")
+               
                 with st.expander("📝 Inserir Coordenadas Manualmente"):
                     st.caption("Cole as coordenadas abaixo (formato: `Latitude, Longitude`), uma por linha.")
                     texto_coords = st.text_area("Coordenadas:", height=150, placeholder="-22.123, -45.123\n-22.150, -45.100\n-22.200, -45.200")
@@ -426,6 +426,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
