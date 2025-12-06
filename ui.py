@@ -154,7 +154,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 
                 # Validação Manual em Português
                 if len(vars_sel) > 4:
-                    st.warning(f"⚠️ Você selecionou {len(vars_sel)} variáveis. O limite recomendado é 4 para não travar o sistema.", icon="🛑")
+                    st.warning(f"⚠️ Você selecionou {len(vars_sel)} variáveis. O limite recomendado é 4")
             else:
                 # Seleção Única (PADRÃO)
                 st.selectbox(
@@ -498,3 +498,4 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
