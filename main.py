@@ -121,6 +121,13 @@ def render_analysis_results():
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             ui.renderizar_resumo_selecao()
+            st.markdown("""
+            <style>
+            div[data-testid="stMetricValue"] {
+                font-size: 1.1rem !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
             res = st.session_state.skewt_results
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
@@ -300,3 +307,4 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
