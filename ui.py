@@ -196,22 +196,60 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o círculo.</div>", unsafe_allow_html=True)
             
             elif tipo_loc == "Polígono":
-                if st.session_state.get('drawn_geometry'): st.success("✅ Polígono Definido", icon="🛡️")
+                # 1. Feedback visual se já existe polígono
+                if st.session_state.get('drawn_geometry'): 
+                    st.success("✅ Polígono Definido", icon="🛡️")
+                    if st.button("🗑️ Limpar Polígono", key="btn_limpar_poly"):
+                        del st.session_state['drawn_geometry']
+                        st.rerun()
                 else: 
-                    #st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.</div>", unsafe_allow_html=True)
                     st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
-                with st.popover("ℹ️ Guia de Ferramentas"): st.markdown("""
-                    **Navegação:**
-                    * ➕ **Zoom In:** Aproxima a visualização do mapa.
-                    * ➖ **Zoom Out:** Afasta a visualização do mapa.
+                
+                # 2. Guia de Ferramentas (Horizontal)
+                with st.popover("ℹ️ Guia de Ferramentas"): 
+                    st.markdown("⬟ **Polígono (Livre)** &nbsp;&nbsp; ⬛ **Retângulo (Quadrado)** &nbsp;&nbsp; 📝 **Editar** &nbsp;&nbsp; 🗑️ **Lixeira**")
 
-                    **Desenho:**
-                    * ⬟ **Polígono:** Clique ponto a ponto para fechar uma área livre.
-                    * ⬛ **Retângulo:** Clique e arraste para criar uma área quadrada.
-                    * ⭕ **Círculo:** Clique no centro e arraste para definir o tamanho.
-                    * 📝 **Editar:** Permite ajustar os pontos de um desenho já feito.
-                    * 🗑️ **Lixeira:** Apaga o desenho atual para começar de novo.
-                    """)
+                # 3. NOVO: INSERÇÃO MANUAL DE COORDENADAS
+                st.markdown("---")
+                with st.expander("📝 Inserir Coordenadas Manualmente"):
+                    st.caption("Cole as coordenadas abaixo (formato: `Latitude, Longitude`), uma por linha.")
+                    texto_coords = st.text_area("Coordenadas:", height=150, placeholder="-22.123, -45.123\n-22.150, -45.100\n-22.200, -45.200")
+                    
+                    if st.button("Processar Coordenadas"):
+                        try:
+                            pontos = []
+                            linhas = texto_coords.strip().split('\n')
+                            for linha in linhas:
+                                # Remove espaços e quebra por vírgula ou ponto e vírgula
+                                partes = linha.replace(';', ',').split(',')
+                                if len(partes) >= 2:
+                                    lat = float(partes[0].strip())
+                                    lon = float(partes[1].strip())
+                                    # GeoJSON exige [Longitude, Latitude]
+                                    pontos.append([lon, lat])
+                            
+                            if len(pontos) < 3:
+                                st.error("⚠️ Um polígono precisa de pelo menos 3 pontos.")
+                            else:
+                                # Fechar o polígono se o último ponto não for igual ao primeiro
+                                if points and pontos[0] != pontos[-1]:
+                                    pontos.append(pontos[0])
+                                
+                                # Cria a geometria GeoJSON
+                                geometria_manual = {
+                                    "type": "Polygon",
+                                    "coordinates": [pontos]
+                                }
+                                
+                                # Salva na sessão e recarrega
+                                st.session_state.drawn_geometry = geometria_manual
+                                st.success("Polígono processado com sucesso!")
+                                st.rerun()
+                                
+                        except ValueError:
+                            st.error("❌ Erro no formato. Certifique-se de usar apenas números e vírgulas/pontos.")
+                        except Exception as e:
+                            st.error(f"❌ Erro ao processar: {e}")
             
             st.divider()
 
@@ -391,6 +429,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
