@@ -20,13 +20,13 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 import folium 
-import gee_handler # Para vis params
+import gee_handler
 
 # ------------------------------------------------------------------
-# 0. MAPA DE SOBREPOSIÇÃO (OVERLAY) - ATUALIZADO
+# 0. MAPA DE SOBREPOSIÇÃO (OVERLAY + SPLIT MAP)
 # ------------------------------------------------------------------
 
-def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, feature: ee.Feature, opacity1: float = 1.0, opacity2: float = 0.6):
+def create_overlay_map(img1, name1, img2, name2, feature, opacity1=1.0, opacity2=0.6, mode="Transparência"):
     try:
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min, lat_min = coords[0][0], coords[0][1]
@@ -40,9 +40,10 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
 
     mapa = geemap.Map(center=[lat_c, lon_c], zoom=4, add_google_map=False, tiles=None)
     
+    # Base ESRI
     esri_layer = folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Tiles &copy; Esri &mdash; Source: Esri",
+        attr="Tiles &copy; Esri",
         name="Esri Satellite",
         overlay=False,
         control=True
@@ -52,20 +53,30 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
     vis1 = gee_handler.obter_vis_params_interativo(name1)
     vis2 = gee_handler.obter_vis_params_interativo(name2)
 
-    # Camada 1 (Base) - Com opacidade variável
-    mapa.addLayer(img1, vis1, f"Base: {name1}", opacity=opacity1)
-    
-    # Camada 2 (Topo) - Com opacidade variável
-    mapa.addLayer(img2, vis2, f"Topo: {name2}", opacity=opacity2)
+    # Lógica do Split Map (Cortina)
+    if mode == "Split Map (Cortina)":
+        # Cria camadas de tile para o split
+        # Usamos uma função interna do geemap para gerar o TileLayer compatível
+        left_layer = geemap.ee_tile_layer(img1, vis1, name=f"Esq: {name1}")
+        right_layer = geemap.ee_tile_layer(img2, vis2, name=f"Dir: {name2}")
+        
+        mapa.split_map(left_layer=left_layer, right_layer=right_layer)
+        
+        # Legendas (Esquerda e Direita)
+        _add_colorbar_bottomleft(mapa, vis1, f"Esq: {name1}", index=0)
+        _add_colorbar_bottomleft(mapa, vis2, f"Dir: {name2}", index=1)
 
+    else:
+        # Modo Transparência (Tradicional)
+        mapa.addLayer(img1, vis1, f"Base: {name1}", opacity=opacity1)
+        mapa.addLayer(img2, vis2, f"Topo: {name2}", opacity=opacity2)
+        
+        # Legendas Empilhadas
+        _add_colorbar_bottomleft(mapa, vis1, f"Base: {name1}", index=0)
+        _add_colorbar_bottomleft(mapa, vis2, f"Topo: {name2}", index=1)
+
+    # Contorno sempre visível por cima de tudo
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
-    
-    # --- LEGENDAS EMPILHADAS ---
-    # Legenda 1 (Base) - Posição mais baixa (bottom: 12px)
-    _add_colorbar_bottomleft(mapa, vis1, f"Base: {name1}", index=0)
-    
-    # Legenda 2 (Topo) - Posição acima da primeira (bottom: 72px)
-    _add_colorbar_bottomleft(mapa, vis2, f"Topo: {name2}", index=1)
 
     if bounds:
         mapa.fit_bounds(bounds)
@@ -73,7 +84,7 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
     mapa.to_streamlit(height=600, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO (Satélite Esri Puro)
+# 1. MAPA INTERATIVO PADRÃO
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -92,7 +103,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     
     esri_layer = folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Tiles &copy; Esri &mdash; Source: Esri",
+        attr="Tiles &copy; Esri",
         name="Esri Satellite",
         overlay=False,
         control=True
@@ -119,7 +130,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO (Mantido Original)
+# 2. MAPA ESTÁTICO
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -194,22 +205,16 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     vmax = vis_params.get("max", 1)
     if not palette: return 
     
-    # Cálculo da posição vertical (empilhamento)
-    # Base = 12px, Cada nova barra sobe +60px
     bottom_offset = 12 + (index * 60)
-    
     N_STEPS = len(palette) 
     index_vals = np.linspace(vmin, vmax, N_STEPS + 1).tolist()
     fmt = '%.2f' if (vmax - vmin) < 10 else '%.0f'
     colormap = StepColormap(colors=palette, index=index_vals, vmin=vmin, vmax=vmax)
     colormap.fmt = fmt
     colormap.caption = vis_params.get("caption", unit_label)
-    
     html = colormap._repr_html_()
     
-    # Injetar o bottom offset dinâmico no estilo
     style = f"position: fixed; bottom: {bottom_offset}px; left: 12px; z-index: 9999; background: rgba(255,255,255,0.85); padding: 6px 8px; border-radius: 6px; box_shadow: 0 1px 4px rgba(0,0,0,0.3);"
-    
     template = Template(f"""{{% macro html(this, kwargs) %}}<div style="{style}">{html}</div>{{% endmacro %}}""")
     macro = MacroElement()
     macro._template = template
