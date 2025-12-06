@@ -116,7 +116,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
             help="Equilibrium Level.\nNível em que a temperatura da parcela volta a igualar a do ambiente, limitando a altura da convecção..")
 
     # --- TABELA DE REFERÊNCIA (NOVA) ---
-    st.markdown("###") # Espaçamento
+    
     with st.expander("📚 Tabela de Referência: Limiares de Severidade", expanded=False):
         st.markdown("""
         | Índice | Estável / Fraco | Moderado | Forte / Severo | Descrição Rápida |
@@ -195,6 +195,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png")
+
 
 
 
