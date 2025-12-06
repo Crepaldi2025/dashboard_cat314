@@ -230,17 +230,23 @@ def render_analysis_results():
             st.markdown("""
             **Use o ícone de Camadas (`🗂️`) no canto superior direito do mapa!**
             * Lá você pode ligar/desligar a **Camada Base** e a **Camada Topo**.
-            * A transparência da camada superior permite ver correlações visuais.
+            * Use os controles de transparência na barra lateral para ajustar.
             """)
 
         l1 = results["layer1"]
         l2 = results["layer2"]
         
+        # Pega opacidades da sessão (definidas na UI)
+        op1 = st.session_state.get('opacity_1', 1.0)
+        op2 = st.session_state.get('opacity_2', 0.6)
+        
         # Chama a nova função do visualizador
         map_visualizer.create_overlay_map(
             l1["res"]["ee_image"], l1["name"],
             l2["res"]["ee_image"], l2["name"],
-            l1["res"]["feature"]
+            l1["res"]["feature"],
+            opacity1=op1,
+            opacity2=op2
         )
         return
 
