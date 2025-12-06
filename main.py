@@ -84,7 +84,7 @@ def run_full_analysis():
             st.session_state.skewt_results = {"df": df, "params": (lat, lon, date, hour)}
         return
     
-    # --- LÓGICA MÚLTIPLOS MAPAS (NOVO) ---
+    # --- LÓGICA MÚLTIPLOS MAPAS ---
     if aba == "Múltiplos Mapas":
         variaveis = st.session_state.get("variaveis_multiplas", [])
         if not variaveis: return
@@ -175,44 +175,8 @@ def render_analysis_results():
 
     results = st.session_state.analysis_results
 
-    # --- RENDERIZAÇÃO MÚLTIPLOS MAPAS (NOVO) ---
-    if aba == "Múltiplos Mapas" and results.get("mode") == "multi":
-        st.subheader("Comparação de Variáveis")
-        ui.renderizar_resumo_selecao()
-        st.markdown("---")
-        
-        data_dict = results["data"]
-        vars_list = list(data_dict.keys())
-        
-        # Grid 2x2 (ou linhas conforme quantidade)
-        col1, col2 = st.columns(2)
-        cols_obj = [col1, col2]
-        
-        for i, var_name in enumerate(vars_list):
-            res_item = data_dict[var_name]
-            ee_img = res_item["ee_image"]
-            feature = res_item["feature"]
-            var_cfg = res_item["var_cfg"]
-            vis_params = gee_handler.obter_vis_params_interativo(var_name)
-            
-            # Alterna colunas
-            with cols_obj[i % 2]:
-                st.markdown(f"**{var_name}**")
-                png, jpg, cbar = map_visualizer.create_static_map(ee_img, feature, vis_params, var_cfg["unit"])
-                if png:
-                    st.image(png, use_container_width=True)
-                    if cbar: st.image(cbar, use_container_width=True)
-        return
-    # -------------------------------------------
-
-    # --- RENDERIZAÇÃO MAPA ÚNICO ---
-    var_cfg = results["var_cfg"]
-
-    st.subheader("Resultado da Análise")
-    ui.renderizar_resumo_selecao() 
-
-    # Construção dos Títulos
-    variavel = st.session_state.get('variavel', '')
+    # --- PRÉ-CÁLCULO DOS TEXTOS DE TÍTULO (MOVEMOS PARA CÁ) ---
+    # Isso permite usar os textos tanto no Mapa Único quanto nos Múltiplos
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     tipo_local = st.session_state.get('tipo_localizacao', '').lower()
     
@@ -244,7 +208,74 @@ def render_analysis_results():
         local_str = "para a área desenhada"
     else: 
         local_str = "para o círculo definido"
+
+    # --- RENDERIZAÇÃO MÚLTIPLOS MAPAS ---
+    if aba == "Múltiplos Mapas" and results.get("mode") == "multi":
+        st.subheader("Comparação de Variáveis")
+        ui.renderizar_resumo_selecao()
+        st.markdown("---")
         
+        data_dict = results["data"]
+        vars_list = list(data_dict.keys())
+        
+        col1, col2 = st.columns(2)
+        cols_obj = [col1, col2]
+        
+        for i, var_name in enumerate(vars_list):
+            res_item = data_dict[var_name]
+            ee_img = res_item["ee_image"]
+            feature = res_item["feature"]
+            var_cfg = res_item["var_cfg"]
+            vis_params = gee_handler.obter_vis_params_interativo(var_name)
+            
+            with cols_obj[i % 2]:
+                st.markdown(f"**{var_name}**")
+                
+                # Gera o mapa estático base
+                png, jpg, cbar = map_visualizer.create_static_map(ee_img, feature, vis_params, var_cfg["unit"])
+                
+                if png:
+                    # Exibe o mapa na tela
+                    st.image(png, use_container_width=True)
+                    if cbar: st.image(cbar, use_container_width=True)
+                    
+                    # --- LÓGICA DE EXPORTAÇÃO (NOVA) ---
+                    try:
+                        # 1. Cria Título Personalizado
+                        titulo_completo = f"{var_name} {periodo_str} {local_str}"
+                        title_bytes = map_visualizer._make_title_image(titulo_completo, 800)
+                        
+                        # 2. Decodifica Imagens
+                        map_png_bytes = base64.b64decode(png.split(",")[1])
+                        map_jpg_bytes = base64.b64decode(jpg.split(",")[1])
+                        cbar_bytes = base64.b64decode(cbar.split(",")[1]) if cbar else None
+                        
+                        # 3. Junta tudo (Stitch)
+                        final_png = map_visualizer._stitch_images_to_bytes(title_bytes, map_png_bytes, cbar_bytes, format='PNG')
+                        final_jpg = map_visualizer._stitch_images_to_bytes(title_bytes, map_jpg_bytes, cbar_bytes, format='JPEG')
+                        
+                        # 4. Botões de Download
+                        sub_c1, sub_c2 = st.columns(2)
+                        var_slug = var_name.lower().replace(" ", "_").replace("(", "").replace(")", "")
+                        if final_png:
+                            sub_c1.download_button("💾 PNG", final_png, f"{var_slug}.png", "image/png", use_container_width=True)
+                        if final_jpg:
+                            sub_c2.download_button("💾 JPG", final_jpg, f"{var_slug}.jpg", "image/jpeg", use_container_width=True)
+                            
+                    except Exception as e:
+                        # Em caso de erro na montagem, não quebra a tela, apenas avisa console
+                        print(f"Erro ao gerar download para {var_name}: {e}")
+
+        return
+    # -------------------------------------------
+
+    # --- RENDERIZAÇÃO MAPA ÚNICO ---
+    var_cfg = results["var_cfg"]
+    st.subheader("Resultado da Análise")
+    ui.renderizar_resumo_selecao() 
+
+    # Título do Mapa Único (Usa as strings calculadas no topo)
+    variavel = st.session_state.get('variavel', '')
     titulo_mapa = f"{variavel} {periodo_str} {local_str}"
     titulo_serie = f"Série Temporal de {variavel} {periodo_str} {local_str}"
 
@@ -257,33 +288,16 @@ def render_analysis_results():
             vis_params = gee_handler.obter_vis_params_interativo(variavel)
 
             if tipo_mapa == "Interativo":
-                # --- AJUDA DO MAPA (ATUALIZADA) ---
+                # AJUDA DO MAPA
                 with st.popover("ℹ️ Ajuda: Como usar o Mapa"):
                     st.markdown("### 🧭 Guia de Botões")
-                    
                     st.markdown("**1️⃣ Navegação e Visualização**")
-                    st.markdown("""
-                    * `➕` / `➖` **Zoom:** Aproxima ou afasta a visão.
-                    * `⛶` **Tela Cheia:** Expande o mapa para o tamanho do monitor.
-                    * `🗂️` **Camadas:** Escolha entre visualização de **Satélite** ou **Ruas**.
-                    """)
-                    
+                    st.markdown("* `➕` / `➖` **Zoom:** Aproxima ou afasta a visão.\n* `⛶` **Tela Cheia:** Expande o mapa.\n* `🗂️` **Camadas:** Alterna Satélite/Ruas.")
                     st.markdown("**2️⃣ Ferramentas de Desenho**")
-                    st.markdown("""
-                    * `📍` **Marcador:** Coloca um pino num ponto específico.
-                    * `╱` **Linha:** Desenha uma linha (útil para medir distâncias).
-                    * `⬟` **Polígono:** Desenha uma área livre (clique ponto a ponto).
-                    * `⬛` **Retângulo:** Desenha uma área quadrada (clique e arraste).
-                    * `⭕` **Círculo:** Desenha um círculo (clique no centro e arraste).
-                    """)
-                    
+                    st.markdown("* `📍` **Marcador** | `╱` **Linha** | `⬟` **Polígono** | `⬛` **Retângulo** | `⭕` **Círculo**")
                     st.markdown("**3️⃣ Edição**")
-                    st.markdown("""
-                    * `📝` **Editar:** Permite ajustar os pontos de um desenho existente.
-                    * `🗑️` **Lixeira:** Remove todos os desenhos do mapa.
-                    """)
-                # ----------------------------------
-
+                    st.markdown("* `📝` **Editar** | `🗑️` **Lixeira**")
+                
                 map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
             
             elif tipo_mapa == "Estático":
