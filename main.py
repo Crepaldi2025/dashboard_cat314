@@ -48,7 +48,8 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
     
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
-    if aba == "Mapas":
+    # Lógica compartilhada para "Mapas" e "Múltiplos Mapas" (ambos usam imagem)
+    if aba in ["Mapas", "Múltiplos Mapas"]:
         target_hour = None
         if st.session_state.get('tipo_periodo') == "Horário Específico":
             target_hour = st.session_state.get('hora_especifica')
@@ -57,8 +58,10 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
         
         if ee_image:
             results["ee_image"] = ee_image
-            df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
-            if df_map_samples is not None: results["map_dataframe"] = df_map_samples
+            # Apenas gera tabela de dados se for mapa único (para economizar tempo no múltiplo)
+            if aba == "Mapas":
+                df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
+                if df_map_samples is not None: results["map_dataframe"] = df_map_samples
             
     elif aba == "Séries Temporais":
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
@@ -69,7 +72,7 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
 def run_full_analysis():
     aba = st.session_state.get("nav_option", "Mapas")
     
-    # --- LOGICA SKEW-T (Inserida aqui) ---
+    # --- LÓGICA SKEW-T ---
     if aba == "Skew-T":
         lat = st.session_state.get("skew_lat")
         lon = st.session_state.get("skew_lon")
@@ -80,8 +83,38 @@ def run_full_analysis():
             df = skewt_handler.get_vertical_profile_data(lat, lon, date, hour)
             st.session_state.skewt_results = {"df": df, "params": (lat, lon, date, hour)}
         return
-    # -------------------------------------
+    
+    # --- LÓGICA MÚLTIPLOS MAPAS (NOVO) ---
+    if aba == "Múltiplos Mapas":
+        variaveis = st.session_state.get("variaveis_multiplas", [])
+        if not variaveis: return
 
+        # Define datas (igual ao código original)
+        tipo_per = st.session_state.tipo_periodo
+        if tipo_per == "Horário Específico":
+            data_unica = st.session_state.get('data_horaria')
+            if data_unica:
+                start_date = data_unica
+                end_date = data_unica + timedelta(days=1) 
+            else: start_date, end_date = None, None
+        else:
+            start_date, end_date = utils.get_date_range(tipo_per, st.session_state)
+            
+        if not (start_date and end_date): return
+
+        geo_key = get_geo_caching_key(st.session_state)
+        
+        results_multi = {}
+        with st.spinner(f"Gerando {len(variaveis)} mapas... isso pode levar alguns segundos."):
+            # Iteramos sobre cada variável escolhida
+            for var in variaveis:
+                res = run_analysis_logic(var, start_date, end_date, geo_key, "Múltiplos Mapas")
+                if res: results_multi[var] = res
+        
+        st.session_state.analysis_results = {"mode": "multi", "data": results_multi}
+        return
+
+    # --- LÓGICA PADRÃO (MAPA ÚNICO E SÉRIES) ---
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
     tipo_per = st.session_state.tipo_periodo
     
@@ -117,10 +150,12 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
-    # --- RENDERIZAÇÃO SKEW-T (Inserida aqui) ---
+    # --- RENDERIZAÇÃO SKEW-T ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             ui.renderizar_resumo_selecao()
+            
+            # Ajuste de CSS para métricas menores
             st.markdown("""
             <style>
             div[data-testid="stMetricValue"] {
@@ -128,22 +163,55 @@ def render_analysis_results():
             }
             </style>
             """, unsafe_allow_html=True)
+            
             res = st.session_state.skewt_results
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
         return
-    # -------------------------------------------
+    # ---------------------------
 
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
         return
 
     results = st.session_state.analysis_results
+
+    # --- RENDERIZAÇÃO MÚLTIPLOS MAPAS (NOVO) ---
+    if aba == "Múltiplos Mapas" and results.get("mode") == "multi":
+        st.subheader("Comparação de Variáveis")
+        ui.renderizar_resumo_selecao()
+        st.markdown("---")
+        
+        data_dict = results["data"]
+        vars_list = list(data_dict.keys())
+        
+        # Grid 2x2 (ou linhas conforme quantidade)
+        col1, col2 = st.columns(2)
+        cols_obj = [col1, col2]
+        
+        for i, var_name in enumerate(vars_list):
+            res_item = data_dict[var_name]
+            ee_img = res_item["ee_image"]
+            feature = res_item["feature"]
+            var_cfg = res_item["var_cfg"]
+            vis_params = gee_handler.obter_vis_params_interativo(var_name)
+            
+            # Alterna colunas
+            with cols_obj[i % 2]:
+                st.markdown(f"**{var_name}**")
+                png, jpg, cbar = map_visualizer.create_static_map(ee_img, feature, vis_params, var_cfg["unit"])
+                if png:
+                    st.image(png, use_container_width=True)
+                    if cbar: st.image(cbar, use_container_width=True)
+        return
+    # -------------------------------------------
+
+    # --- RENDERIZAÇÃO MAPA ÚNICO ---
     var_cfg = results["var_cfg"]
 
     st.subheader("Resultado da Análise")
     ui.renderizar_resumo_selecao() 
 
-    # --- Construção dos Títulos ---
+    # Construção dos Títulos
     variavel = st.session_state.get('variavel', '')
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     tipo_local = st.session_state.get('tipo_localizacao', '').lower()
@@ -189,6 +257,7 @@ def render_analysis_results():
             vis_params = gee_handler.obter_vis_params_interativo(variavel)
 
             if tipo_mapa == "Interativo":
+                # --- AJUDA DO MAPA (ATUALIZADA) ---
                 with st.popover("ℹ️ Ajuda: Como usar o Mapa"):
                     st.markdown("### 🧭 Guia de Botões")
                     
@@ -196,7 +265,7 @@ def render_analysis_results():
                     st.markdown("""
                     * `➕` / `➖` **Zoom:** Aproxima ou afasta a visão.
                     * `⛶` **Tela Cheia:** Expande o mapa para o tamanho do monitor.
-                    * `🗂️` **Camadas:** Escolha entre visualização de dados ou contorno.
+                    * `🗂️` **Camadas:** Escolha entre visualização de **Satélite** ou **Ruas**.
                     """)
                     
                     st.markdown("**2️⃣ Ferramentas de Desenho**")
@@ -213,9 +282,10 @@ def render_analysis_results():
                     * `📝` **Editar:** Permite ajustar os pontos de um desenho existente.
                     * `🗑️` **Lixeira:** Remove todos os desenhos do mapa.
                     """)
-                
-                # Renderiza o mapa
-                map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"])
+                # ----------------------------------
+
+                map_visualizer.create_interactive_map(results["ee_image"], feature, vis_params, var_cfg["unit"]) 
+            
             elif tipo_mapa == "Estático":
                 with st.spinner("Gerando imagem estática com nova escala..."):
                     png_url, jpg_url, colorbar_img = map_visualizer.create_static_map(results["ee_image"], feature, vis_params, var_cfg["unit"])
@@ -310,7 +380,7 @@ def main():
     ui.renderizar_pagina_principal(opcao_menu)
     
     is_polygon = (
-        opcao_menu in ["Mapas", "Séries Temporais"] and 
+        opcao_menu in ["Mapas", "Séries Temporais", "Múltiplos Mapas"] and 
         st.session_state.get('tipo_localizacao') == "Polígono"
     )
         
@@ -328,6 +398,3 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
-
-
-
