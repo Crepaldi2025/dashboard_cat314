@@ -204,7 +204,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 
                 # 2. Guia de Ferramentas (Horizontal)
                 with st.popover("ℹ️ Guia de Ferramentas"): 
-                    st.markdown("⬟ **Polígono (Livre)** &nbsp;&nbsp; ⬛ **Retângulo (Quadrado)** &nbsp;&nbsp; 📝 **Editar** &nbsp;&nbsp; 🗑️ **Lixeira**")
+                    st.markdown("➕ **Zoom In** &nbsp;&nbsp; ➖ **Zoom Out** &nbsp;&nbsp; ⬟ **Polígono** &nbsp;&nbsp; ⬛ **Retângulo** &nbsp;&nbsp; ⭕ **Círculo** &nbsp;&nbsp; 📝 **Editar** &nbsp;&nbsp; 🗑️ **Lixeira**")
 
                 # 3. NOVO: INSERÇÃO MANUAL DE COORDENADAS
                
@@ -426,6 +426,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
