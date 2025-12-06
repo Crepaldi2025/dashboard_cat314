@@ -20,13 +20,13 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 import folium 
-import gee_handler # Para pegar configurações de visualização
+import gee_handler # Para vis params
 
 # ------------------------------------------------------------------
-# 0. MAPA DE SOBREPOSIÇÃO (OVERLAY) - NOVO
+# 0. MAPA DE SOBREPOSIÇÃO (OVERLAY) - ATUALIZADO
 # ------------------------------------------------------------------
 
-def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, feature: ee.Feature):
+def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, feature: ee.Feature, opacity1: float = 1.0, opacity2: float = 0.6):
     try:
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min, lat_min = coords[0][0], coords[0][1]
@@ -52,16 +52,20 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
     vis1 = gee_handler.obter_vis_params_interativo(name1)
     vis2 = gee_handler.obter_vis_params_interativo(name2)
 
-    # Camada Base (Opaca)
-    mapa.addLayer(img1, vis1, f"Base: {name1}")
+    # Camada 1 (Base) - Com opacidade variável
+    mapa.addLayer(img1, vis1, f"Base: {name1}", opacity=opacity1)
     
-    # Camada Topo (Transparente)
-    mapa.addLayer(img2, vis2, f"Topo: {name2}", opacity=0.6)
+    # Camada 2 (Topo) - Com opacidade variável
+    mapa.addLayer(img2, vis2, f"Topo: {name2}", opacity=opacity2)
 
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
     
-    # Adiciona a legenda da camada superior
-    _add_colorbar_bottomleft(mapa, vis2, name2)
+    # --- LEGENDAS EMPILHADAS ---
+    # Legenda 1 (Base) - Posição mais baixa (bottom: 12px)
+    _add_colorbar_bottomleft(mapa, vis1, f"Base: {name1}", index=0)
+    
+    # Legenda 2 (Topo) - Posição acima da primeira (bottom: 72px)
+    _add_colorbar_bottomleft(mapa, vis2, f"Topo: {name2}", index=1)
 
     if bounds:
         mapa.fit_bounds(bounds)
@@ -69,7 +73,7 @@ def create_overlay_map(img1: ee.Image, name1: str, img2: ee.Image, name2: str, f
     mapa.to_streamlit(height=600, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 1. MAPA INTERATIVO
+# 1. MAPA INTERATIVO (Satélite Esri Puro)
 # ------------------------------------------------------------------
 
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
@@ -115,7 +119,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
-# 2. MAPA ESTÁTICO
+# 2. MAPA ESTÁTICO (Mantido Original)
 # ------------------------------------------------------------------
 
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
@@ -184,19 +188,29 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
 # 3. FUNÇÕES AUXILIARES
 # ------------------------------------------------------------------
 
-def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str):
+def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str, index: int = 0):
     palette = vis_params.get("palette", None)
     vmin = vis_params.get("min", 0)
     vmax = vis_params.get("max", 1)
     if not palette: return 
+    
+    # Cálculo da posição vertical (empilhamento)
+    # Base = 12px, Cada nova barra sobe +60px
+    bottom_offset = 12 + (index * 60)
+    
     N_STEPS = len(palette) 
-    index = np.linspace(vmin, vmax, N_STEPS + 1).tolist()
+    index_vals = np.linspace(vmin, vmax, N_STEPS + 1).tolist()
     fmt = '%.2f' if (vmax - vmin) < 10 else '%.0f'
-    colormap = StepColormap(colors=palette, index=index, vmin=vmin, vmax=vmax)
+    colormap = StepColormap(colors=palette, index=index_vals, vmin=vmin, vmax=vmax)
     colormap.fmt = fmt
     colormap.caption = vis_params.get("caption", unit_label)
+    
     html = colormap._repr_html_()
-    template = Template(f"""{{% macro html(this, kwargs) %}}<div style="position: fixed; bottom: 12px; left: 12px; z-index: 9999; background: rgba(255,255,255,0.85); padding: 6px 8px; border-radius: 6px; box_shadow: 0 1px 4px rgba(0,0,0,0.3);">{html}</div>{{% endmacro %}}""")
+    
+    # Injetar o bottom offset dinâmico no estilo
+    style = f"position: fixed; bottom: {bottom_offset}px; left: 12px; z-index: 9999; background: rgba(255,255,255,0.85); padding: 6px 8px; border-radius: 6px; box_shadow: 0 1px 4px rgba(0,0,0,0.3);"
+    
+    template = Template(f"""{{% macro html(this, kwargs) %}}<div style="{style}">{html}</div>{{% endmacro %}}""")
     macro = MacroElement()
     macro._template = template
     mapa.get_root().add_child(macro)
