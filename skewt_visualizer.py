@@ -100,7 +100,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
         c5, c6, c7, c8 = st.columns(4)
         
         li_val = f"{li.magnitude:.1f}" if li is not None else "--"
-        c5.metric("Lifted Index (LI)", li_val, 
+        c5.metric("LI", li_val, 
             help="Diferença de temperatura (Ambiente - Parcela) em 500hPa.\nvalores muito negativos indicam forte instabilidade.")
         
         k_val = f"{k_idx.magnitude:.0f}" if k_idx is not None else "--"
@@ -112,7 +112,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
             help="Quantidade total de vapor de água na coluna que poderia precipitar se toda a umidade se condensasse.\nIndica potencial para chuvas volumosas.")
         
         el_val = f"{el_p.magnitude:.0f} hPa" if el_p is not None else "--"
-        c8.metric("Nível Equilíbrio (EL)", el_val, 
+        c8.metric("EL", el_val, 
             help="Equilibrium Level.\nNível em que a temperatura da parcela volta a igualar a do ambiente, limitando a altura da convecção..")
 
     # --- 4. PLOTAGEM DO GRÁFICO ---
@@ -179,5 +179,6 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png")
+
 
 
