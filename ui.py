@@ -232,7 +232,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                                 st.error("⚠️ Um polígono precisa de pelo menos 3 pontos.")
                             else:
                                 # Fechar o polígono se o último ponto não for igual ao primeiro
-                                if points and pontos[0] != pontos[-1]:
+                                if pontos and pontos[0] != pontos[-1]:
                                     pontos.append(pontos[0])
                                 
                                 # Cria a geometria GeoJSON
@@ -429,6 +429,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
