@@ -196,7 +196,7 @@ def render_analysis_results():
                     st.markdown("""
                     * `➕` / `➖` **Zoom:** Aproxima ou afasta a visão.
                     * `⛶` **Tela Cheia:** Expande o mapa para o tamanho do monitor.
-                    * `🗂️` **Camadas:** Escolha entre visualização de **Satélite** ou **Ruas**.
+                    * `🗂️` **Camadas:** Escolha entre visualização de dados ou contorno.
                     """)
                     
                     st.markdown("**2️⃣ Ferramentas de Desenho**")
@@ -328,5 +328,6 @@ def main():
     render_analysis_results()
 
 if __name__ == "__main__": main()
+
 
 
