@@ -82,38 +82,38 @@ def render_skewt_plot(df, lat, lon, date, hour):
         # Correção do ValueError: Usar 'is not None' em vez de check booleano direto
         cape_val = f"{cape.magnitude:.0f} J/kg" if cape is not None else "--"
         c1.metric("CAPE", cape_val, 
-            help="Convective Available Potential Energy.\nEnergia disponível para tempestades.\n> 1000: Moderado\n> 2500: Extremo")
+            help="Convective Available Potential Energy.\nEnergia potencial disponível para que a parcela suba livremente; valores altos indicam ambiente mais instável.")
         
         cin_val = f"{cin.magnitude:.0f} J/kg" if cin is not None else "--"
         c2.metric("CIN", cin_val, 
-            help="Convective Inhibition.\nEnergia que 'segura' a convecção.\nQuanto maior, mais difícil iniciar a tempestade.")
+            help="Convective Inhibition.\nEnergia que inibe o disparo da convecção.\nQuanto maior, mais difícil iniciar a tempestade.")
         
         lcl_val = f"{lcl_p.magnitude:.0f} hPa" if lcl_p is not None else "--"
         c3.metric("LCL", lcl_val, 
-            help="Lifted Condensation Level.\nAltura da base das nuvens.")
+            help="Lifted Condensation Level.\nNível em que a parcela em ascensão se torna saturada, aproximando a altura da base das nuvens.")
         
         lfc_val = f"{lfc_p.magnitude:.0f} hPa" if lfc_p is not None else "--"
         c4.metric("LFC", lfc_val, 
-            help="Level of Free Convection.\nAltitude onde a parcela fica mais quente que o ambiente e sobe sozinha.")
+            help="Level of Free Convection.\nNível a partir do qual a parcela fica mais quente que o ambiente e passa a subir espontaneamente.")
 
         # Linha 2: Índices de Estabilidade e Umidade
         c5, c6, c7, c8 = st.columns(4)
         
         li_val = f"{li.magnitude:.1f}" if li is not None else "--"
         c5.metric("Lifted Index (LI)", li_val, 
-            help="Diferença de temperatura (Ambiente - Parcela) em 500hPa.\n< 0: Instável\n< -4: Muito Instável")
+            help="Diferença de temperatura (Ambiente - Parcela) em 500hPa.\nvalores muito negativos indicam forte instabilidade.")
         
         k_val = f"{k_idx.magnitude:.0f}" if k_idx is not None else "--"
         c6.metric("K-Index", k_val, 
-            help="Probabilidade de tempestades de massa de ar.\n> 30: Alta probabilidade\n< 20: Baixa probabilidade")
+            help="Índice que combina temperatura e umidade em 850–500 hPa para estimar potencial de convecção úmida e trovoadas.")
         
         pw_val = f"{pw.magnitude:.1f} mm" if pw is not None else "--"
         c7.metric("Água Precipitável", pw_val, 
-            help="Total de água na coluna atmosférica se tudo condensasse.\nIndica potencial para chuvas volumosas.")
+            help="Quantidade total de vapor de água na coluna que poderia precipitar se toda a umidade se condensasse.\nIndica potencial para chuvas volumosas.")
         
         el_val = f"{el_p.magnitude:.0f} hPa" if el_p is not None else "--"
         c8.metric("Nível Equilíbrio (EL)", el_val, 
-            help="Equilibrium Level.\nLimite superior da nuvem (topo da convecção).")
+            help="Equilibrium Level.\nNível em que a temperatura da parcela volta a igualar a do ambiente, limitando a altura da convecção..")
 
     # --- 4. PLOTAGEM DO GRÁFICO ---
     fig = plt.figure(figsize=(9, 9))
@@ -179,4 +179,5 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png")
+
 
