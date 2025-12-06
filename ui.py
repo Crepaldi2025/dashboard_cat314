@@ -181,6 +181,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                 with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
                     st.markdown("**Como preencher:**\n* **Lat/Lon:** Graus decimais (ex: -22.42).\n* **Raio:** Km do centro à borda.")
+                    st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o círculo.</div>", unsafe_allow_html=True)
             
             elif tipo_loc == "Polígono":
                 if st.session_state.get('drawn_geometry'): st.success("✅ Polígono Definido", icon="🛡️")
@@ -367,6 +368,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
