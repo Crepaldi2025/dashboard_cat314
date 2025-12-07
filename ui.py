@@ -416,7 +416,7 @@ def renderizar_pagina_principal(opcao):
 
         with col1:
             st.markdown("#### 🗺️ Análise Espacial")
-            st.info("**Mapas**\nGera mapas de calor para uma única variável (ex: Temperatura) em uma área e data específicas.")
+            st.info("**Mapas**\nGera mapas para uma única variável (ex: Temperatura) em uma área e data específicas.")
             st.info("**Múltiplos Mapas**\nGera painéis estáticos para comparar até 4 variáveis simultaneamente (ex: Chuva vs Umidade).")
             st.info("**Sobreposição (Camadas)**\nPermite cruzar duas variáveis no mesmo mapa usando transparência ou cortina deslizante.")
             st.info("**Hidrografia**\nUpload de Shapefile (.zip) próprio para recortar dados em bacias ou rios específicos.")
@@ -424,7 +424,7 @@ def renderizar_pagina_principal(opcao):
         with col2:
             st.markdown("#### 📈 Análise Temporal & Vertical")
             st.success("**Séries Temporais**\nGera gráficos interativos mostrando a evolução de uma variável ao longo do tempo.")
-            st.success("**Múltiplas Séries**\nPlota gráficos comparativos de várias variáveis para identificar correlações temporais.")
+            st.success("**Múltiplas Séries**\nPlota gráficos comparativos de até 4 várias variáveis para identificar correlações temporais.")
             st.success("**Skew-T (Sondagem)**\nGera diagramas termodinâmicos verticais da atmosfera (perfil de temperatura e orvalho).")
 
         st.markdown("---")
@@ -518,3 +518,4 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
