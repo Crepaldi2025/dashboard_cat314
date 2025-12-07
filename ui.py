@@ -160,12 +160,16 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 
                 vis_mode = st.radio("Estilo de Comparação:", ["Transparência", "Split Map (Cortina)"], horizontal=True, key='overlay_mode', on_change=reset_analysis_results_only)
                 
-                # CORREÇÃO AQUI: Removemos o 'else: st.info(...)' duplicado
                 if vis_mode == "Transparência":
                     st.markdown("🎚️ **Controle de Opacidade**")
                     c_op1, c_op2 = st.columns(2)
                     with c_op1: st.slider("Base", 0.0, 1.0, 1.0, key='opacity_1', on_change=reset_analysis_results_only)
                     with c_op2: st.slider("Topo", 0.0, 1.0, 0.6, key='opacity_2', on_change=reset_analysis_results_only)
+                else:
+                    st.info(
+                        "↔️ **Modo Cortina (Split Map):**\n\n"
+                        "Arraste a linha vertical no centro do mapa para revelar a diferença entre a camada **Base** (Lado Esquerdo) e a camada **Topo** (Lado Direito)."
+                    )
             
             else:
                 st.selectbox(
@@ -339,13 +343,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             elif opcao == "Múltiplas Séries":
                 st.info("ℹ️ Gera múltiplos gráficos simultâneos.")
             elif opcao == "Sobreposição (Camadas)":
-                if st.session_state.get('overlay_mode') == "Split Map (Cortina)":
-                st.info(
-                        "↔️ **Modo Cortina (Split Map):**\n\n"
-                        "Arraste a linha vertical no centro do mapa para revelar a diferença entre a camada **Base** (Lado Esquerdo) e a camada **Topo** (Lado Direito)."
-                    )
-                else:
-                    st.info("ℹ️ Ajuste a transparência para misturar.")
+                # (Mensagem já corrigida acima, dentro do if vis_mode)
+                pass
             elif opcao == "Hidrografia":
                 st.info("ℹ️ Sobrepõe dados climáticos sobre o shapefile enviado.")
 
@@ -397,7 +396,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (COM LIMPEZA)
+# Renderizar a página principal (COM LIMPEZA AUTOMÁTICA)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -417,7 +416,7 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     
-    # LÓGICA DE LIMPEZA CORRIGIDA:
+    # LÓGICA DE LIMPEZA
     has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
     has_skewt = "skewt_results" in st.session_state and st.session_state.skewt_results is not None
     is_generating = st.session_state.get("analysis_triggered", False)
@@ -538,5 +537,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
-
