@@ -81,13 +81,11 @@ def render_download_buttons(df, filename_prefix, key_suffix):
     if df is None or df.empty:
         return
 
-    # Garante conversão segura para texto antes de exportar
+    # Converte para string para garantir segurança contra erros de objeto/data
     try:
-        # Cria uma cópia limpa convertendo valores para string pura
-        # Isso remove objetos complexos que o Excel/CSV não entendem
-        df_export = pd.DataFrame(df.values, columns=df.columns).astype(str)
-    except:
         df_export = df.astype(str)
+    except:
+        df_export = df
 
     csv = df_export.to_csv(index=False).encode('utf-8')
     
@@ -235,7 +233,7 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
-    # --- SKEW-T: CORREÇÃO DEFINITIVA DO ERRO JSON ---
+    # --- SKEW-T: CORREÇÃO COMPLETA DO ERRO JSON ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             ui.renderizar_resumo_selecao()
@@ -245,16 +243,18 @@ def render_analysis_results():
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
                 
                 with st.expander("📥 Exportar Dados da Sondagem"):
-                    # Aqui criamos um novo DataFrame 'limpo' apenas com valores e colunas, sem metadados
-                    # Isso remove as unidades do MetPy que travam o Streamlit
                     try:
-                        df_clean = pd.DataFrame(res["df"].values, columns=res["df"].columns)
-                        df_clean = df_clean.astype(str) # Força tudo para texto
-                    except:
-                        df_clean = pd.DataFrame(res["df"]).astype(str)
-
-                    st.dataframe(df_clean, use_container_width=True)
-                    render_download_buttons(df_clean, "sondagem_skewt", "skewt")
+                        # 1. Reseta o index para transformar a data (index) em coluna normal
+                        df_safe = pd.DataFrame(res["df"]).reset_index()
+                        
+                        # 2. Converte TUDO para string para remover unidades físicas/datas complexas
+                        # Isso previne o erro "Object of type date is not JSON serializable"
+                        df_safe = df_safe.astype(str)
+                        
+                        st.dataframe(df_safe, use_container_width=True)
+                        render_download_buttons(df_safe, "sondagem_skewt", "skewt")
+                    except Exception as e:
+                        st.error(f"Erro ao exibir dados brutos: {e}")
         return
 
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -330,7 +330,7 @@ def render_analysis_results():
                     except: pass
         return
 
-    # --- MÚLTIPLAS SÉRIES ---
+    # --- MÚLTIPLAS SÉRIES (SEM DUPLICATAS) ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -342,8 +342,6 @@ def render_analysis_results():
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
-                # DADOS E BOTÕES PADRONIZADOS
-                render_download_buttons(res["time_series_df"], f"serie_{var_name.lower().replace(' ', '_')}", f"multi_series_{i}")
         return
 
     var_cfg = results["var_cfg"]
@@ -382,15 +380,11 @@ def render_analysis_results():
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
-    # --- SÉRIES TEMPORAIS ---
+    # --- SÉRIES TEMPORAIS (SEM DUPLICATAS) ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
-            
-            st.subheader("Tabela de Dados")
-            st.dataframe(results["time_series_df"], use_container_width=True, hide_index=True)
-            render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
 
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
