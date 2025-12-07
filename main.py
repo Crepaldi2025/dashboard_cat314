@@ -259,7 +259,15 @@ def render_analysis_results():
                         # 4. Formata colunas numéricas (float) para 1 casa decimal
                         for col in df_formatted.select_dtypes(include=['float']).columns:
                             df_formatted[col] = df_formatted[col].apply(lambda x: f"{x:.1f}")
-
+                        # Ajuste os nomes abaixo conforme as colunas reais 
+                        colunas_unidades = {
+                            "pressure": "Pressão (hPa)",
+                            "temperature": "Temperatura (°C)",
+                            
+                            "u_wind": "Vento U (m/s)",
+                            "v_wind": "Vento V (m/s)",
+                        }
+                        df_formatted = df_formatted.rename(columns=colunas_unidades)
                         # 5. Converte TUDO para string final (resolve o erro JSON definitivamente)
                         df_final = df_formatted.astype(str)
 
@@ -452,3 +460,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
