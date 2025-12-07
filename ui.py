@@ -395,7 +395,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (COM LIMPEZA CORRIGIDA)
+# Renderizar a página principal (COM LIMPEZA AUTOMÁTICA)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -415,14 +415,12 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     
-    # LÓGICA DE LIMPEZA ATUALIZADA
-    # Verifica se tem resultado OU se está gerando (triggered = True)
-    has_results = st.session_state.get("analysis_results") is not None
-    has_skewt = st.session_state.get("skewt_results") is not None
+    # LÓGICA DE LIMPEZA CORRIGIDA:
+    has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
+    has_skewt = "skewt_results" in st.session_state and st.session_state.skewt_results is not None
     is_generating = st.session_state.get("analysis_triggered", False)
 
-    # Se NÃO tem resultado E NÃO está gerando, mostra o menu.
-    # Se estiver gerando (is_generating=True), já esconde.
+    # SÓ MOSTRA SE NÃO TEM RESULTADO E NÃO ESTÁ GERANDO
     if not has_results and not has_skewt and not is_generating:
         
         st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
@@ -452,12 +450,11 @@ def renderizar_pagina_principal(opcao):
         )
 
 def renderizar_resumo_selecao():
-    # Verifica qual aba está ativa para decidir o que mostrar
     nav_option = st.session_state.get('nav_option')
 
     # --- LÓGICA PARA SKEW-T ---
     if nav_option == "Skew-T":
-        with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
+        with st.expander("📋 Resumo das Opções Selecionadas", expanded=False):
             c1, c2, c3 = st.columns(3)
             with c1: 
                 st.markdown("**Análise:**\nSondagem (Skew-T)")
@@ -490,7 +487,7 @@ def renderizar_resumo_selecao():
         if "variavel" not in st.session_state: return
         var_text = st.session_state.variavel
 
-    with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
+    with st.expander("📋 Resumo das Opções Selecionadas", expanded=False):
         c1, c2, c3 = st.columns(3)
         with c1: st.markdown(f"**{label_titulo}** \n{var_text}")
         with c2:
