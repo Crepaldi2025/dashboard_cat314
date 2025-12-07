@@ -224,7 +224,6 @@ def render_analysis_results():
         ui.renderizar_resumo_selecao()
         st.markdown("---")
         
-        # --- AJUDA DO MAPA ATUALIZADA (DIDÁTICA E ESPECÍFICA) ---
         with st.popover("ℹ️ Como controlar a visualização?"): 
             st.markdown("""
             **Use o ícone 🗂️ (Camadas) no canto superior direito para:**
@@ -232,7 +231,6 @@ def render_analysis_results():
             2. **Exibir ou Ocultar** o Contorno da área (linha vermelha).
             3. **Visualizar** a imagem de satélite ao fundo.
             """)
-        # ---------------------------------------------------------
         
         mode = st.session_state.get('overlay_mode', "Transparência")
         map_visualizer.create_overlay_map(
@@ -255,6 +253,7 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"**{var_name}**")
+                # CORREÇÃO: use_column_width=True
                 png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_column_width=True) 
@@ -300,7 +299,6 @@ def render_analysis_results():
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
             if tipo_mapa == "Interativo":
-                # AJUDA DO MAPA (PADRÃO)
                 with st.popover("ℹ️ Ajuda do Mapa"): 
                     st.markdown("**Controles:** Zoom, Tela Cheia, Camadas.\n**Ferramentas:** Marcador, Linha, Polígono, Retângulo, Círculo, Editar, Lixeira.")
                 map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
@@ -308,8 +306,10 @@ def render_analysis_results():
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
                 if png:
+                    # CORREÇÃO: use_column_width=True
                     st.image(png, use_column_width=True) 
                     if cbar: st.image(cbar, use_column_width=True)
+                    
                     try:
                         title = f"{st.session_state.variavel} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
@@ -349,6 +349,46 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
+
+# -------------------------------------------------------------
+# 👇 AQUI ESTÁ A FUNÇÃO MAIN (NÃO MEXA NA INDENTAÇÃO) 👇
+# -------------------------------------------------------------
+def main():
+    if 'gee_initialized' not in st.session_state:
+        gee_handler.inicializar_gee()
+        st.session_state.gee_initialized = True
+        mensagem_container = st.empty()
+        mensagem_container.success("✅ Conectado ao Google Earth Engine com sucesso!")
+        time.sleep(5)
+        mensagem_container.empty()
+        
+    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
+    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
+    
+    if opcao_menu == "Sobre o Aplicativo":
+        ui.renderizar_pagina_sobre()
+        return
+    
+    ui.renderizar_pagina_principal(opcao_menu)
+    
+    # Ativa desenho de polígono se necessário
+    is_polygon = (
+        opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Sobreposição (Camadas)"] and 
+        st.session_state.get('tipo_localizacao') == "Polígono"
+    )
+        
+    is_running = st.session_state.get("analysis_triggered", False)
+    has_geom = 'drawn_geometry' in st.session_state
+    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
+    
+    if is_polygon and not is_running and not has_geom and not has_res: 
+        render_polygon_drawer()
+    
+    if is_running:
+        st.session_state.analysis_triggered = False 
+        run_full_analysis() 
+    
+    render_analysis_results()
 
 if __name__ == "__main__":
     main()
