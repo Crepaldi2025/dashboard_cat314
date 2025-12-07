@@ -77,14 +77,17 @@ def render_map_tips():
         """)
 
 # --- FUNÇÃO PADRONIZADA DE EXPORTAÇÃO (CSV + XLSX) ---
-# Usada APENAS onde o charts_visualizer NÃO gera botões (Mapas e Skew-T)
 def render_download_buttons(df, filename_prefix, key_suffix):
+    """Gera botões de download padronizados para CSV e Excel."""
     if df is None or df.empty:
         return
 
-    # Garante conversão para string para evitar erros de serialização (datas/unidades)
+    # Tenta converter para string de forma forçada para evitar erros de serialização
     try:
-        df_export = df.astype(str)
+        # Cria uma cópia e força conversão de TUDO para string para garantir
+        df_export = df.copy()
+        for col in df_export.columns:
+            df_export[col] = df_export[col].astype(str)
     except:
         df_export = df
 
@@ -234,7 +237,7 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
-    # --- SKEW-T: CORRIGIDO (DADOS COMO STRING PARA EVITAR ERRO JSON) ---
+    # --- SKEW-T: CORREÇÃO DO ERRO JSON ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             ui.renderizar_resumo_selecao()
@@ -245,13 +248,16 @@ def render_analysis_results():
                 
                 with st.expander("📥 Exportar Dados da Sondagem"):
                     try:
-                        # CONVERSÃO CRÍTICA: Força string para evitar erro de serialização
-                        df_safe = res["df"].astype(str)
-                    except:
-                        df_safe = pd.DataFrame(res["df"]).astype(str)
-                    
-                    st.dataframe(df_safe, use_container_width=True)
-                    render_download_buttons(df_safe, "sondagem_skewt", "skewt")
+                        # CRÍTICO: Converte TUDO para string para remover objetos 'pint' ou datas complexas
+                        # Isso impede o erro 'is not JSON serializable'
+                        df_safe = pd.DataFrame(res["df"]).copy()
+                        for col in df_safe.columns:
+                            df_safe[col] = df_safe[col].astype(str)
+                        
+                        st.dataframe(df_safe, use_container_width=True)
+                        render_download_buttons(df_safe, "sondagem_skewt", "skewt")
+                    except Exception as e:
+                        st.error(f"Não foi possível exibir a tabela de dados brutos: {e}")
         return
 
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -327,7 +333,7 @@ def render_analysis_results():
                     except: pass
         return
 
-    # --- MÚLTIPLAS SÉRIES: SEM BOTÕES EXTRAS (Para evitar duplicidade) ---
+    # --- MÚLTIPLAS SÉRIES (SEM BOTÕES DUPLICADOS) ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -372,13 +378,12 @@ def render_analysis_results():
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
-        # MAPAS MANTEM A EXPORTAÇÃO PADRONIZADA (POIS NÃO TINHAM)
         st.subheader("Tabela de Dados")
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
-    # --- SÉRIES TEMPORAIS: SEM BOTÕES EXTRAS (Para evitar duplicidade) ---
+    # --- SÉRIES TEMPORAIS (SEM BOTÕES DUPLICADOS) ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
