@@ -127,7 +127,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     if bounds:
         mapa.fit_bounds(bounds)
     
-    mapa.to_streamlit(height=500, use_container_width=True)
+    mapa.to_streamlit(height=300, use_container_width=True)
 
 # ------------------------------------------------------------------
 # 2. MAPA ESTÁTICO
@@ -271,3 +271,4 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
