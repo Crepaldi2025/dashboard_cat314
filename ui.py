@@ -340,7 +340,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.info("ℹ️ Gera múltiplos gráficos simultâneos.")
             elif opcao == "Sobreposição (Camadas)":
                 if st.session_state.get('overlay_mode') == "Split Map (Cortina)":
-                    st.info("ℹ️ Arraste a barra central para comparar.")
+                    st.info(
+                        "↔️ **Modo Cortina (Split Map):**\n\n"
+                        "Arraste a linha vertical no centro do mapa para revelar a diferença entre a camada **Base** (Lado Esquerdo) e a camada **Topo** (Lado Direito)."
+                    )
                 else:
                     st.info("ℹ️ Ajuste a transparência para misturar.")
             elif opcao == "Hidrografia":
@@ -535,3 +538,4 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
