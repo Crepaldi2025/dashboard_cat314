@@ -269,6 +269,7 @@ def render_analysis_results():
                         
                         sub_c1, sub_c2 = st.columns(2)
                         var_slug = var_name.lower().replace(" ", "_")
+                        # BOTÕES PADRONIZADOS
                         if fp: sub_c1.download_button("💾 Baixar PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
                         if fj: sub_c2.download_button("💾 Baixar JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
                     except: pass
@@ -278,7 +279,19 @@ def render_analysis_results():
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
-        with st.expander("ℹ️ Ajuda dos Gráficos"): st.markdown("Use a barra no topo do gráfico para zoom e pan.")
+        
+        # --- AJUDA COMPLETA E DETALHADA ---
+        with st.popover("ℹ️ Ajuda dos Gráficos"):
+            st.markdown("""
+            **Como interagir com os gráficos:**
+            * 🔍 **Zoom:** Clique e arraste na área do gráfico para aproximar um período.
+            * ✋ **Pan (Mover):** Clique e arraste para navegar temporalmente.
+            * 🏠 **Reset:** Clique no ícone da "Casinha" (ou clique duplo) para voltar ao início.
+            * 📸 **Baixar:** Clique no ícone de câmera (canto superior direito do gráfico) para salvar como PNG.
+            * 🖱️ **Valores:** Passe o mouse sobre a linha para ver o valor exato e a data.
+            """)
+        # -----------------------------------
+        
         st.markdown("---")
         cols = st.columns(2)
         for i, var_name in enumerate(results["data"]):
@@ -300,7 +313,6 @@ def render_analysis_results():
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
             if tipo_mapa == "Interativo":
-                # AJUDA DO MAPA (PADRÃO)
                 with st.popover("ℹ️ Ajuda do Mapa"): 
                     st.markdown("**Controles:** Zoom, Tela Cheia, Camadas.\n**Ferramentas:** Marcador, Linha, Polígono, Retângulo, Círculo, Editar, Lixeira.")
                 map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
@@ -308,7 +320,6 @@ def render_analysis_results():
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
                 if png:
-                    # CORREÇÃO AQUI: use_column_width=True
                     st.image(png, use_column_width=True) 
                     if cbar: st.image(cbar, use_column_width=True)
                     try:
@@ -321,7 +332,7 @@ def render_analysis_results():
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
                         
                         c1, c2 = st.columns(2)
-                        # PADRONIZAÇÃO AQUI:
+                        # BOTÕES PADRONIZADOS
                         if fp: c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
@@ -332,7 +343,7 @@ def render_analysis_results():
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             csv = results["map_dataframe"].to_csv(index=False).encode('utf-8')
-            # PADRONIZAÇÃO AQUI:
+            # PADRONIZAÇÃO AQUI
             st.download_button("💾 Baixar Tabela (CSV)", csv, "dados_mapa.csv", "text/csv")
 
     elif aba == "Séries Temporais":
@@ -354,9 +365,6 @@ def render_polygon_drawer():
         del st.session_state['drawn_geometry']
         st.rerun()
 
-# -------------------------------------------------------------
-# 👇 AQUI ESTÁ A FUNÇÃO MAIN (ENCUSTADA NA ESQUERDA) 👇
-# -------------------------------------------------------------
 def main():
     if 'gee_initialized' not in st.session_state:
         gee_handler.inicializar_gee()
