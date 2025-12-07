@@ -370,13 +370,22 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
             
             if not disable:
-                st.markdown("<div style='font-size:14px;margin-top:8px;'>⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.</div>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div style='font-size:14px;margin-top:8px;'>"
+                    "⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>"
+                    "Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar."
+                    "</div>", 
+                    unsafe_allow_html=True
+                )
             else:
                 if opcao == "Hidrografia" and not st.session_state.get("hidro_upload"):
                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Faça upload do arquivo .ZIP.</div>", unsafe_allow_html=True)
                 elif opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
-                    if not st.session_state.get("variaveis_multiplas"):
+                    vars_sel = st.session_state.get("variaveis_multiplas", [])
+                    if not vars_sel:
                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
+                    elif len(vars_sel) > 4:
+                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Erro:</b> Remova variáveis até ficar com no máximo 4.</div>", unsafe_allow_html=True)
                 else:
                      st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
@@ -386,7 +395,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (AGORA COM GUIAS EXPLICATIVOS)
+# Renderizar a página principal (COM LIMPEZA AUTOMÁTICA)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -406,8 +415,11 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     
-    # Se NÃO houver resultados e NÃO for Polígono/Skew-T, mostra a tela inicial
-    if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state and 'skewt_results' not in st.session_state:
+    # LÓGICA DE LIMPEZA: Só mostra o guia se NÃO tiver resultados gerados
+    has_results = st.session_state.get("analysis_results") is not None
+    has_skewt = st.session_state.get("skewt_results") is not None
+    
+    if not has_results and not has_skewt:
         
         st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
         st.markdown("Este aplicativo permite analisar dados climáticos globais (ERA5) de forma interativa. **Selecione uma ferramenta no menu à esquerda:**")
@@ -416,7 +428,7 @@ def renderizar_pagina_principal(opcao):
 
         with col1:
             st.markdown("#### 🗺️ Análise Espacial")
-            st.info("**Mapas**\nGera mapas para uma única variável (ex: Temperatura) em uma área e data específicas.")
+            st.info("**Mapas**\nGera mapas de calor para uma única variável (ex: Temperatura) em uma área e data específicas.")
             st.info("**Múltiplos Mapas**\nGera painéis estáticos para comparar até 4 variáveis simultaneamente (ex: Chuva vs Umidade).")
             st.info("**Sobreposição (Camadas)**\nPermite cruzar duas variáveis no mesmo mapa usando transparência ou cortina deslizante.")
             st.info("**Hidrografia**\nUpload de Shapefile (.zip) próprio para recortar dados em bacias ou rios específicos.")
@@ -424,11 +436,17 @@ def renderizar_pagina_principal(opcao):
         with col2:
             st.markdown("#### 📈 Análise Temporal & Vertical")
             st.success("**Séries Temporais**\nGera gráficos interativos mostrando a evolução de uma variável ao longo do tempo.")
-            st.success("**Múltiplas Séries**\nPlota gráficos comparativos de até 4 várias variáveis para identificar correlações temporais.")
+            st.success("**Múltiplas Séries**\nPlota gráficos comparativos de várias variáveis para identificar correlações temporais.")
             st.success("**Skew-T (Sondagem)**\nGera diagramas termodinâmicos verticais da atmosfera (perfil de temperatura e orvalho).")
 
         st.markdown("---")
-        st.caption("### 👈 *Comece configurando os parâmetros na barra lateral.*")
+        # FRASE DE DESTAQUE AQUI
+        st.markdown(
+            "<div style='text-align: center; font-size: 1.2rem; color: #333; margin-top: 20px;'>"
+            "👈 <b>Comece configurando os parâmetros na barra lateral.</b>"
+            "</div>", 
+            unsafe_allow_html=True
+        )
 
 def renderizar_resumo_selecao():
     # Verifica qual aba está ativa para decidir o que mostrar
@@ -518,6 +536,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
-
-
