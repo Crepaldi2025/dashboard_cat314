@@ -77,12 +77,12 @@ def render_map_tips():
         """)
 
 # --- FUNÇÃO PADRONIZADA DE EXPORTAÇÃO (CSV + XLSX) ---
+# Usada APENAS onde o charts_visualizer NÃO gera botões (Mapas e Skew-T)
 def render_download_buttons(df, filename_prefix, key_suffix):
-    """Gera botões de download padronizados para CSV e Excel."""
     if df is None or df.empty:
         return
 
-    # Converte para string para garantir que datas/unidades não quebrem o download
+    # Garante conversão para string para evitar erros de serialização (datas/unidades)
     try:
         df_export = df.astype(str)
     except:
@@ -234,6 +234,7 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
+    # --- SKEW-T: CORRIGIDO (DADOS COMO STRING PARA EVITAR ERRO JSON) ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             ui.renderizar_resumo_selecao()
@@ -243,8 +244,8 @@ def render_analysis_results():
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
                 
                 with st.expander("📥 Exportar Dados da Sondagem"):
-                    # --- CORREÇÃO DO ERRO JSON (Convertendo para string) ---
                     try:
+                        # CONVERSÃO CRÍTICA: Força string para evitar erro de serialização
                         df_safe = res["df"].astype(str)
                     except:
                         df_safe = pd.DataFrame(res["df"]).astype(str)
@@ -326,7 +327,7 @@ def render_analysis_results():
                     except: pass
         return
 
-    # --- MÚLTIPLAS SÉRIES (MANTENDO OS BOTÕES DE EXPORTAÇÃO) ---
+    # --- MÚLTIPLAS SÉRIES: SEM BOTÕES EXTRAS (Para evitar duplicidade) ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -338,8 +339,6 @@ def render_analysis_results():
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
-                # Mantendo os botões de exportação padronizados aqui
-                render_download_buttons(res["time_series_df"], f"serie_{var_name.lower().replace(' ', '_')}", f"multi_series_{i}")
         return
 
     var_cfg = results["var_cfg"]
@@ -373,21 +372,17 @@ def render_analysis_results():
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
+        # MAPAS MANTEM A EXPORTAÇÃO PADRONIZADA (POIS NÃO TINHAM)
         st.subheader("Tabela de Dados")
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
-    # --- SÉRIES TEMPORAIS (MANTENDO OS BOTÕES DE EXPORTAÇÃO) ---
+    # --- SÉRIES TEMPORAIS: SEM BOTÕES EXTRAS (Para evitar duplicidade) ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
-            
-            st.subheader("Tabela de Dados")
-            st.dataframe(results["time_series_df"], use_container_width=True, hide_index=True)
-            # Mantendo os botões aqui também
-            render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
 
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
