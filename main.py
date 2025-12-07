@@ -263,7 +263,7 @@ def render_analysis_results():
                         colunas_unidades = {
                             "pressure": "Pressão (hPa)",
                             "temperature": "Temperatura (°C)",
-                            "relative_humidity" Umidade Relativa (%)
+                            "relative_humidity": Umidade Relativa (%)
                             "u_component": "Vento U (m/s)",
                             "v_component": "Vento V (m/s)",
                         }
@@ -460,6 +460,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
