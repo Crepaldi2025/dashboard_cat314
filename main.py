@@ -329,7 +329,7 @@ def render_analysis_results():
     ui.renderizar_resumo_selecao() 
 
     if aba in ["Mapas", "Hidrografia"]:
-        st.markdown("---") 
+         
         if "ee_image" in results:
             vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
             tipo_mapa = st.session_state.get("map_type", "Interativo")
@@ -427,6 +427,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
