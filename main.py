@@ -30,7 +30,7 @@ def set_background():
 
 set_background()
 
-# --- FUNÇÃO DE AJUDA DOS GRÁFICOS (MANTIDA) ---
+# --- FUNÇÃO DE AJUDA PADRONIZADA ---
 def render_chart_tips():
     with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
         st.markdown("### 📈 Guia de Ferramentas")
@@ -52,7 +52,7 @@ def render_chart_tips():
         * **Tela Cheia:** Passe o mouse no gráfico e procure o ícone `⛶` para expandir.
         """)
 
-# --- NOVA FUNÇÃO DE AJUDA DO MAPA (DIDÁTICA) ---
+# --- FUNÇÃO DE AJUDA DO MAPA ---
 def render_map_tips():
     with st.popover("ℹ️ Ajuda: Ferramentas do Mapa"):
         st.markdown("### 🗺️ Guia de Navegação")
@@ -290,6 +290,7 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"**{var_name}**")
+                # Aqui o use_column_width=True é bom, pois divide a tela em 2 colunas
                 png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_column_width=True) 
@@ -314,7 +315,6 @@ def render_analysis_results():
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
         
-        # --- AJUDA DOS GRÁFICOS (DETALHADA) ---
         render_chart_tips()
         
         st.markdown("---")
@@ -337,7 +337,7 @@ def render_analysis_results():
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
             if tipo_mapa == "Interativo":
-                # --- AJUDA DO MAPA (DIDÁTICA) ---
+                # AJUDA DO MAPA (NOVA)
                 render_map_tips()
                 
                 map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
@@ -345,8 +345,11 @@ def render_analysis_results():
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
                 if png:
-                    st.image(png, use_column_width=True) 
-                    if cbar: st.image(cbar, use_column_width=True)
+                    # --- AQUI É A MUDANÇA PARA REDUZIR O TAMANHO ---
+                    st.image(png, width=600) 
+                    if cbar: st.image(cbar, width=600)
+                    # -----------------------------------------------
+                    
                     try:
                         title = f"{st.session_state.variavel} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
@@ -370,7 +373,6 @@ def render_analysis_results():
 
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
-            # --- AJUDA DOS GRÁFICOS (DETALHADA) ---
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
 
