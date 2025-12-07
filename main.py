@@ -272,7 +272,6 @@ def render_analysis_results():
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
         st.subheader("Mapa de Sobreposição (Overlay)")
         ui.renderizar_resumo_selecao()
-        
         with st.popover("ℹ️ Como controlar a visualização?"): 
             st.markdown("""
             **Use o ícone 🗂️ (Camadas) no canto superior direito para:**
@@ -294,7 +293,6 @@ def render_analysis_results():
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
-     
         cols = st.columns(2)
         for i, var_name in enumerate(results["data"]):
             res = results["data"][var_name]
@@ -323,16 +321,15 @@ def render_analysis_results():
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
         render_chart_tips()
-   
+        
         cols = st.columns(2)
         for i, var_name in enumerate(results["data"]):
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
-                # Exportação Individual
-                with st.expander("📥 Exportar Dados"):
-                    render_download_buttons(res["time_series_df"], f"serie_{var_name.lower().replace(' ', '_')}", f"multi_series_{i}")
+                # EXPORTAÇÃO DIRETA (SEM EXPANDER)
+                render_download_buttons(res["time_series_df"], f"serie_{var_name.lower().replace(' ', '_')}", f"multi_series_{i}")
         return
 
     var_cfg = results["var_cfg"]
@@ -340,7 +337,6 @@ def render_analysis_results():
     ui.renderizar_resumo_selecao() 
 
     if aba in ["Mapas", "Hidrografia"]:
-       
         if "ee_image" in results:
             vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
             tipo_mapa = st.session_state.get("map_type", "Interativo")
@@ -367,12 +363,10 @@ def render_analysis_results():
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
-        # --- TABELA DE DADOS PADRONIZADA ---
-      
+        # TABELA DE DADOS MAPA (PADRONIZADA)
         st.subheader("Tabela de Dados")
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
-            # USO DA FUNÇÃO PADRONIZADA (CSV + XLSX)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
     elif aba == "Séries Temporais":
@@ -380,8 +374,7 @@ def render_analysis_results():
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
             
-            # --- TABELA DE DADOS E BOTÕES PADRONIZADOS (SEM EXPANDER) ---
-          
+            # TABELA DE DADOS SÉRIE (PADRONIZADA E SEM EXPANDER)
             st.subheader("Tabela de Dados")
             st.dataframe(results["time_series_df"], use_container_width=True, hide_index=True)
             render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
@@ -439,4 +432,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
