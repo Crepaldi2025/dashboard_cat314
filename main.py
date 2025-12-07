@@ -347,7 +347,7 @@ def render_analysis_results():
                 if png:
                     # --- AQUI É A MUDANÇA PARA REDUZIR O TAMANHO ---
                     st.image(png, width=600) 
-                    if cbar: st.image(cbar, width=600)
+                    if cbar: st.image(cbar, width=400)
                     # -----------------------------------------------
                     
                     try:
@@ -429,3 +429,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
