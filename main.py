@@ -77,15 +77,13 @@ def render_map_tips():
         """)
 
 # --- FUNÇÃO PADRONIZADA DE EXPORTAÇÃO (CSV + XLSX) ---
+# Usada principalmente nos Mapas e Skew-T
 def render_download_buttons(df, filename_prefix, key_suffix):
-    """Gera botões de download padronizados para CSV e Excel."""
     if df is None or df.empty:
         return
 
-    # Preparar CSV
     csv = df.to_csv(index=False).encode('utf-8')
     
-    # Preparar Excel
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
@@ -238,7 +236,6 @@ def render_analysis_results():
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
                 
-                # Exportação para Skew-T (Padronizada)
                 with st.expander("📥 Exportar Dados da Sondagem"):
                     st.dataframe(res["df"], use_container_width=True)
                     render_download_buttons(res["df"], "sondagem_skewt", "skewt")
@@ -317,6 +314,7 @@ def render_analysis_results():
                     except: pass
         return
 
+    # --- MÚLTIPLAS SÉRIES (CORRIGIDO: SEM BOTÕES EXTRAS, USA O ORIGINAL) ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -328,8 +326,6 @@ def render_analysis_results():
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
-                # PADRÃO CORRIGIDO: APENAS OS BOTÕES, SEM EXPANDER, SEM DUPLICAÇÃO
-                render_download_buttons(res["time_series_df"], f"serie_{var_name.lower().replace(' ', '_')}", f"multi_series_{i}")
         return
 
     var_cfg = results["var_cfg"]
@@ -366,16 +362,14 @@ def render_analysis_results():
         st.subheader("Tabela de Dados")
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
+            # AQUI MANTEMOS A EXPORTAÇÃO CSV+XLSX (POIS FALTAVA NO MAPA)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
+    # --- SÉRIES TEMPORAIS (CORRIGIDO: SEM BOTÕES EXTRAS, USA O ORIGINAL) ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
-            
-            st.subheader("Tabela de Dados")
-            st.dataframe(results["time_series_df"], use_container_width=True, hide_index=True)
-            render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
 
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
