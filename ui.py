@@ -444,7 +444,7 @@ def renderizar_pagina_principal(opcao):
         st.markdown("---")
         st.info(
             "ℹ️ **Nota sobre os Dados:** Por padrão, os resultados apresentam **médias agregadas** (diárias ou mensais). "
-            "Caso precise visualizar um momento exato nos mapas, utilize a opção **'Horário Específico'** para selecionar uma hora pontual (0-23h)."
+            "Caso precise visualizar um momento exato nos mapas ou na sobreposição, utilize a opção **'Horário Específico'** para selecionar uma hora pontual (0-23h)."
         )
 
         
@@ -542,6 +542,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
