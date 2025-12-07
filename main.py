@@ -328,7 +328,7 @@ def render_analysis_results():
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
-                # EXPORTAÇÃO DIRETA (SEM EXPANDER)
+                # PADRÃO CORRIGIDO: APENAS OS BOTÕES, SEM EXPANDER, SEM DUPLICAÇÃO
                 render_download_buttons(res["time_series_df"], f"serie_{var_name.lower().replace(' ', '_')}", f"multi_series_{i}")
         return
 
@@ -363,7 +363,6 @@ def render_analysis_results():
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
-        # TABELA DE DADOS MAPA (PADRONIZADA)
         st.subheader("Tabela de Dados")
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
@@ -374,7 +373,6 @@ def render_analysis_results():
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
             
-            # TABELA DE DADOS SÉRIE (PADRONIZADA E SEM EXPANDER)
             st.subheader("Tabela de Dados")
             st.dataframe(results["time_series_df"], use_container_width=True, hide_index=True)
             render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
