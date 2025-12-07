@@ -81,7 +81,6 @@ def render_download_buttons(df, filename_prefix, key_suffix):
     if df is None or df.empty:
         return
 
-    # Converte para string para garantir segurança contra erros de objeto/data
     try:
         df_export = df.astype(str)
     except:
@@ -233,7 +232,6 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
-    # --- SKEW-T: CORREÇÃO COMPLETA DO ERRO JSON ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             ui.renderizar_resumo_selecao()
@@ -244,17 +242,34 @@ def render_analysis_results():
                 
                 with st.expander("📥 Exportar Dados da Sondagem"):
                     try:
-                        # 1. Reseta o index para transformar a data (index) em coluna normal
-                        df_safe = pd.DataFrame(res["df"]).reset_index()
+                        # 1. Copia o dataframe
+                        df_formatted = pd.DataFrame(res["df"]).copy()
                         
-                        # 2. Converte TUDO para string para remover unidades físicas/datas complexas
-                        # Isso previne o erro "Object of type date is not JSON serializable"
-                        df_safe = df_safe.astype(str)
+                        # 2. Reseta o índice se for data (para não perder informação na conversão)
+                        if isinstance(df_formatted.index, pd.DatetimeIndex):
+                            df_formatted.reset_index(inplace=True)
+
+                        # 3. Limpa unidades físicas (MetPy) e converte para número
+                        for col in df_formatted.columns:
+                            # Tenta extrair .magnitude (MetPy) ou mantem o valor
+                            df_formatted[col] = df_formatted[col].apply(lambda x: getattr(x, 'magnitude', x))
+                            # Tenta converter para numérico para podermos formatar
+                            df_formatted[col] = pd.to_numeric(df_formatted[col], errors='ignore')
+
+                        # 4. Formata colunas numéricas (float) para 1 casa decimal
+                        for col in df_formatted.select_dtypes(include=['float']).columns:
+                            df_formatted[col] = df_formatted[col].apply(lambda x: f"{x:.1f}")
+
+                        # 5. Converte TUDO para string final (resolve o erro JSON definitivamente)
+                        df_final = df_formatted.astype(str)
+
+                        st.dataframe(df_final, use_container_width=True)
+                        render_download_buttons(df_final, "sondagem_skewt", "skewt")
                         
-                        st.dataframe(df_safe, use_container_width=True)
-                        render_download_buttons(df_safe, "sondagem_skewt", "skewt")
                     except Exception as e:
-                        st.error(f"Erro ao exibir dados brutos: {e}")
+                        # Fallback de segurança: apenas converte para string sem formatação bonita
+                        st.dataframe(res["df"].astype(str), use_container_width=True)
+                        render_download_buttons(res["df"].astype(str), "sondagem_skewt", "skewt")
         return
 
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -330,7 +345,6 @@ def render_analysis_results():
                     except: pass
         return
 
-    # --- MÚLTIPLAS SÉRIES (SEM DUPLICATAS) ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -380,7 +394,6 @@ def render_analysis_results():
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
-    # --- SÉRIES TEMPORAIS (SEM DUPLICATAS) ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
