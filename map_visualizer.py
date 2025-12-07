@@ -55,14 +55,11 @@ def create_overlay_map(img1, name1, img2, name2, feature, opacity1=1.0, opacity2
 
     # Lógica do Split Map (Cortina)
     if mode == "Split Map (Cortina)":
-        # Cria camadas de tile para o split
-        # Usamos uma função interna do geemap para gerar o TileLayer compatível
         left_layer = geemap.ee_tile_layer(img1, vis1, name=f"Esq: {name1}")
         right_layer = geemap.ee_tile_layer(img2, vis2, name=f"Dir: {name2}")
         
         mapa.split_map(left_layer=left_layer, right_layer=right_layer)
         
-        # Legendas (Esquerda e Direita)
         _add_colorbar_bottomleft(mapa, vis1, f"Esq: {name1}", index=0)
         _add_colorbar_bottomleft(mapa, vis2, f"Dir: {name2}", index=1)
 
@@ -71,16 +68,16 @@ def create_overlay_map(img1, name1, img2, name2, feature, opacity1=1.0, opacity2
         mapa.addLayer(img1, vis1, f"Base: {name1}", opacity=opacity1)
         mapa.addLayer(img2, vis2, f"Topo: {name2}", opacity=opacity2)
         
-        # Legendas Empilhadas
         _add_colorbar_bottomleft(mapa, vis1, f"Base: {name1}", index=0)
         _add_colorbar_bottomleft(mapa, vis2, f"Topo: {name2}", index=1)
 
-    # Contorno sempre visível por cima de tudo
+    # Contorno sempre visível
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
 
     if bounds:
         mapa.fit_bounds(bounds)
     
+    # REDUZIDO AQUI DE 600 PARA 500
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
@@ -127,7 +124,8 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     if bounds:
         mapa.fit_bounds(bounds)
     
-    mapa.to_streamlit(height=350, use_container_width=True)
+    # REDUZIDO AQUI DE 500 PARA 400
+    mapa.to_streamlit(height=400, use_container_width=True)
 
 # ------------------------------------------------------------------
 # 2. MAPA ESTÁTICO
@@ -146,6 +144,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
             region = feature.geometry().buffer(dim * 0.05)
         except: region = feature.geometry()
 
+        # Dimensions controla a resolução da imagem gerada, não o tamanho na tela
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
@@ -271,7 +270,3 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
-
-
-
-
