@@ -428,7 +428,7 @@ def renderizar_pagina_principal(opcao):
             st.success("**Skew-T (Sondagem)**\nGera diagramas termodinâmicos verticais da atmosfera (perfil de temperatura e orvalho).")
 
         st.markdown("---")
-        st.caption("👈 *Comece configurando os parâmetros na barra lateral.*")
+        st.caption("👈 ##*Comece configurando os parâmetros na barra lateral.*")
 
 def renderizar_resumo_selecao():
     # Verifica qual aba está ativa para decidir o que mostrar
@@ -518,4 +518,5 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
