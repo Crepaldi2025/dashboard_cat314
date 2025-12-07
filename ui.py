@@ -422,7 +422,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (COM LIMPEZA)
+# Renderizar a página principal
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -458,10 +458,10 @@ def renderizar_pagina_principal(opcao):
 
         with col1:
             st.markdown("#### 🗺️ Análise Espacial")
-            st.info("**Mapas**\nGera mapas para uma única variável (ex: Temperatura) em uma área e data específicas.")
-            st.info("**Múltiplos Mapas**\nGera painéis estáticos para comparar até 4 variáveis simultaneamente (ex: Chuva vs Umidade).")
-            st.info("**Sobreposição (Camadas)**\nPermite cruzar duas variáveis no mesmo mapa usando transparência ou cortina deslizante.")
-            st.info("**Hidrografia**\nUpload de Shapefile (.zip) próprio para recortar dados em bacias ou rios específicos.")
+            st.success("**Mapas**\nGera mapas para uma única variável (ex: Temperatura) em uma área e data específicas.")
+            st.success("**Múltiplos Mapas**\nGera painéis estáticos para comparar até 4 variáveis simultaneamente (ex: Chuva vs Umidade).")
+            st.success("**Sobreposição (Camadas)**\nPermite cruzar duas variáveis no mesmo mapa usando transparência ou cortina deslizante.")
+            st.success("**Hidrografia**\nUpload de Shapefile (.zip) próprio para recortar dados em bacias ou rios específicos.")
 
         with col2:
             st.markdown("#### 📈 Análise Temporal & Vertical")
@@ -569,6 +569,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
