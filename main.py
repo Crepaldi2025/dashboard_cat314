@@ -316,7 +316,6 @@ def render_analysis_results():
         
         render_chart_tips()
         
-        st.markdown("---")
         cols = st.columns(2)
         for i, var_name in enumerate(results["data"]):
             res = results["data"][var_name]
@@ -428,5 +427,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
