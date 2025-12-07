@@ -263,9 +263,9 @@ def render_analysis_results():
                         colunas_unidades = {
                             "pressure": "Pressão (hPa)",
                             "temperature": "Temperatura (°C)",
-                            
-                            "u_component_of_wind": "Vento U (m/s)",
-                            "v_component_of_wind": "Vento V (m/s)",
+                            "relative_humidity" Umidade Relativa (%)
+                            "u_component": "Vento U (m/s)",
+                            "v_component": "Vento V (m/s)",
                         }
                         df_formatted = df_formatted.rename(columns=colunas_unidades)
                         # 5. Converte TUDO para string final (resolve o erro JSON definitivamente)
@@ -460,5 +460,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
