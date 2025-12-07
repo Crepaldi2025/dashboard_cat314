@@ -211,17 +211,23 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if tipo_loc == "Estado":
                     if len(lista_ufs) <= 1: st.error("⚠️ Lista de estados vazia (Fallback ativo).")
                     st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
+                    
                 elif tipo_loc == "Município":
                     st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
                     estado_str = st.session_state.get('estado', 'Selecione...')
+                    
                     lista_muns = ["Selecione um estado primeiro"]
                     
                     if estado_str != "Selecione...":
-                         # Adicionado .strip() aqui para limpar espaços
-                         uf_sigla = estado_str.split(' - ')[-1].strip()
+                         # 👇 MUDANÇA AQUI: Pega sempre os 2 últimos caracteres (a Sigla)
+                         uf_sigla = estado_str[-2:]
                          
                          muns = dados_geo.get(uf_sigla, [])
-                         if muns: lista_muns = ["Selecione..."] + muns
+                         if muns: 
+                             lista_muns = ["Selecione..."] + sorted(muns)
+                         else:
+                             # Opcional: Ajuda a debugar se não achar nada
+                             lista_muns = [f"Sem dados para {uf_sigla}"]
                     
                     st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
                 
@@ -545,6 +551,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
