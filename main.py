@@ -76,19 +76,22 @@ def render_map_tips():
         * `🗑️` **Lixeira:** Remove todos os desenhos ou o item selecionado.
         """)
 
-# --- FUNÇÃO PADRONIZADA DE EXPORTAÇÃO (CSV + XLSX) ---
+# --- FUNÇÃO PADRONIZADA DE EXPORTAÇÃO (APENAS PARA MAPAS E SKEW-T) ---
 def render_download_buttons(df, filename_prefix, key_suffix):
-    """Gera botões de download padronizados para CSV e Excel."""
     if df is None or df.empty:
         return
 
-    # Preparar CSV
-    csv = df.to_csv(index=False).encode('utf-8')
+    # Tenta converter para string para evitar erros de serialização (datas/unidades)
+    try:
+        df_export = df.astype(str)
+    except:
+        df_export = df
+
+    csv = df_export.to_csv(index=False).encode('utf-8')
     
-    # Preparar Excel
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
+        df_export.to_excel(writer, index=False)
     excel_data = buffer.getvalue()
     
     c1, c2 = st.columns(2)
@@ -238,19 +241,11 @@ def render_analysis_results():
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
                 
+                # CORREÇÃO DO ERRO JSON: Convertendo para string antes de exibir
                 with st.expander("📥 Exportar Dados da Sondagem"):
-                    # CORREÇÃO CRÍTICA DO ERRO JSON:
-                    # Cria uma cópia limpa do DataFrame para remover unidades do MetPy
-                    try:
-                        df_clean = res["df"].copy()
-                        for col in df_clean.columns:
-                            # Remove unidades se existirem (Pint Quantity)
-                            df_clean[col] = df_clean[col].apply(lambda x: getattr(x, 'magnitude', x))
-                    except:
-                        df_clean = res["df"].astype(str) # Fallback seguro
-
+                    df_clean = res["df"].astype(str)
                     st.dataframe(df_clean, use_container_width=True)
-                    render_download_buttons(df_clean, "sondagem_skewt", "skewt")
+                    render_download_buttons(res["df"], "sondagem_skewt", "skewt")
         return
 
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -326,6 +321,7 @@ def render_analysis_results():
                     except: pass
         return
 
+    # --- MÚLTIPLAS SÉRIES (REMOVIDOS OS BOTÕES EXTRAS - USA O VISUALIZER PADRÃO) ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -337,8 +333,6 @@ def render_analysis_results():
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
-                # EXPORTAÇÃO PADRONIZADA DIRETA
-                render_download_buttons(res["time_series_df"], f"serie_{var_name.lower().replace(' ', '_')}", f"multi_series_{i}")
         return
 
     var_cfg = results["var_cfg"]
@@ -377,14 +371,11 @@ def render_analysis_results():
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
+    # --- SÉRIES TEMPORAIS (REMOVIDOS OS BOTÕES EXTRAS) ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
-            
-            st.subheader("Tabela de Dados")
-            st.dataframe(results["time_series_df"], use_container_width=True, hide_index=True)
-            render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
 
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
