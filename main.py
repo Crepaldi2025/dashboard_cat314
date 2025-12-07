@@ -82,12 +82,9 @@ def render_download_buttons(df, filename_prefix, key_suffix):
     if df is None or df.empty:
         return
 
-    # Tenta converter para string de forma forçada para evitar erros de serialização
+    # Garante conversão segura para texto antes de exportar
     try:
-        # Cria uma cópia e força conversão de TUDO para string para garantir
-        df_export = df.copy()
-        for col in df_export.columns:
-            df_export[col] = df_export[col].astype(str)
+        df_export = df.astype(str)
     except:
         df_export = df
 
@@ -237,7 +234,7 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
-    # --- SKEW-T: CORREÇÃO DO ERRO JSON ---
+    # --- SKEW-T: TABELA FORMATADA (1 CASA DECIMAL) ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             ui.renderizar_resumo_selecao()
@@ -248,16 +245,29 @@ def render_analysis_results():
                 
                 with st.expander("📥 Exportar Dados da Sondagem"):
                     try:
-                        # CRÍTICO: Converte TUDO para string para remover objetos 'pint' ou datas complexas
-                        # Isso impede o erro 'is not JSON serializable'
-                        df_safe = pd.DataFrame(res["df"]).copy()
-                        for col in df_safe.columns:
-                            df_safe[col] = df_safe[col].astype(str)
+                        # 1. Copia o dataframe para não alterar o original (que gera o gráfico)
+                        df_export = res["df"].copy()
                         
-                        st.dataframe(df_safe, use_container_width=True)
-                        render_download_buttons(df_safe, "sondagem_skewt", "skewt")
+                        # 2. Remove as unidades físicas (MetPy) e converte para número puro
+                        for col in df_export.columns:
+                            df_export[col] = df_export[col].apply(lambda x: getattr(x, 'magnitude', x))
+                            df_export[col] = pd.to_numeric(df_export[col], errors='ignore')
+
+                        # 3. Formata apenas colunas numéricas para string com 1 casa decimal (ex: 25.0)
+                        # Isso também resolve o erro de JSON, pois vira string
+                        for col in df_export.select_dtypes(include=['float', 'int']).columns:
+                            df_export[col] = df_export[col].apply(lambda x: f"{x:.1f}")
+
+                        # 4. Garante que tudo seja string para exibição/download seguro
+                        df_export = df_export.astype(str)
+
+                        st.dataframe(df_export, use_container_width=True)
+                        render_download_buttons(df_export, "sondagem_skewt", "skewt")
+                        
                     except Exception as e:
-                        st.error(f"Não foi possível exibir a tabela de dados brutos: {e}")
+                        st.error(f"Erro ao processar tabela: {e}")
+                        # Fallback de segurança se der erro na formatação
+                        st.dataframe(res["df"].astype(str), use_container_width=True)
         return
 
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
@@ -333,7 +343,7 @@ def render_analysis_results():
                     except: pass
         return
 
-    # --- MÚLTIPLAS SÉRIES (SEM BOTÕES DUPLICADOS) ---
+    # --- MÚLTIPLAS SÉRIES (SEM BOTÕES EXTRAS - EVITANDO DUPLICATA) ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -383,7 +393,7 @@ def render_analysis_results():
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
-    # --- SÉRIES TEMPORAIS (SEM BOTÕES DUPLICADOS) ---
+    # --- SÉRIES TEMPORAIS (SEM BOTÕES EXTRAS - EVITANDO DUPLICATA) ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
