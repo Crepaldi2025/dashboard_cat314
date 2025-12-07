@@ -43,6 +43,19 @@ def _carregar_texto_docx(file_path):
         return "\n\n".join(full_text)
     except Exception: return None
 
+# --- FUNÇÃO AUXILIAR PARA BUSCAR NO IBGE (FALLBACK) ---
+@st.cache_data
+def get_municipios_ibge(uf_sigla):
+    """Busca municípios diretamente do IBGE se o cache local falhar."""
+    try:
+        url = f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf_sigla}/municipios"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            return sorted([m['nome'] for m in response.json()])
+    except:
+        pass
+    return []
+
 # -----------------------
 # Apagar dados da memória
 # -----------------------
@@ -201,20 +214,38 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 ) 
                 
                 tipo_loc = st.session_state.get('tipo_localizacao', 'Estado')
+                
+                # Garante que mapa_nomes_uf não esteja vazio
+                if not mapa_nomes_uf:
+                    mapa_nomes_uf = {'AC':'Acre','AL':'Alagoas','AP':'Amapá','AM':'Amazonas','BA':'Bahia','CE':'Ceará','DF':'Distrito Federal','ES':'Espírito Santo','GO':'Goiás','MA':'Maranhão','MT':'Mato Grosso','MS':'Mato Grosso do Sul','MG':'Minas Gerais','PA':'Pará','PB':'Paraíba','PR':'Paraná','PE':'Pernambuco','PI':'Piauí','RJ':'Rio de Janeiro','RN':'Rio Grande do Norte','RS':'Rio Grande do Sul','RO':'Rondônia','RR':'Roraima','SC':'Santa Catarina','SP':'São Paulo','SE':'Sergipe','TO':'Tocantins'}
+
                 lista_ufs = ["Selecione..."] + [f"{mapa_nomes_uf[uf]} - {uf}" for uf in sorted(mapa_nomes_uf)]
 
                 if tipo_loc == "Estado":
-                    if len(lista_ufs) <= 1: st.error("⚠️ Lista de estados vazia (Fallback ativo).")
                     st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
                 
                 elif tipo_loc == "Município":
                     st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
+                    
                     estado_str = st.session_state.get('estado', 'Selecione...')
                     lista_muns = ["Selecione um estado primeiro"]
+                    
                     if estado_str != "Selecione...":
-                         uf_sigla = estado_str.split(' - ')[-1]
+                         # Pega a sigla (sempre os 2 últimos)
+                         uf_sigla = estado_str[-2:]
+                         
+                         # Tenta pegar do cache local
                          muns = dados_geo.get(uf_sigla, [])
-                         if muns: lista_muns = ["Selecione..."] + muns
+                         
+                         # Se o cache falhar ou estiver vazio, busca direto do IBGE
+                         if not muns:
+                             muns = get_municipios_ibge(uf_sigla)
+                         
+                         if muns: 
+                             lista_muns = ["Selecione..."] + sorted(muns)
+                         else:
+                             lista_muns = [f"Erro ao carregar cidades de {uf_sigla}"]
+                    
                     st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
                 
                 elif tipo_loc == "Círculo (Lat/Lon/Raio)":
@@ -365,7 +396,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
             
             if not disable:
-                # --- MENSAGEM AUMENTADA ---
+                # --- MENSAGEM COM FONTE MAIOR ---
                 st.markdown(
                     "<div style='font-size:18px;margin-top:12px;line-height:1.5;'>"
                     "⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>"
@@ -391,7 +422,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (COM LIMPEZA E LÓGICA CORRETA)
+# Renderizar a página principal (COM LIMPEZA)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -416,16 +447,16 @@ def renderizar_pagina_principal(opcao):
     has_skewt = st.session_state.get("skewt_results") is not None
     is_generating = st.session_state.get("analysis_triggered", False)
 
-    # SÓ MOSTRA SE NÃO TEM RESULTADO E NÃO ESTÁ GERANDO
     if not has_results and not has_skewt and not is_generating:
         
         st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
         
+        # --- AQUI ESTÁ A NOTA DIDÁTICA ---
         st.info(
             "ℹ️ **Nota sobre os Dados:** Por padrão, os resultados apresentam **médias agregadas** (diárias ou mensais). "
             "Caso precise visualizar um momento exato nos mapas, utilize a opção **'Horário Específico'** para selecionar uma hora pontual (0-23h)."
         )
-
+        
         col1, col2 = st.columns(2)
 
         with col1:
@@ -536,4 +567,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
