@@ -1,4 +1,3 @@
-Coordenadas
 # ==================================================================================
 # ui.py
 # ==================================================================================
@@ -537,6 +536,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
