@@ -237,7 +237,7 @@ def render_analysis_results():
             res = st.session_state.skewt_results
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
-                st.markdown("---")
+                
                 # Exportação para Skew-T (Padronizada)
                 with st.expander("📥 Exportar Dados da Sondagem"):
                     st.dataframe(res["df"], use_container_width=True)
@@ -272,7 +272,7 @@ def render_analysis_results():
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
         st.subheader("Mapa de Sobreposição (Overlay)")
         ui.renderizar_resumo_selecao()
-        st.markdown("---")
+        
         with st.popover("ℹ️ Como controlar a visualização?"): 
             st.markdown("""
             **Use o ícone 🗂️ (Camadas) no canto superior direito para:**
@@ -294,7 +294,7 @@ def render_analysis_results():
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
-        st.markdown("---")
+     
         cols = st.columns(2)
         for i, var_name in enumerate(results["data"]):
             res = results["data"][var_name]
@@ -323,7 +323,7 @@ def render_analysis_results():
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
         render_chart_tips()
-        st.markdown("---")
+   
         cols = st.columns(2)
         for i, var_name in enumerate(results["data"]):
             res = results["data"][var_name]
@@ -340,7 +340,7 @@ def render_analysis_results():
     ui.renderizar_resumo_selecao() 
 
     if aba in ["Mapas", "Hidrografia"]:
-        st.markdown("---") 
+       
         if "ee_image" in results:
             vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
             tipo_mapa = st.session_state.get("map_type", "Interativo")
@@ -368,7 +368,7 @@ def render_analysis_results():
                     except: pass
 
         # --- TABELA DE DADOS PADRONIZADA ---
-        st.markdown("---")
+      
         st.subheader("Tabela de Dados")
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
@@ -381,7 +381,7 @@ def render_analysis_results():
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
             
             # --- TABELA DE DADOS E BOTÕES PADRONIZADOS (SEM EXPANDER) ---
-            st.markdown("---")
+          
             st.subheader("Tabela de Dados")
             st.dataframe(results["time_series_df"], use_container_width=True, hide_index=True)
             render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
@@ -439,3 +439,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
