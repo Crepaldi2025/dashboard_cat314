@@ -77,7 +77,7 @@ def create_overlay_map(img1, name1, img2, name2, feature, opacity1=1.0, opacity2
     if bounds:
         mapa.fit_bounds(bounds)
     
-    # REDUZIDO AQUI DE 600 PARA 500
+    # REDUZIDO AQUI 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
@@ -124,8 +124,8 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     if bounds:
         mapa.fit_bounds(bounds)
     
-    # REDUZIDO AQUI DE 500 PARA 400
-    mapa.to_streamlit(height=600, use_container_width=True)
+    # REDUZIDO AQUI 
+    mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
 # 2. MAPA ESTÁTICO
@@ -270,4 +270,5 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
