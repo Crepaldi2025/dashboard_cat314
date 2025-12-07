@@ -153,8 +153,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             elif opcao == "Sobreposição (Camadas)":
                 st.caption("Selecione duas variáveis para comparar:")
-                st.selectbox("1ª Camada (Base):", lista_vars, index=0, key='var_camada_1', on_change=reset_analysis_state)
-                st.selectbox("2ª Camada (Topo):", lista_vars, index=3, key='var_camada_2', on_change=reset_analysis_state)
+                st.selectbox("1ª Camada (Base/Esquerda):", lista_vars, index=0, key='var_camada_1', on_change=reset_analysis_state)
+                st.selectbox("2ª Camada (Topo/Direita):", lista_vars, index=3, key='var_camada_2', on_change=reset_analysis_state)
                 
                 st.markdown("---")
                 
@@ -180,8 +180,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.divider()
 
             # --- 5. LOCALIZAÇÃO / HIDROGRAFIA ---
-            
-            # Inicializa a variável para evitar UnboundLocalError
             tipo_loc = "N/A" 
 
             if opcao == "Hidrografia":
@@ -193,11 +191,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if uploaded_file:
                     st.success("Arquivo recebido! Clique em Gerar Análise.", icon="✅")
                 
-                # Define aqui para ser usado na validação final
                 tipo_loc = "Hidrografia"
                 
             else:
-                # --- LOCALIZAÇÃO PADRÃO ---
                 st.markdown("#### 📍 Localização")
                 st.selectbox(
                     "Tipo de Recorte", 
@@ -354,20 +350,16 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
             
-            # Lógica de bloqueio padrão
             if tipo_loc == "Polígono" and not st.session_state.get('drawn_geometry'): disable = True
             elif tipo_loc == "Círculo (Lat/Lon/Raio)" and not (st.session_state.get('latitude') and st.session_state.get('longitude')): disable = True
             
-            # Bloqueios específicos
             if opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                 vars_sel = st.session_state.get("variaveis_multiplas", [])
                 if not vars_sel or len(vars_sel) > 4: disable = True
             
             if opcao == "Hidrografia":
-                if not st.session_state.get("hidro_upload"): 
-                    disable = True
-                else:
-                    disable = False
+                if not st.session_state.get("hidro_upload"): disable = True
+                else: disable = False
 
             st.button(
                 "🚀 Gerar Análise", 
@@ -378,22 +370,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
             
             if not disable:
-                st.markdown(
-                    "<div style='font-size:14px;margin-top:8px;'>"
-                    "⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>"
-                    "Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar."
-                    "</div>", 
-                    unsafe_allow_html=True
-                )
+                st.markdown("<div style='font-size:14px;margin-top:8px;'>⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.</div>", unsafe_allow_html=True)
             else:
                 if opcao == "Hidrografia" and not st.session_state.get("hidro_upload"):
                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Faça upload do arquivo .ZIP.</div>", unsafe_allow_html=True)
                 elif opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
-                    vars_sel = st.session_state.get("variaveis_multiplas", [])
-                    if not vars_sel:
+                    if not st.session_state.get("variaveis_multiplas"):
                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
-                    elif len(vars_sel) > 4:
-                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Erro:</b> Remova variáveis até ficar com no máximo 4.</div>", unsafe_allow_html=True)
                 else:
                      st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
@@ -403,13 +386,14 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal
+# Renderizar a página principal (AGORA COM GUIAS EXPLICATIVOS)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
     st.markdown("""<style>.block-container{padding-top:3rem!important;padding-bottom:5rem!important}h1{margin-top:0rem!important}.stExpander{border:1px solid #f0f2f6;border-radius:8px}</style>""", unsafe_allow_html=True)
     fuso_br = pytz.timezone('America/Sao_Paulo')
     agora, agora_utc = datetime.now(fuso_br), datetime.now(pytz.utc)
+    
     c1, c2 = st.columns([3, 1.5])
     with c1:
         lc, tc = st.columns([1, 5])
@@ -419,9 +403,32 @@ def renderizar_pagina_principal(opcao):
         with tc: st.title(f"{opcao}")
     with c2:
         st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
+    
     st.markdown("---")
+    
+    # Se NÃO houver resultados e NÃO for Polígono/Skew-T, mostra a tela inicial
     if "analysis_results" not in st.session_state and 'drawn_geometry' not in st.session_state and 'skewt_results' not in st.session_state:
-        st.markdown("Configure sua análise no **Painel de Controle** à esquerda e clique em **Gerar Análise** para exibir os resultados aqui.")
+        
+        st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
+        st.markdown("Este aplicativo permite analisar dados climáticos globais (ERA5) de forma interativa. **Selecione uma ferramenta no menu à esquerda:**")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("#### 🗺️ Análise Espacial")
+            st.info("**Mapas**\nGera mapas de calor para uma única variável (ex: Temperatura) em uma área e data específicas.")
+            st.info("**Múltiplos Mapas**\nGera painéis estáticos para comparar até 4 variáveis simultaneamente (ex: Chuva vs Umidade).")
+            st.info("**Sobreposição (Camadas)**\nPermite cruzar duas variáveis no mesmo mapa usando transparência ou cortina deslizante.")
+            st.info("**Hidrografia**\nUpload de Shapefile (.zip) próprio para recortar dados em bacias ou rios específicos.")
+
+        with col2:
+            st.markdown("#### 📈 Análise Temporal & Vertical")
+            st.success("**Séries Temporais**\nGera gráficos interativos mostrando a evolução de uma variável ao longo do tempo.")
+            st.success("**Múltiplas Séries**\nPlota gráficos comparativos de várias variáveis para identificar correlações temporais.")
+            st.success("**Skew-T (Sondagem)**\nGera diagramas termodinâmicos verticais da atmosfera (perfil de temperatura e orvalho).")
+
+        st.markdown("---")
+        st.caption("👈 *Comece configurando os parâmetros na barra lateral.*")
 
 def renderizar_resumo_selecao():
     # Verifica qual aba está ativa para decidir o que mostrar
@@ -467,7 +474,7 @@ def renderizar_resumo_selecao():
         with c1: st.markdown(f"**{label_titulo}** \n{var_text}")
         with c2:
             if nav_option == "Hidrografia":
-                st.markdown("**Local:**\nShapefile Personalizado (Upload)")
+                st.markdown("**Local:**\nShapefile Personalizado")
             else:
                 tipo = st.session_state.tipo_localizacao
                 local_txt = ""
