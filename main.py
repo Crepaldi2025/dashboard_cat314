@@ -30,10 +30,22 @@ def set_background():
 
 set_background()
 
+# --- FUNÇÃO DE AJUDA PADRONIZADA (USADA EM TODAS AS SÉRIES) ---
+def render_chart_tips():
+    with st.expander("ℹ️ Dicas de Interação com os Gráficos", expanded=False):
+        st.markdown("""
+        **Ferramentas da barra de topo do gráfico:**
+        * 📷 **Baixar:** Salva o gráfico como imagem PNG.
+        * 🔍 **Zoom:** Clique e arraste na área do gráfico para aproximar um período.
+        * ✋ **Pan:** Clique e arraste para mover o gráfico lateralmente.
+        * ➕ **Zoom In/Out:** Botões para aproximar ou afastar.
+        * 🏠 **Reset:** Volta para a visualização original (padrão).
+        * 🖱️ **Hover:** Passe o mouse sobre as linhas para ver os valores exatos.
+        """)
+
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
     
-    # Se for hidrografia, a chave é baseada no nome do arquivo enviado
     if session_state.get('nav_option') == 'Hidrografia':
         uploaded = session_state.get('hidro_upload')
         return f"hidro:{uploaded.name if uploaded else 'none'}"
@@ -46,7 +58,6 @@ def get_geo_caching_key(session_state):
     return key
 
 def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
-    # O gee_handler já sabe lidar com o upload se a aba for Hidrografia
     geometry, feature = gee_handler.get_area_of_interest_geometry(st.session_state)
     
     if not geometry: return None 
@@ -56,7 +67,6 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
     
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
-    # Lógica compartilhada para Todos os Modos de Mapa (incluindo Hidrografia)
     if aba in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia"]:
         target_hour = None
         if st.session_state.get('tipo_periodo') == "Horário Específico":
@@ -66,7 +76,6 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
         
         if ee_image:
             results["ee_image"] = ee_image
-            # Gera tabela de dados se for mapa único ou hidro
             if aba in ["Mapas", "Hidrografia"]:
                 df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
                 if df_map_samples is not None: results["map_dataframe"] = df_map_samples
@@ -80,7 +89,6 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
 def run_full_analysis():
     aba = st.session_state.get("nav_option", "Mapas")
     
-    # --- LÓGICA SKEW-T ---
     if aba == "Skew-T":
         lat = st.session_state.get("skew_lat")
         lon = st.session_state.get("skew_lon")
@@ -92,7 +100,6 @@ def run_full_analysis():
             st.session_state.skewt_results = {"df": df, "params": (lat, lon, date, hour)}
         return
     
-    # --- LÓGICA SOBREPOSIÇÃO ---
     if aba == "Sobreposição (Camadas)":
         v1 = st.session_state.get("var_camada_1")
         v2 = st.session_state.get("var_camada_2")
@@ -120,7 +127,6 @@ def run_full_analysis():
                 }
         return
 
-    # --- LÓGICA MÚLTIPLOS ---
     if aba in ["Múltiplos Mapas", "Múltiplas Séries"]:
         variaveis = st.session_state.get("variaveis_multiplas", [])
         if not variaveis: return
@@ -148,7 +154,6 @@ def run_full_analysis():
         st.session_state.analysis_results = {"mode": mode_tag, "data": results_multi}
         return
 
-    # --- LÓGICA PADRÃO (ÚNICO / HIDROGRAFIA) ---
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
     tipo_per = st.session_state.tipo_periodo
     
@@ -167,7 +172,6 @@ def run_full_analysis():
     
     try:
         with st.spinner("Processando dados no Google Earth Engine..."):
-            # O parâmetro 'aba' aqui passa 'Hidrografia' ou 'Mapas' ou 'Séries'
             analysis_data = run_analysis_logic(variavel, start_date, end_date, geo_key, aba)
         
         if analysis_data is None:
@@ -197,7 +201,6 @@ def render_analysis_results():
 
     results = st.session_state.analysis_results
 
-    # Títulos e Strings
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     periodo_str = ""
     if tipo_periodo == "Personalizado": periodo_str = f"de {st.session_state.get('data_inicio').strftime('%d/%m/%Y')} a {st.session_state.get('data_fim').strftime('%d/%m/%Y')}"
@@ -218,7 +221,6 @@ def render_analysis_results():
         elif tipo_local == "polígono": local_str = "para a área desenhada"
         elif "círculo" in tipo_local: local_str = "para o círculo definido"
 
-    # --- RENDERIZAÇÃO ESPECIAL: SOBREPOSIÇÃO ---
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
         st.subheader("Mapa de Sobreposição (Overlay)")
         ui.renderizar_resumo_selecao()
@@ -243,7 +245,6 @@ def render_analysis_results():
         )
         return
 
-    # --- RENDERIZAÇÃO ESPECIAL: MÚLTIPLOS MAPAS ---
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
@@ -253,7 +254,6 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"**{var_name}**")
-                # CORREÇÃO AQUI: use_column_width=True para compatibilidade
                 png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_column_width=True) 
@@ -269,28 +269,17 @@ def render_analysis_results():
                         
                         sub_c1, sub_c2 = st.columns(2)
                         var_slug = var_name.lower().replace(" ", "_")
-                        # BOTÕES PADRONIZADOS
                         if fp: sub_c1.download_button("💾 Baixar PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
                         if fj: sub_c2.download_button("💾 Baixar JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
                     except: pass
         return
 
-    # --- RENDERIZAÇÃO ESPECIAL: MÚLTIPLAS SÉRIES ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
         
-        # --- AJUDA COMPLETA E DETALHADA ---
-        with st.popover("ℹ️ Ajuda dos Gráficos"):
-            st.markdown("""
-            **Como interagir com os gráficos:**
-            * 🔍 **Zoom:** Clique e arraste na área do gráfico para aproximar um período.
-            * ✋ **Pan (Mover):** Clique e arraste para navegar temporalmente.
-            * 🏠 **Reset:** Clique no ícone da "Casinha" (ou clique duplo) para voltar ao início.
-            * 📸 **Baixar:** Clique no ícone de câmera (canto superior direito do gráfico) para salvar como PNG.
-            * 🖱️ **Valores:** Passe o mouse sobre a linha para ver o valor exato e a data.
-            """)
-        # -----------------------------------
+        # AJUDA IDÊNTICA AO SÉRIES TEMPORAIS
+        render_chart_tips()
         
         st.markdown("---")
         cols = st.columns(2)
@@ -298,10 +287,10 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
+                # show_help=False PARA NÃO DUPLICAR
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
         return
 
-    # --- RENDERIZAÇÃO PADRÃO (MAPA ÚNICO OU HIDROGRAFIA) ---
     var_cfg = results["var_cfg"]
     st.subheader(f"Análise: {st.session_state.get('variavel')} {local_str}")
     ui.renderizar_resumo_selecao() 
@@ -332,23 +321,23 @@ def render_analysis_results():
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
                         
                         c1, c2 = st.columns(2)
-                        # BOTÕES PADRONIZADOS
                         if fp: c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
-        # Tabela de Dados
         st.markdown("---")
         st.subheader("Tabela de Dados")
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             csv = results["map_dataframe"].to_csv(index=False).encode('utf-8')
-            # PADRONIZAÇÃO AQUI
             st.download_button("💾 Baixar Tabela (CSV)", csv, "dados_mapa.csv", "text/csv")
 
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
-            charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=True)
+            # AJUDA IDÊNTICA AQUI TAMBÉM
+            render_chart_tips()
+            # show_help=False PARA NÃO DUPLICAR
+            charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
 
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
@@ -383,7 +372,6 @@ def main():
     
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # Ativa desenho de polígono se necessário
     is_polygon = (
         opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Sobreposição (Camadas)"] and 
         st.session_state.get('tipo_localizacao') == "Polígono"
