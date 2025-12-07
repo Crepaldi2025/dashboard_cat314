@@ -165,11 +165,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     c_op1, c_op2 = st.columns(2)
                     with c_op1: st.slider("Base", 0.0, 1.0, 1.0, key='opacity_1', on_change=reset_analysis_results_only)
                     with c_op2: st.slider("Topo", 0.0, 1.0, 0.6, key='opacity_2', on_change=reset_analysis_results_only)
-                else:
-                    st.info(
-                        "↔️ **Modo Cortina (Split Map):**\n\n"
-                        "Arraste a linha vertical no centro do mapa para revelar a diferença entre a camada **Base** (Lado Esquerdo) e a camada **Topo** (Lado Direito)."
-                    )
             
             else:
                 st.selectbox(
@@ -211,28 +206,24 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if tipo_loc == "Estado":
                     if len(lista_ufs) <= 1: st.error("⚠️ Lista de estados vazia (Fallback ativo).")
                     st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
-                    
+                
                 elif tipo_loc == "Município":
-                st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
-                
-                # Pega o valor selecionado
-                estado_str = st.session_state.get('estado', 'Selecione...')
-                
-                lista_muns = ["Selecione um estado primeiro"]
-                
-                if estado_str != "Selecione...":
-                    # --- CORREÇÃO AQUI ---
-                    # Divide pelo traço e remove espaços em branco da sigla
-                    try:
-                        uf_sigla = estado_str.split(' - ')[-1].strip()
-                        muns = dados_geo.get(uf_sigla, [])
-                        
-                        if muns:
-                            lista_muns = ["Selecione..."] + sorted(muns)
-                    except:
-                        pass # Evita erro se a string estiver mal formatada
-                
-                st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
+                    st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
+                    
+                    estado_str = st.session_state.get('estado', 'Selecione...')
+                    lista_muns = ["Selecione um estado primeiro"]
+                    
+                    if estado_str != "Selecione...":
+                         # --- CORREÇÃO AQUI COM .STRIP() ---
+                         try:
+                             uf_sigla = estado_str.split(' - ')[-1].strip()
+                             muns = dados_geo.get(uf_sigla, [])
+                             if muns:
+                                 lista_muns = ["Selecione..."] + sorted(muns)
+                         except:
+                             pass
+                    
+                    st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
                 
                 elif tipo_loc == "Círculo (Lat/Lon/Raio)":
                     c1, c2 = st.columns(2)
@@ -243,6 +234,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
                         st.markdown("**1️⃣ Coordenadas (Latitude e Longitude)**")
                         st.markdown("Devem estar em **Graus Decimais** (ex: `-22.42`).\n* **Dica:** No Google Maps, clique com o botão direito no local desejado para copiar.")
+                        st.markdown("") 
                         st.markdown("**2️⃣ Raio**")
                         st.markdown("Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.")
                     
@@ -260,7 +252,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                         st.markdown("* `➕` `➖` **Zoom:** Aproxima ou afasta a visão.\n* `⛶` **Tela Cheia:** Expande o mapa.\n* `🗂️` **Camadas:** Alterna entre Satélite e Mapa de Ruas.")
                         st.markdown("---")
                         st.markdown("**✏️ Ferramentas de Desenho**")
-                        st.markdown("* `⬟` **Polígono:** Clique ponto a ponto para fechar uma área livre.\n* `⬛` **Retângulo:** Clique e arraste para criar uma área quadrada.\n* `⭕` **Círculo:** Clique no centro e arraste para definir o raio.\n* `📍` **Marcador:** Adiciona um pino em um local específico.\n* `╱` **Linha:** Desenha uma linha (útil para medir distâncias).")
+                        st.markdown("* `⬟` **Polígono:** Clique ponto a ponto para fechar uma área livre.\n* `⬛` **Retângulo:** Clique e arraste para criar uma área quadrada.\n* `⭕` **Círculo:** Clique no centro e arraste para definir o raio.\n* `📍` **Marcador:** Adiciona um pino em um local específico.\n* `╱` **Linha:** Desenhe uma linha (útil para medir distâncias).")
                         st.markdown("---")
                         st.markdown("**🛠️ Edição e Limpeza**")
                         st.markdown("* `📝` **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.\n* `🗑️` **Lixeira:** Apaga todos os desenhos feitos no mapa.")
@@ -354,7 +346,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             elif opcao == "Múltiplas Séries":
                 st.info("ℹ️ Gera múltiplos gráficos simultâneos.")
             elif opcao == "Sobreposição (Camadas)":
-                # A mensagem já foi tratada acima no if 'overlay'
                 pass
             elif opcao == "Hidrografia":
                 st.info("ℹ️ Sobrepõe dados climáticos sobre o shapefile enviado.")
@@ -382,7 +373,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
             
             if not disable:
-                # --- MENSAGEM COM FONTE MAIOR ---
+                # --- MENSAGEM AUMENTADA ---
                 st.markdown(
                     "<div style='font-size:18px;margin-top:12px;line-height:1.5;'>"
                     "⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>"
@@ -408,7 +399,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (COM LIMPEZA)
+# Renderizar a página principal (COM LIMPEZA E LÓGICA CORRETA)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -433,10 +424,15 @@ def renderizar_pagina_principal(opcao):
     has_skewt = st.session_state.get("skewt_results") is not None
     is_generating = st.session_state.get("analysis_triggered", False)
 
+    # SÓ MOSTRA SE NÃO TEM RESULTADO E NÃO ESTÁ GERANDO
     if not has_results and not has_skewt and not is_generating:
         
         st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
-        st.markdown("Este aplicativo permite analisar dados climáticos globais (ERA5) de forma interativa. **Selecione uma ferramenta no menu à esquerda:**")
+        
+        st.info(
+            "ℹ️ **Nota sobre os Dados:** Por padrão, os resultados apresentam **médias agregadas** (diárias ou mensais). "
+            "Caso precise visualizar um momento exato nos mapas, utilize a opção **'Horário Específico'** para selecionar uma hora pontual (0-23h)."
+        )
 
         col1, col2 = st.columns(2)
 
@@ -454,12 +450,6 @@ def renderizar_pagina_principal(opcao):
             st.success("**Skew-T (Sondagem)**\nGera diagramas termodinâmicos verticais da atmosfera (perfil de temperatura e orvalho).")
 
         st.markdown("---")
-        st.info(
-            "ℹ️ **Nota sobre os Dados:** Por padrão, os resultados apresentam **médias agregadas** (diárias ou mensais). "
-            "Caso precise visualizar um momento exato nos mapas ou na sobreposição, utilize a opção **'Horário Específico'** para selecionar uma hora pontual (0-23h)."
-        )
-
-        
         st.markdown(
             "<div style='text-align: center; font-size: 1.2rem; color: #333; margin-top: 20px;'>"
             "👈 <b>Comece configurando os parâmetros na barra lateral.</b>"
@@ -554,15 +544,3 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
-
-
-
-
-
-
-
-
-
-
-
-
