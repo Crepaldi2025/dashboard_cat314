@@ -229,9 +229,9 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                     
                     with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
-                        st.markdown("** 1️⃣ Coordenadas (Latitude e Longitude)")
+                        st.markdown("** 1️⃣ Coordenadas (Latitude e Longitude)**")
                         st.markdown("Devem estar em **Graus Decimais** (ex: `-22.42`).\n* **Dica:** No Google Maps, clique com o botão direito no local desejado para copiar.")
-                        st.markdown("** 2️⃣ Raio")
+                        st.markdown("** 2️⃣ Raio**")
                         st.markdown("Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.")
                     
                     st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o círculo.</div>", unsafe_allow_html=True)
@@ -536,6 +536,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
