@@ -395,7 +395,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (COM LIMPEZA)
+# Renderizar a página principal (COM LIMPEZA CORRIGIDA)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -415,12 +415,14 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     
-    # LÓGICA DE LIMPEZA CORRIGIDA:
-    has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
-    has_skewt = "skewt_results" in st.session_state and st.session_state.skewt_results is not None
-    is_generating = st.session_state.get("analysis_triggered", False) 
+    # LÓGICA DE LIMPEZA ATUALIZADA
+    # Verifica se tem resultado OU se está gerando (triggered = True)
+    has_results = st.session_state.get("analysis_results") is not None
+    has_skewt = st.session_state.get("skewt_results") is not None
+    is_generating = st.session_state.get("analysis_triggered", False)
 
-    # SÓ MOSTRA SE NÃO TEM RESULTADO E NÃO ESTÁ GERANDO
+    # Se NÃO tem resultado E NÃO está gerando, mostra o menu.
+    # Se estiver gerando (is_generating=True), já esconde.
     if not has_results and not has_skewt and not is_generating:
         
         st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
