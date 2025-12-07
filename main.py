@@ -260,8 +260,7 @@ def render_analysis_results():
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
         st.subheader("Mapa de Sobreposição (Overlay)")
         ui.renderizar_resumo_selecao()
-        st.markdown("---")
-        
+                
         with st.popover("ℹ️ Como controlar a visualização?"): 
             st.markdown("""
             **Use o ícone 🗂️ (Camadas) no canto superior direito para:**
@@ -284,7 +283,7 @@ def render_analysis_results():
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
-        st.markdown("---")
+        
         cols = st.columns(2)
         for i, var_name in enumerate(results["data"]):
             res = results["data"][var_name]
@@ -429,4 +428,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
