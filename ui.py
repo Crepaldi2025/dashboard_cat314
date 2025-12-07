@@ -395,7 +395,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal
+# Renderizar a página principal (COM LIMPEZA)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -415,12 +415,13 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     
-    # LÓGICA DE LIMPEZA
+    # LÓGICA DE LIMPEZA CORRIGIDA:
     has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
     has_skewt = "skewt_results" in st.session_state and st.session_state.skewt_results is not None
-    
-    # SÓ MOSTRA SE NÃO TIVER RESULTADO
-    if not has_results and not has_skewt:
+    is_generating = st.session_state.get("analysis_triggered", False) 
+
+    # SÓ MOSTRA SE NÃO TEM RESULTADO E NÃO ESTÁ GERANDO
+    if not has_results and not has_skewt and not is_generating:
         
         st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
         st.markdown("Este aplicativo permite analisar dados climáticos globais (ERA5) de forma interativa. **Selecione uma ferramenta no menu à esquerda:**")
@@ -449,12 +450,10 @@ def renderizar_pagina_principal(opcao):
         )
 
 def renderizar_resumo_selecao():
+    # Verifica qual aba está ativa para decidir o que mostrar
     nav_option = st.session_state.get('nav_option')
-    
-    # Se NÃO TIVER RESULTADO, não mostra resumo também (opcional)
-    # Mas se você quiser ver o resumo da seleção, deixe como está.
-    # O pedido foi só para a tela principal (boas-vindas).
 
+    # --- LÓGICA PARA SKEW-T ---
     if nav_option == "Skew-T":
         with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
             c1, c2, c3 = st.columns(3)
@@ -471,6 +470,7 @@ def renderizar_resumo_selecao():
                 st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
         return
 
+    # --- LÓGICA PARA MAPAS E SÉRIES ---
     label_titulo = "Variável:"
     var_text = ""
     
