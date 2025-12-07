@@ -167,6 +167,7 @@ def run_full_analysis():
     
     try:
         with st.spinner("Processando dados no Google Earth Engine..."):
+            # O parâmetro 'aba' aqui passa 'Hidrografia' ou 'Mapas' ou 'Séries'
             analysis_data = run_analysis_logic(variavel, start_date, end_date, geo_key, aba)
         
         if analysis_data is None:
@@ -252,7 +253,7 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"**{var_name}**")
-                # Botões Padronizados
+                # CORREÇÃO AQUI: use_column_width=True para compatibilidade
                 png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_column_width=True) 
@@ -268,7 +269,6 @@ def render_analysis_results():
                         
                         sub_c1, sub_c2 = st.columns(2)
                         var_slug = var_name.lower().replace(" ", "_")
-                        # PADRONIZAÇÃO AQUI:
                         if fp: sub_c1.download_button("💾 Baixar PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
                         if fj: sub_c2.download_button("💾 Baixar JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
                     except: pass
@@ -300,6 +300,7 @@ def render_analysis_results():
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
             if tipo_mapa == "Interativo":
+                # AJUDA DO MAPA (PADRÃO)
                 with st.popover("ℹ️ Ajuda do Mapa"): 
                     st.markdown("**Controles:** Zoom, Tela Cheia, Camadas.\n**Ferramentas:** Marcador, Linha, Polígono, Retângulo, Círculo, Editar, Lixeira.")
                 map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
@@ -307,6 +308,7 @@ def render_analysis_results():
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
                 if png:
+                    # CORREÇÃO AQUI: use_column_width=True
                     st.image(png, use_column_width=True) 
                     if cbar: st.image(cbar, use_column_width=True)
                     try:
@@ -351,6 +353,46 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
+
+# -------------------------------------------------------------
+# 👇 AQUI ESTÁ A FUNÇÃO MAIN (ENCUSTADA NA ESQUERDA) 👇
+# -------------------------------------------------------------
+def main():
+    if 'gee_initialized' not in st.session_state:
+        gee_handler.inicializar_gee()
+        st.session_state.gee_initialized = True
+        mensagem_container = st.empty()
+        mensagem_container.success("✅ Conectado ao Google Earth Engine com sucesso!")
+        time.sleep(5)
+        mensagem_container.empty()
+        
+    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
+    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
+    
+    if opcao_menu == "Sobre o Aplicativo":
+        ui.renderizar_pagina_sobre()
+        return
+    
+    ui.renderizar_pagina_principal(opcao_menu)
+    
+    # Ativa desenho de polígono se necessário
+    is_polygon = (
+        opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Sobreposição (Camadas)"] and 
+        st.session_state.get('tipo_localizacao') == "Polígono"
+    )
+        
+    is_running = st.session_state.get("analysis_triggered", False)
+    has_geom = 'drawn_geometry' in st.session_state
+    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
+    
+    if is_polygon and not is_running and not has_geom and not has_res: 
+        render_polygon_drawer()
+    
+    if is_running:
+        st.session_state.analysis_triggered = False 
+        run_full_analysis() 
+    
+    render_analysis_results()
 
 if __name__ == "__main__":
     main()
