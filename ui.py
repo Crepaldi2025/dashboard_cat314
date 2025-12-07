@@ -213,23 +213,26 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
                     
                 elif tipo_loc == "Município":
-                    st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
-                    estado_str = st.session_state.get('estado', 'Selecione...')
-                    
-                    lista_muns = ["Selecione um estado primeiro"]
-                    
-                    if estado_str != "Selecione...":
-                         # 👇 MUDANÇA AQUI: Pega sempre os 2 últimos caracteres (a Sigla)
-                         uf_sigla = estado_str[-2:]
-                         
-                         muns = dados_geo.get(uf_sigla, [])
-                         if muns: 
-                             lista_muns = ["Selecione..."] + sorted(muns)
-                         else:
-                             # Opcional: Ajuda a debugar se não achar nada
-                             lista_muns = [f"Sem dados para {uf_sigla}"]
-                    
-                    st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
+                st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
+                
+                # Pega o valor selecionado
+                estado_str = st.session_state.get('estado', 'Selecione...')
+                
+                lista_muns = ["Selecione um estado primeiro"]
+                
+                if estado_str != "Selecione...":
+                    # --- CORREÇÃO AQUI ---
+                    # Divide pelo traço e remove espaços em branco da sigla
+                    try:
+                        uf_sigla = estado_str.split(' - ')[-1].strip()
+                        muns = dados_geo.get(uf_sigla, [])
+                        
+                        if muns:
+                            lista_muns = ["Selecione..."] + sorted(muns)
+                    except:
+                        pass # Evita erro se a string estiver mal formatada
+                
+                st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
                 
                 elif tipo_loc == "Círculo (Lat/Lon/Raio)":
                     c1, c2 = st.columns(2)
@@ -551,6 +554,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
