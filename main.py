@@ -30,17 +30,26 @@ def set_background():
 
 set_background()
 
-# --- FUNÇÃO DE AJUDA PADRONIZADA (USADA EM TODAS AS SÉRIES) ---
+# --- FUNÇÃO DE AJUDA PERSONALIZADA (EXATAMENTE COMO VOCÊ PEDIU) ---
 def render_chart_tips():
-    with st.expander("ℹ️ Dicas de Interação com os Gráficos", expanded=False):
+    with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
+        st.markdown("### 📈 Guia de Ferramentas")
+        
+        st.markdown("**1️⃣ Barra de Ferramentas (Canto Superior Direito)**")
         st.markdown("""
-        **Ferramentas da barra de topo do gráfico:**
-        * 📷 **Baixar:** Salva o gráfico como imagem PNG.
-        * 🔍 **Zoom:** Clique e arraste na área do gráfico para aproximar um período.
-        * ✋ **Pan:** Clique e arraste para mover o gráfico lateralmente.
-        * ➕ **Zoom In/Out:** Botões para aproximar ou afastar.
-        * 🏠 **Reset:** Volta para a visualização original (padrão).
-        * 🖱️ **Hover:** Passe o mouse sobre as linhas para ver os valores exatos.
+        * `📷` **Câmera:** Baixa o gráfico atual como imagem (PNG).
+        * `🔍` **Zoom:** Clique e arraste na tela para aproximar uma área específica.
+        * `✥` **Pan (Mover):** Clique e arraste para mover o gráfico para os lados.
+        * `➕` / `➖` **Zoom In/Out:** Aproxima ou afasta a visualização centralizada.
+        * `🏠` **Casinha (Reset):** Retorna o gráfico para a visualização original.
+        * `🔲` **Autoscale:** Ajusta os eixos automaticamente para caber todos os dados.
+        """)
+        
+        st.markdown("**2️⃣ Interação e Atalhos**")
+        st.markdown("""
+        * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
+        * **Valor Exato:** Passe o mouse sobre a linha azul para ver a data e o valor exato (Tooltip).
+        * **Tela Cheia:** Passe o mouse no gráfico e procure o ícone `⛶` para expandir.
         """)
 
 def get_geo_caching_key(session_state):
@@ -278,7 +287,7 @@ def render_analysis_results():
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
         
-        # AJUDA IDÊNTICA AO SÉRIES TEMPORAIS
+        # --- AJUDA IDÊNTICA AO PEDIDO (Renderizada no main) ---
         render_chart_tips()
         
         st.markdown("---")
@@ -287,7 +296,7 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
-                # show_help=False PARA NÃO DUPLICAR
+                # show_help=False para NÃO duplicar a ajuda
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
         return
 
@@ -334,9 +343,9 @@ def render_analysis_results():
 
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
-            # AJUDA IDÊNTICA AQUI TAMBÉM
+            # --- AJUDA IDÊNTICA AO PEDIDO (Renderizada no main) ---
             render_chart_tips()
-            # show_help=False PARA NÃO DUPLICAR
+            # show_help=False para NÃO duplicar a ajuda
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
 
 def render_polygon_drawer():
@@ -372,6 +381,7 @@ def main():
     
     ui.renderizar_pagina_principal(opcao_menu)
     
+    # Ativa desenho de polígono se necessário
     is_polygon = (
         opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Sobreposição (Camadas)"] and 
         st.session_state.get('tipo_localizacao') == "Polígono"
