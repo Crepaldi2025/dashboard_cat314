@@ -253,7 +253,6 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"**{var_name}**")
-                # CORREÇÃO AQUI: use_column_width=True para compatibilidade
                 png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_column_width=True) 
@@ -266,8 +265,10 @@ def render_analysis_results():
                         cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
+                        
                         sub_c1, sub_c2 = st.columns(2)
                         var_slug = var_name.lower().replace(" ", "_")
+                        # BOTÕES PADRONIZADOS
                         if fp: sub_c1.download_button("💾 Baixar PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
                         if fj: sub_c2.download_button("💾 Baixar JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
                     except: pass
@@ -278,7 +279,7 @@ def render_analysis_results():
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
         
-        # --- AJUDA PADRONIZADA DOS GRÁFICOS ---
+        # AJUDA PADRONIZADA DOS GRÁFICOS
         with st.popover("ℹ️ Ajuda dos Gráficos"):
             st.markdown("""
             **Como interagir com os gráficos:**
@@ -288,7 +289,6 @@ def render_analysis_results():
             * 📸 **Baixar:** Clique no ícone de câmera (canto superior direito do gráfico) para salvar como PNG.
             * 🖱️ **Valores:** Passe o mouse sobre a linha para ver o valor exato e a data.
             """)
-        # -------------------------------------
         
         st.markdown("---")
         cols = st.columns(2)
@@ -330,6 +330,7 @@ def render_analysis_results():
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
                         
                         c1, c2 = st.columns(2)
+                        # BOTÕES PADRONIZADOS
                         if fp: c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
@@ -362,7 +363,7 @@ def render_polygon_drawer():
         st.rerun()
 
 # -------------------------------------------------------------
-# 👇 AQUI ESTÁ A FUNÇÃO MAIN (ENCUSTADA NA ESQUERDA) 👇
+# FUNÇÃO MAIN - ENCOSTADA NA MARGEM ESQUERDA
 # -------------------------------------------------------------
 def main():
     if 'gee_initialized' not in st.session_state:
