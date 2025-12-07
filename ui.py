@@ -395,7 +395,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (COM LIMPEZA AUTOMÁTICA)
+# Renderizar a página principal
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
@@ -415,10 +415,11 @@ def renderizar_pagina_principal(opcao):
     
     st.markdown("---")
     
-    # LÓGICA DE LIMPEZA: Só mostra o guia se NÃO tiver resultados gerados
-    has_results = st.session_state.get("analysis_results") is not None
-    has_skewt = st.session_state.get("skewt_results") is not None
+    # LÓGICA DE LIMPEZA
+    has_results = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
+    has_skewt = "skewt_results" in st.session_state and st.session_state.skewt_results is not None
     
+    # SÓ MOSTRA SE NÃO TIVER RESULTADO
     if not has_results and not has_skewt:
         
         st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
@@ -440,7 +441,6 @@ def renderizar_pagina_principal(opcao):
             st.success("**Skew-T (Sondagem)**\nGera diagramas termodinâmicos verticais da atmosfera (perfil de temperatura e orvalho).")
 
         st.markdown("---")
-        # FRASE DE DESTAQUE AQUI
         st.markdown(
             "<div style='text-align: center; font-size: 1.2rem; color: #333; margin-top: 20px;'>"
             "👈 <b>Comece configurando os parâmetros na barra lateral.</b>"
@@ -449,10 +449,12 @@ def renderizar_pagina_principal(opcao):
         )
 
 def renderizar_resumo_selecao():
-    # Verifica qual aba está ativa para decidir o que mostrar
     nav_option = st.session_state.get('nav_option')
+    
+    # Se NÃO TIVER RESULTADO, não mostra resumo também (opcional)
+    # Mas se você quiser ver o resumo da seleção, deixe como está.
+    # O pedido foi só para a tela principal (boas-vindas).
 
-    # --- LÓGICA PARA SKEW-T ---
     if nav_option == "Skew-T":
         with st.expander("📋 Resumo das Opções Selecionadas", expanded=True):
             c1, c2, c3 = st.columns(3)
@@ -469,7 +471,6 @@ def renderizar_resumo_selecao():
                 st.markdown(f"**Momento:**\n{data_str} às {hour}:00 UTC")
         return
 
-    # --- LÓGICA PARA MAPAS E SÉRIES ---
     label_titulo = "Variável:"
     var_text = ""
     
