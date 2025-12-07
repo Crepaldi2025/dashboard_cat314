@@ -167,7 +167,6 @@ def run_full_analysis():
     
     try:
         with st.spinner("Processando dados no Google Earth Engine..."):
-            # O parâmetro 'aba' aqui passa 'Hidrografia' ou 'Mapas' ou 'Séries'
             analysis_data = run_analysis_logic(variavel, start_date, end_date, geo_key, aba)
         
         if analysis_data is None:
@@ -253,7 +252,7 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"**{var_name}**")
-                # CORREÇÃO: use_column_width=True
+                # Botões Padronizados
                 png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
                 if png:
                     st.image(png, use_column_width=True) 
@@ -266,10 +265,12 @@ def render_analysis_results():
                         cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
+                        
                         sub_c1, sub_c2 = st.columns(2)
                         var_slug = var_name.lower().replace(" ", "_")
-                        if fp: sub_c1.download_button("💾 PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
-                        if fj: sub_c2.download_button("💾 JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
+                        # PADRONIZAÇÃO AQUI:
+                        if fp: sub_c1.download_button("💾 Baixar PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
+                        if fj: sub_c2.download_button("💾 Baixar JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
                     except: pass
         return
 
@@ -306,10 +307,8 @@ def render_analysis_results():
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
                 if png:
-                    # CORREÇÃO: use_column_width=True
                     st.image(png, use_column_width=True) 
                     if cbar: st.image(cbar, use_column_width=True)
-                    
                     try:
                         title = f"{st.session_state.variavel} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
@@ -318,9 +317,11 @@ def render_analysis_results():
                         cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
+                        
                         c1, c2 = st.columns(2)
-                        if fp: c1.download_button("💾 PNG", fp, "mapa.png", "image/png", use_container_width=True)
-                        if fj: c2.download_button("💾 JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
+                        # PADRONIZAÇÃO AQUI:
+                        if fp: c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
+                        if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
         # Tabela de Dados
@@ -329,7 +330,8 @@ def render_analysis_results():
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
             csv = results["map_dataframe"].to_csv(index=False).encode('utf-8')
-            st.download_button("💾 Exportar CSV", csv, "dados_mapa.csv", "text/csv")
+            # PADRONIZAÇÃO AQUI:
+            st.download_button("💾 Baixar Tabela (CSV)", csv, "dados_mapa.csv", "text/csv")
 
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
@@ -349,46 +351,6 @@ def render_polygon_drawer():
     elif 'drawn_geometry' in st.session_state and (not map_data or not map_data.get("all_drawings")):
         del st.session_state['drawn_geometry']
         st.rerun()
-
-# -------------------------------------------------------------
-# 👇 AQUI ESTÁ A FUNÇÃO MAIN (NÃO MEXA NA INDENTAÇÃO) 👇
-# -------------------------------------------------------------
-def main():
-    if 'gee_initialized' not in st.session_state:
-        gee_handler.inicializar_gee()
-        st.session_state.gee_initialized = True
-        mensagem_container = st.empty()
-        mensagem_container.success("✅ Conectado ao Google Earth Engine com sucesso!")
-        time.sleep(5)
-        mensagem_container.empty()
-        
-    dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
-    opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
-    
-    if opcao_menu == "Sobre o Aplicativo":
-        ui.renderizar_pagina_sobre()
-        return
-    
-    ui.renderizar_pagina_principal(opcao_menu)
-    
-    # Ativa desenho de polígono se necessário
-    is_polygon = (
-        opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Sobreposição (Camadas)"] and 
-        st.session_state.get('tipo_localizacao') == "Polígono"
-    )
-        
-    is_running = st.session_state.get("analysis_triggered", False)
-    has_geom = 'drawn_geometry' in st.session_state
-    has_res = "analysis_results" in st.session_state and st.session_state.analysis_results is not None
-    
-    if is_polygon and not is_running and not has_geom and not has_res: 
-        render_polygon_drawer()
-    
-    if is_running:
-        st.session_state.analysis_triggered = False 
-        run_full_analysis() 
-    
-    render_analysis_results()
 
 if __name__ == "__main__":
     main()
