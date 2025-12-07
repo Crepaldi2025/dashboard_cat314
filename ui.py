@@ -160,13 +160,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 
                 vis_mode = st.radio("Estilo de Comparação:", ["Transparência", "Split Map (Cortina)"], horizontal=True, key='overlay_mode', on_change=reset_analysis_results_only)
                 
+                # CORREÇÃO AQUI: Removemos o 'else: st.info(...)' duplicado
                 if vis_mode == "Transparência":
                     st.markdown("🎚️ **Controle de Opacidade**")
                     c_op1, c_op2 = st.columns(2)
                     with c_op1: st.slider("Base", 0.0, 1.0, 1.0, key='opacity_1', on_change=reset_analysis_results_only)
                     with c_op2: st.slider("Topo", 0.0, 1.0, 0.6, key='opacity_2', on_change=reset_analysis_results_only)
-                else:
-                    st.info("ℹ️ Arraste a barra vertical no centro do mapa para comparar.")
             
             else:
                 st.selectbox(
@@ -395,7 +394,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         return opcao
 
 # -----------------------------
-# Renderizar a página principal (COM LIMPEZA AUTOMÁTICA)
+# Renderizar a página principal (COM LIMPEZA)
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
