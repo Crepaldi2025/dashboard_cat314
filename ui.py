@@ -209,20 +209,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 
                 elif tipo_loc == "Município":
                     st.selectbox("UF", lista_ufs, key='estado', on_change=reset_analysis_state)
-                    
                     estado_str = st.session_state.get('estado', 'Selecione...')
                     lista_muns = ["Selecione um estado primeiro"]
-                    
                     if estado_str != "Selecione...":
-                         # --- CORREÇÃO AQUI COM .STRIP() ---
-                         try:
-                             uf_sigla = estado_str.split(' - ')[-1].strip()
-                             muns = dados_geo.get(uf_sigla, [])
-                             if muns:
-                                 lista_muns = ["Selecione..."] + sorted(muns)
-                         except:
-                             pass
-                    
+                         uf_sigla = estado_str.split(' - ')[-1]
+                         muns = dados_geo.get(uf_sigla, [])
+                         if muns: lista_muns = ["Selecione..."] + muns
                     st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
                 
                 elif tipo_loc == "Círculo (Lat/Lon/Raio)":
@@ -544,3 +536,4 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
