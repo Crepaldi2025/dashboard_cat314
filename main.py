@@ -238,7 +238,7 @@ def render_analysis_results():
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
                 st.markdown("---")
-                # Exportação para Skew-T (Opcional, mas padronizada se houver dados tabulares)
+                # Exportação para Skew-T (Padronizada)
                 with st.expander("📥 Exportar Dados da Sondagem"):
                     st.dataframe(res["df"], use_container_width=True)
                     render_download_buttons(res["df"], "sondagem_skewt", "skewt")
@@ -330,7 +330,7 @@ def render_analysis_results():
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
-                # Exportação Individual para cada série
+                # Exportação Individual
                 with st.expander("📥 Exportar Dados"):
                     render_download_buttons(res["time_series_df"], f"serie_{var_name.lower().replace(' ', '_')}", f"multi_series_{i}")
         return
@@ -367,12 +367,12 @@ def render_analysis_results():
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
-        # --- TABELA DE DADOS PADRONIZADA (CSV + XLSX) ---
+        # --- TABELA DE DADOS PADRONIZADA ---
         st.markdown("---")
         st.subheader("Tabela de Dados")
         if "map_dataframe" in results and not results["map_dataframe"].empty:
             st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
-            # AQUI ESTÁ A MÁGICA
+            # USO DA FUNÇÃO PADRONIZADA (CSV + XLSX)
             render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
 
     elif aba == "Séries Temporais":
@@ -380,12 +380,11 @@ def render_analysis_results():
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
             
-            # --- EXPORTAÇÃO PADRONIZADA PARA SÉRIES ---
+            # --- TABELA DE DADOS E BOTÕES PADRONIZADOS (SEM EXPANDER) ---
             st.markdown("---")
             st.subheader("Tabela de Dados")
-            with st.expander("📥 Visualizar e Exportar Dados"):
-                st.dataframe(results["time_series_df"], use_container_width=True)
-                render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
+            st.dataframe(results["time_series_df"], use_container_width=True, hide_index=True)
+            render_download_buttons(results["time_series_df"], "serie_temporal", "serie_main")
 
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
