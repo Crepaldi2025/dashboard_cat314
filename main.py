@@ -30,7 +30,7 @@ def set_background():
 
 set_background()
 
-# --- FUNÇÃO DE AJUDA PERSONALIZADA (EXATAMENTE COMO VOCÊ PEDIU) ---
+# --- FUNÇÃO DE AJUDA DOS GRÁFICOS (MANTIDA) ---
 def render_chart_tips():
     with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
         st.markdown("### 📈 Guia de Ferramentas")
@@ -50,6 +50,33 @@ def render_chart_tips():
         * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
         * **Valor Exato:** Passe o mouse sobre a linha azul para ver a data e o valor exato (Tooltip).
         * **Tela Cheia:** Passe o mouse no gráfico e procure o ícone `⛶` para expandir.
+        """)
+
+# --- NOVA FUNÇÃO DE AJUDA DO MAPA (DIDÁTICA) ---
+def render_map_tips():
+    with st.popover("ℹ️ Ajuda: Ferramentas do Mapa"):
+        st.markdown("### 🗺️ Guia de Navegação")
+        
+        st.markdown("**1️⃣ Controles de Visualização**")
+        st.markdown("""
+        * `➕` / `➖` **Zoom:** Aproxime ou afaste a visão do mapa.
+        * `⛶` **Tela Cheia:** Expande o mapa para ocupar todo o monitor (ícone lateral).
+        * `🗂️` **Camadas:** (Ícone no topo direito) Alterne o fundo (Satélite/Ruas) e ligue/desligue os dados.
+        """)
+        
+        st.markdown("**2️⃣ Desenho e Marcação (Barra Lateral Esquerda)**")
+        st.markdown("""
+        * `⬟` **Polígono:** Desenhe áreas livres (clique ponto a ponto).
+        * `⬛` **Retângulo:** Desenhe áreas quadradas (clique e arraste).
+        * `⭕` **Círculo:** Desenhe uma área circular (clique no centro e arraste).
+        * `📍` **Marcador:** Adiciona um pino em um ponto de interesse.
+        * `╱` **Linha:** Desenhe rotas ou meça distâncias.
+        """)
+        
+        st.markdown("**3️⃣ Edição**")
+        st.markdown("""
+        * `📝` **Editar:** Permite ajustar ou mover os desenhos existentes.
+        * `🗑️` **Lixeira:** Remove todos os desenhos ou o item selecionado.
         """)
 
 def get_geo_caching_key(session_state):
@@ -287,7 +314,7 @@ def render_analysis_results():
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
         
-        # --- AJUDA IDÊNTICA AO PEDIDO (Renderizada no main) ---
+        # --- AJUDA DOS GRÁFICOS (DETALHADA) ---
         render_chart_tips()
         
         st.markdown("---")
@@ -296,7 +323,6 @@ def render_analysis_results():
             res = results["data"][var_name]
             with cols[i % 2]:
                 st.markdown(f"##### {var_name}")
-                # show_help=False para NÃO duplicar a ajuda
                 charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
         return
 
@@ -311,8 +337,9 @@ def render_analysis_results():
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
             if tipo_mapa == "Interativo":
-                with st.popover("ℹ️ Ajuda do Mapa"): 
-                    st.markdown("**Controles:** Zoom, Tela Cheia, Camadas.\n**Ferramentas:** Marcador, Linha, Polígono, Retângulo, Círculo, Editar, Lixeira.")
+                # --- AJUDA DO MAPA (DIDÁTICA) ---
+                render_map_tips()
+                
                 map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
             else:
                 with st.spinner("Gerando imagem..."):
@@ -343,9 +370,8 @@ def render_analysis_results():
 
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
-            # --- AJUDA IDÊNTICA AO PEDIDO (Renderizada no main) ---
+            # --- AJUDA DOS GRÁFICOS (DETALHADA) ---
             render_chart_tips()
-            # show_help=False para NÃO duplicar a ajuda
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
 
 def render_polygon_drawer():
@@ -381,7 +407,6 @@ def main():
     
     ui.renderizar_pagina_principal(opcao_menu)
     
-    # Ativa desenho de polígono se necessário
     is_polygon = (
         opcao_menu in ["Mapas", "Múltiplos Mapas", "Séries Temporais", "Múltiplas Séries", "Sobreposição (Camadas)"] and 
         st.session_state.get('tipo_localizacao') == "Polígono"
