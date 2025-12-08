@@ -204,7 +204,6 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
 def display_multiaxis_chart(data_dict):
     """
     Gera um único gráfico com múltiplos eixos Y para comparar variáveis.
-    data_dict: Dicionário contendo os resultados das séries {nome_var: {df, var_cfg}}
     """
     if not data_dict:
         return
@@ -213,12 +212,52 @@ def display_multiaxis_chart(data_dict):
     
     colors = ['#1f77b4', '#d62728', '#2ca02c', '#ff7f0e'] 
     
+    # --- 1. CONTROLE DE ESPAÇO LATERAL (Domínio) ---
+    # Se tiver muitos eixos, "espreme" o gráfico (0.2 a 0.8) para dar espaço aos números laterais.
+    # Ajuste aqui: [Espaço Esquerda, Espaço Direita]
+    x_domain = [0.15, 0.85] if len(data_dict) > 2 else [0, 1]
+
     layout_settings = {
-        'xaxis': dict(domain=[0.1, 0.9] if len(data_dict) > 2 else [0, 1]),
-        'yaxis': dict(title="Eixo 1", titlefont=dict(color=colors[0]), tickfont=dict(color=colors[0])),
-        'yaxis2': dict(title="Eixo 2", titlefont=dict(color=colors[1]), tickfont=dict(color=colors[1]), anchor="x", overlaying="y", side="right"),
-        'yaxis3': dict(title="Eixo 3", titlefont=dict(color=colors[2]), tickfont=dict(color=colors[2]), anchor="free", overlaying="y", side="right", position=0.95),
-        'yaxis4': dict(title="Eixo 4", titlefont=dict(color=colors[3]), tickfont=dict(color=colors[3]), anchor="free", overlaying="y", side="left", position=0.05)
+        'xaxis': dict(domain=x_domain),
+        
+        # Eixo 1 (Azul - Esquerda Principal)
+        'yaxis': dict(
+            title="Eixo 1", 
+            titlefont=dict(color=colors[0]), 
+            tickfont=dict(color=colors[0])
+        ),
+        
+        # Eixo 2 (Vermelho - Direita Principal)
+        'yaxis2': dict(
+            title="Eixo 2", 
+            titlefont=dict(color=colors[1]), 
+            tickfont=dict(color=colors[1]), 
+            anchor="x", 
+            overlaying="y", 
+            side="right"
+        ),
+        
+        # Eixo 3 (Verde - Direita Externa)
+        'yaxis3': dict(
+            title="Eixo 3", 
+            titlefont=dict(color=colors[2]), 
+            tickfont=dict(color=colors[2]), 
+            anchor="free", 
+            overlaying="y", 
+            side="right", 
+            position=0.93 # <--- Ajuste a distância lateral aqui (0.90 a 1.0)
+        ),
+        
+        # Eixo 4 (Laranja - Esquerda Externa)
+        'yaxis4': dict(
+            title="Eixo 4", 
+            titlefont=dict(color=colors[3]), 
+            tickfont=dict(color=colors[3]), 
+            anchor="free", 
+            overlaying="y", 
+            side="left", 
+            position=0.07 # <--- Ajuste a distância lateral aqui (0.0 a 0.10)
+        )
     }
 
     idx = 0
@@ -248,15 +287,18 @@ def display_multiaxis_chart(data_dict):
 
     layout_settings['xaxis'].update(dict(title="Data", showgrid=True))
 
+    # --- 3. CONTROLE DE MARGENS E LEGENDA ---
     fig.update_layout(
         title="Comparação Multi-Eixos",
-        legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"),
-        height=600,
-        margin=dict(l=20, r=20, t=60, b=20),
+        # y=1.2 sobe a legenda para não bater no título
+        legend=dict(x=0.5, y=1.2, orientation="h", xanchor="center"), 
+        height=650, # Aumentei um pouco a altura total
+        # t=100 aumenta a margem do topo (para caber título e legenda)
+        # l=50 e r=50 dão respiro nas laterais
+        margin=dict(l=50, r=50, t=100, b=50),
         **layout_settings
     )
     
     st.plotly_chart(fig, use_container_width=True)
     
-    st.info("💡 **Dica:** Dê um clique na legenda de uma variável para retirá-la ou retorná-la.")
-
+    st.info("💡 **Dica:** Dê um clique na legenda de uma variável para retirar ou retornar.")
