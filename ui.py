@@ -197,7 +197,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.markdown("#### Shapefile")
                 st.info("Envie um arquivo **.ZIP** contendo o shapefile (.shp, .shx, .dbf) da bacia ou rio.")
                 
-                uploaded_file = st.file_uploader("Upload ZIP", type=["zip"], key='hidro_upload', on_change=reset_analysis_state)
+                uploaded_file = st.file_uploader("Upload ZIP", type=["zip"], key='shapefile_upload', on_change=reset_analysis_state)
                 
                 if uploaded_file:
                     st.success("Arquivo recebido! Clique em Gerar Análise.", icon="✅")
@@ -384,7 +384,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if not vars_sel or len(vars_sel) > 4: disable = True
             
             if opcao == "Shapefile":
-                if not st.session_state.get("hidro_upload"): disable = True
+                if not st.session_state.get("shapefile_upload"): disable = True
                 else: disable = False
 
             st.button(
@@ -405,7 +405,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     unsafe_allow_html=True
                 )
             else:
-                if opcao == "Shapefile" and not st.session_state.get("hidro_upload"):
+                if opcao == "Shapefile" and not st.session_state.get("shapefile_upload"):
                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Faça upload do arquivo .ZIP.</div>", unsafe_allow_html=True)
                 elif opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                     vars_sel = st.session_state.get("variaveis_multiplas", [])
@@ -569,6 +569,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
