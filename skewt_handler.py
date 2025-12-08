@@ -35,7 +35,7 @@ def _normalize_hour(hour):
             h_str = h_str.split(sep)[0]
             break
     return int(h_str)
-
+@st.cache_data(ttl=3600) # Cache válido por 1 hora (3600 segundos)
 def get_vertical_profile_data(lat, lon, date_obj, hour):
     # ----------------------------------------------------------------------
     # 0. Normalização
@@ -178,3 +178,4 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
     except Exception as e:
         st.error(f"Erro processando resposta: {e}")
         return None
+
