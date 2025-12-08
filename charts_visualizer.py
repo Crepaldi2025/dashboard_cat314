@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io
+import plotly.graph_objects as go
 
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     
@@ -182,3 +183,67 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     with cex1: st.download_button("💾 Exportar CSV", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("💾 Exportar Excel", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+def display_multiaxis_chart(data_dict):
+    """
+    Gera um único gráfico com múltiplos eixos Y para comparar variáveis.
+    data_dict: Dicionário contendo os resultados das séries {nome_var: {df, var_cfg}}
+    """
+    if not data_dict:
+        return
+
+    fig = go.Figure()
+    
+    # Cores para diferenciar as linhas
+    colors = ['#1f77b4', '#d62728', '#2ca02c', '#ff7f0e'] 
+    axis_configs = {}
+    
+    # Configurações de layout para até 4 eixos
+    layout_settings = {
+        'xaxis': dict(domain=[0.1, 0.9] if len(data_dict) > 2 else [0, 1]),
+        'yaxis': dict(title="Eixo 1", titlefont=dict(color=colors[0]), tickfont=dict(color=colors[0])),
+        'yaxis2': dict(title="Eixo 2", titlefont=dict(color=colors[1]), tickfont=dict(color=colors[1]), anchor="x", overlaying="y", side="right"),
+        'yaxis3': dict(title="Eixo 3", titlefont=dict(color=colors[2]), tickfont=dict(color=colors[2]), anchor="free", overlaying="y", side="right", position=0.95),
+        'yaxis4': dict(title="Eixo 4", titlefont=dict(color=colors[3]), tickfont=dict(color=colors[3]), anchor="free", overlaying="y", side="left", position=0.05)
+    }
+
+    idx = 0
+    for var_name, res in data_dict.items():
+        if idx >= 4: break # Limite de segurança
+        
+        df = res["time_series_df"]
+        unit = res["var_cfg"]["unit"]
+        
+        # Garante nome correto das colunas
+        if 'date' not in df.columns: continue
+        
+        # Adiciona a linha (Trace)
+        yaxis_name = f"y{idx+1}" if idx > 0 else "y"
+        
+        fig.add_trace(go.Scatter(
+            x=df['date'],
+            y=df['value'],
+            name=f"{var_name} ({unit})",
+            yaxis=yaxis_name,
+            line=dict(color=colors[idx], width=2.5),
+            mode='lines+markers'
+        ))
+        
+        # Atualiza o título do eixo correspondente com o nome da variável
+        key = f"yaxis{idx+1}" if idx > 0 else "yaxis"
+        layout_settings[key]['title'] = f"{var_name} ({unit})"
+        
+        idx += 1
+
+    # Aplica o layout
+    fig.update_layout(
+        title="Comparação Multi-Eixos",
+        xaxis=dict(title="Data", showgrid=True),
+        legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"), # Legenda no topo
+        height=600,
+        margin=dict(l=20, r=20, t=60, b=20),
+        **layout_settings
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.info("💡 **Dica:** Dê dois cliques na legenda de uma variável para isolá-la.")
