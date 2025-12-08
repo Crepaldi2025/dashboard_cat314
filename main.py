@@ -324,6 +324,15 @@ def render_analysis_results():
             opacity2=st.session_state.get('opacity_2', 0.6), 
             mode=mode
         )
+
+        if mode == "Split Map (Cortina)":
+            st.markdown(
+                "<div style='text-align: center; margin-top: 10px; color: #555; background-color: #f0f2f6; padding: 10px; border-radius: 5px; border: 1px solid #ccc;'>"
+                "↔️ <b>Dica:</b> Clique e arraste a <b>barra vertical central</b> para alternar entre as camadas."
+                "</div>", 
+                unsafe_allow_html=True
+            )
+        
         return
 
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
@@ -460,6 +469,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
