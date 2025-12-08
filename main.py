@@ -241,44 +241,74 @@ def render_analysis_results():
             6. Salve este arquivo .zip no seu computador/laptop.                                                       
             7. **Pronto!** Basta enviar esse arquivo .zip aqui no painel lateral do Clima-Cast.
             """)
-    # --------------------------------
-
-
-    
+        
     ui.renderizar_resumo_selecao() 
 
+    # --- 5. LÓGICA UNIFICADA: MAPAS + SHAPEFILE ---
     if aba in ["Mapas", "Shapefile"]:
         if "ee_image" in results:
             vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
+            # ========================
+            # 1. RENDERIZAÇÃO DO MAPA
+            # ========================
             if tipo_mapa == "Interativo":
                 render_map_tips()
+                
+                # Controle de Opacidade
                 opacity_val = 1.0 
                 if aba == "Shapefile":
                     st.markdown("#### 🎚️ Ajuste de Transparência")
-                    opacity_val = st.slider("Opacidade", 0.0, 1.0, 0.7, 0.1, key='shp_opacity')
-                
-                # CHAMADA ÚNICA
-                map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"], opacity=opacity_val)
+                    opacity_val = st.slider("Opacidade da Camada", 0.0, 1.0, 0.7, step=0.1, key='shp_opacity')
+
+                # CHAMADA ÚNICA DO MAPA
+                map_visualizer.create_interactive_map(
+                    results["ee_image"], 
+                    results["feature"], 
+                    vis_params, 
+                    var_cfg["unit"],
+                    opacity=opacity_val 
+                )
+
             else:
+                # Mapa Estático (Com botões de download de imagem)
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
+                
+                import base64
                 if png:
                     st.image(base64.b64decode(png.split(",")[1]), use_column_width=True) 
                     if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
+                    
                     try:
-                        title = f"{st.session_state.variavel} {local_str}"
+                        title = f"{st.session_state.variavel} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
-                        mp, jp = base64.b64decode(png.split(",")[1]), base64.b64decode(jpg.split(",")[1])
+                        mp = base64.b64decode(png.split(",")[1])
+                        jp = base64.b64decode(jpg.split(",")[1])
                         cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
+                        
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
+                        
+                        # Botões de Download da IMAGEM
+                        st.markdown("##### 📥 Baixar Mapa (Imagem)")
                         c1, c2 = st.columns(2)
                         if fp: c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
+            # ========================
+            # 2. EXPORTAÇÃO DE DADOS (RESTAURADA!)
+            # ========================
+            # Colocamos dentro de um expander para não poluir, mas os botões estão lá!
+            if "map_dataframe" in results and not results["map_dataframe"].empty:
+                st.markdown("---")
+                with st.expander("📊 Ver Tabela e Baixar Dados (CSV/Excel)", expanded=False):
+                    st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True, height=200)
+                    render_download_buttons(results["map_dataframe"], "dados_climaticos", "mapa_export")
+
+    # --- 6. SÉRIES TEMPORAIS ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
@@ -319,6 +349,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
