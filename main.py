@@ -27,51 +27,15 @@ def set_background():
 
 set_background()
 
-# --- FUNÇÃO DE AJUDA DOS GRÁFICOS (RESTAURADA COMPLETA) ---
+# --- HELPERS ---
 def render_chart_tips():
-    with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
-        st.markdown("### 📈 Guia de Ferramentas")
-        st.markdown("**1️⃣ Barra de Ferramentas (Canto Superior Direito)**")
-        st.markdown("""
-        * `📷` **Câmera:** Baixa o gráfico atual como imagem (PNG).
-        * `🔍` **Zoom:** Clique e arraste na tela para aproximar uma área específica.
-        * `✥` **Pan (Mover):** Clique e arraste para mover o gráfico para os lados.
-        * `➕` / `➖` **Zoom In/Out:** Aproxima ou afasta a visualização centralizada.
-        * `🏠` **Casinha (Reset):** Retorna o gráfico para a visualização original.
-        * `🔲` **Autoscale:** Ajusta os eixos automaticamente para caber todos os dados.
-        """)
-        st.markdown("**2️⃣ Interação e Atalhos**")
-        st.markdown("""
-        * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
-        * **Valor Exato:** Passe o mouse sobre a linha azul para ver a data e o valor exato (Tooltip).
-        * **Tela Cheia:** Passe o mouse no gráfico e procure o ícone `⛶` para expandir.
-        """)
+    with st.expander("ℹ️ Ajuda: Gráficos"):
+        st.markdown("* `📷` **Câmera:** Baixa imagem.\n* `🔍` **Zoom:** Aproxima.\n* `🏠` **Reset:** Restaura.")
 
-# --- FUNÇÃO DE AJUDA DO MAPA (RESTAURADA COMPLETA) ---
 def render_map_tips():
-    with st.popover("ℹ️ Ajuda: Ferramentas do Mapa"):
-        st.markdown("### 🗺️ Guia de Navegação")
-        st.markdown("**1️⃣ Controles de Visualização**")
-        st.markdown("""
-        * `➕` / `➖` **Zoom:** Aproxime ou afaste a visão do mapa.
-        * `⛶` **Tela Cheia:** Expande o mapa para ocupar todo o monitor (ícone lateral).
-        * `🗂️` **Camadas:** (Ícone no topo direito) Alterne entre Dados e Contorno.
-        """)
-        st.markdown("**2️⃣ Desenho e Marcação (Barra Lateral Esquerda)**")
-        st.markdown("""
-        * `⬟` **Polígono:** Desenhe áreas livres (clique ponto a ponto).
-        * `⬛` **Retângulo:** Desenhe áreas quadradas (clique e arraste).
-        * `⭕` **Círculo:** Desenhe uma área circular (clique no centro e arraste).
-        * `📍` **Marcador:** Adiciona um pino em um ponto de interesse.
-        * `╱` **Linha:** Desenhe rotas ou meça distâncias.
-        """)
-        st.markdown("**3️⃣ Edição**")
-        st.markdown("""
-        * `📝` **Editar:** Permite ajustar ou mover os desenhos existentes.
-        * `🗑️` **Lixeira:** Remove todos os desenhos ou o item selecionado.
-        """)
+    with st.popover("ℹ️ Ajuda: Mapa"):
+        st.markdown("* `➕` / `➖` **Zoom:** Aproxima/Afasta.\n* `🗂️` **Camadas:** Alterne dados/satélite.")
 
-# --- FUNÇÃO PADRONIZADA DE EXPORTAÇÃO (CSV + XLSX) ---
 def render_download_buttons(df, filename_prefix, key_suffix):
     if df is None or df.empty: return
     try: df_export = df.astype(str)
@@ -104,60 +68,46 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
     if not var_cfg: return None
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
-    # 1. Mapas e Shapefile
+    # Inicializa variável para evitar UnboundLocalError
+    ee_image = None
+
     if aba in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile"]:
         target_hour = None
         if st.session_state.get('tipo_periodo') == "Horário Específico":
             target_hour = st.session_state.get('hora_especifica')
         
         ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry, target_hour)
-        
         if ee_image:
             results["ee_image"] = ee_image
-            # Gera dados para a tabela
+            # Gera dados para tabela (Mapas/Shapefile)
             if aba in ["Mapas", "Shapefile"]:
                 df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
                 if df_map_samples is not None: results["map_dataframe"] = df_map_samples
             
-    # 2. Séries Temporais
     elif aba in ["Séries Temporais", "Múltiplas Séries"]:
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
         if df is not None: results["time_series_df"] = df
 
     return results
 
-# --- 1. SKEW-T (COM TRATAMENTO DE ERRO 429) ---
+def run_full_analysis():
+    aba = st.session_state.get("nav_option", "Mapas")
+    
+    # SKEW-T (COM TRATAMENTO DE ERRO)
     if aba == "Skew-T":
         lat, lon = st.session_state.get("skew_lat"), st.session_state.get("skew_lon")
         date, hour = st.session_state.get("skew_date"), st.session_state.get("skew_hour")
-        
         try:
-            with st.spinner("Gerando Skew-T (ERA5/GFS)..."):
-                # Tenta baixar os dados
+            with st.spinner("Gerando Skew-T..."):
                 df = skewt_handler.get_vertical_profile_data(lat, lon, date, hour)
-                
-                # Se der certo, salva no session_state
                 st.session_state.skewt_results = {"df": df, "params": (lat, lon, date, hour)}
-                
         except Exception as e:
-            # --- SE DER ERRO, MOSTRA O AVISO AMIGÁVEL AQUI ---
-            st.session_state.skewt_results = None # Limpa resultados antigos
-            
-            st.warning("⚠️ **Não foi possível obter os dados neste momento.**")
-            
-            with st.expander("ℹ️ Entenda o motivo (Erro 429 / Conexão)", expanded=True):
-                st.info(
-                    "**O que aconteceu?**\n\n"
-                    "O serviço de dados (Open-Meteo) provavelmente bloqueou a conexão temporariamente "
-                    "por excesso de pedidos (Erro 429) ou instabilidade momentânea.\n\n"
-                    "👉 **Solução:** Aguarde cerca de **1 minuto** e tente clicar em 'Gerar Análise' novamente."
-                )
-            
-            # Mostra o erro técnico pequeno abaixo, caso seja outra coisa
-            st.error(f"Detalhe técnico do erro: {e}")
-            
+            st.session_state.skewt_results = None
+            st.warning("⚠️ Erro na conexão.")
+            with st.expander("ℹ️ Detalhes (Erro 429)"): st.info("O serviço bloqueou a conexão. Aguarde 1 min.")
         return
     
+    # SOBREPOSIÇÃO
     if aba == "Sobreposição (Camadas)":
         v1, v2 = st.session_state.get("var_camada_1"), st.session_state.get("var_camada_2")
         tipo_per = st.session_state.tipo_periodo
@@ -173,6 +123,7 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
             if res1 and res2: st.session_state.analysis_results = {"mode": "overlay", "layer1": {"res": res1, "name": v1}, "layer2": {"res": res2, "name": v2}}
         return
 
+    # MÚLTIPLOS
     if aba in ["Múltiplos Mapas", "Múltiplas Séries"]:
         vars_sel = st.session_state.get("variaveis_multiplas", [])
         if not vars_sel: return
@@ -191,7 +142,7 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
         st.session_state.analysis_results = {"mode": "multi_series" if aba == "Múltiplas Séries" else "multi_map", "data": results_multi}
         return
 
-    # Lógica Padrão (Mapas, Shapefile, Séries)
+    # PADRÃO
     variavel = st.session_state.get("variavel", "Temperatura do Ar (2m)")
     tipo_per = st.session_state.tipo_periodo
     if tipo_per == "Horário Específico":
@@ -209,64 +160,32 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
-    # 1. SKEW-T
     if aba == "Skew-T":
-        if "skewt_results" in st.session_state:
-
-            # --- AVISO RESTAURADO (COMPLETO) ---
-            with st.expander("ℹ️ Sobre limites de conexão (Erro 429)", expanded=False):
-                st.info(
-                    "**O que significa 'Erro 429 - Too Many Requests'?**\n\n"
-                    "O Open-Meteo é um serviço gratuito de alta qualidade. Para evitar sobrecarga, "
-                    "eles bloqueiam temporariamente o acesso se receberem muitos pedidos em poucos segundos.\n\n"
-                    "👉 **Dica:** Se isso acontecer, aguarde cerca de **1 minuto** e tente novamente. "
-                    "Evite clicar em 'Gerar' várias vezes seguidas rapidamente."
-                )
-            # -----------------------------------            
-            
-            ui.renderizar_resumo_selecao()
+        if "skewt_results" in st.session_state and st.session_state.skewt_results:
             res = st.session_state.skewt_results
+            ui.renderizar_resumo_selecao()
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
-                with st.expander("📥 Exportar Dados"):
-                    render_download_buttons(pd.DataFrame(res["df"]).astype(str), "skewt", "sk")
+                with st.expander("📥 Exportar Dados"): render_download_buttons(pd.DataFrame(res["df"]).astype(str), "skewt", "sk")
         return
 
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None: return
     results = st.session_state.analysis_results
 
-    tipo_periodo = st.session_state.get('tipo_periodo', '')
-    periodo_str = ""
-    if tipo_periodo == "Personalizado": periodo_str = f"de {st.session_state.get('data_inicio').strftime('%d/%m/%Y')} a {st.session_state.get('data_fim').strftime('%d/%m/%Y')}"
-    elif tipo_periodo == "Mensal": periodo_str = f"mensal ({st.session_state.get('mes_mensal')}/{st.session_state.get('ano_mensal')})"
-    elif tipo_periodo == "Anual": periodo_str = f"anual ({st.session_state.get('ano_anual')})"
-    elif tipo_periodo == "Horário Específico": periodo_str = f"em {st.session_state.get('data_horaria').strftime('%d/%m/%Y')} às {st.session_state.get('hora_especifica')}:00"
-
     local_str = "Local Selecionado"
-    if aba == "Shapefile": 
-        local_str = "na Área Personalizada (Shapefile)"
-        with st.expander("❓ Não tem um Shapefile? Aprenda a criar um em 1 minuto 👇"):
-            st.markdown("1. Vá em **[geojson.io](https://geojson.io/)**.\n2. Desenhe sua área (Polígono).\n3. Menu: **Save > Shapefile**.\n4. Envie o ZIP aqui.")
+    if aba == "Shapefile": local_str = "na Área Personalizada (Shapefile)"
     
-    # 2. SOBREPOSIÇÃO
+    # OVERLAY
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
         st.subheader("Mapa de Sobreposição")
         ui.renderizar_resumo_selecao()
         mode = st.session_state.get('overlay_mode', "Transparência")
         map_visualizer.create_overlay_map(results["layer1"]["res"]["ee_image"], results["layer1"]["name"], results["layer2"]["res"]["ee_image"], results["layer2"]["name"], results["layer1"]["res"]["feature"], opacity1=st.session_state.get('opacity_1', 1.0), opacity2=st.session_state.get('opacity_2', 0.6), mode=mode)
-        
-        # --- RESTAURADO O AVISO ESTILIZADO AQUI ---
         if mode == "Split Map (Cortina)":
-            st.markdown(
-                "<div style='text-align: center; margin-top: 10px; color: #555; background-color: #f0f2f6; padding: 10px; border-radius: 5px; border: 1px solid #ccc;'>"
-                "↔️ <b>Dica:</b> Clique e arraste a <b>barra vertical central</b> para alternar entre as camadas."
-                "</div>", 
-                unsafe_allow_html=True
-            )
-        # ------------------------------------------
+            st.markdown("<div style='text-align: center; margin-top: 10px; color: #555; background-color: #f0f2f6; padding: 10px; border-radius: 5px; border: 1px solid #ccc;'>↔️ <b>Dica:</b> Arraste a barra central.</div>", unsafe_allow_html=True)
         return
 
-    # 3. MÚLTIPLOS MAPAS
+    # MULTI MAPAS
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
@@ -279,10 +198,6 @@ def render_analysis_results():
                     if png:
                         st.image(base64.b64decode(png.split(",")[1]), use_column_width=True) 
                         if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
-                        st.markdown("📥 **Baixar:**")
-                        c1, c2 = st.columns(2)
-                        c1.download_button("PNG", base64.b64decode(png.split(",")[1]), f"{var}.png", "image/png", key=f"png_{i}")
-                        c2.download_button("JPG", base64.b64decode(jpg.split(",")[1]), f"{var}.jpg", "image/jpeg", key=f"jpg_{i}")
         else:
             cols = st.columns(2)
             for i, var in enumerate(results["data"]):
@@ -291,7 +206,7 @@ def render_analysis_results():
                     map_visualizer.create_interactive_map(results["data"][var]["ee_image"], results["data"][var]["feature"], gee_handler.obter_vis_params_interativo(var), results["data"][var]["var_cfg"]["unit"])
         return
 
-    # 4. MÚLTIPLAS SÉRIES
+    # MULTI SÉRIES
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -304,9 +219,11 @@ def render_analysis_results():
                     charts_visualizer.display_time_series_chart(results["data"][var]["time_series_df"], var, results["data"][var]["var_cfg"]["unit"], show_help=False)
         return
 
-    # 5. MAPAS E SHAPEFILE (CORRIGIDO E COMPLETO)
+    # UNIFICADO: MAPAS + SHAPEFILE
     var_cfg = results["var_cfg"]
     st.subheader(f"Análise: {st.session_state.get('variavel')} {local_str}")
+    if aba == "Shapefile":
+        with st.expander("❓ Como obter Shapefile?"): st.markdown("Use [geojson.io](https://geojson.io/). Desenhe, Salve como Shapefile, Envie o ZIP.")
     ui.renderizar_resumo_selecao() 
 
     if aba in ["Mapas", "Shapefile"]:
@@ -314,7 +231,7 @@ def render_analysis_results():
             vis = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
-            # --- MODO INTERATIVO ---
+            # MODO INTERATIVO
             if tipo_mapa == "Interativo":
                 render_map_tips()
                 opa = 1.0 
@@ -323,53 +240,45 @@ def render_analysis_results():
                     opa = st.slider("Opacidade", 0.0, 1.0, 0.7, 0.1, key='shp_opacity')
                 map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis, var_cfg["unit"], opacity=opa)
 
-            # --- MODO ESTÁTICO ---
+            # MODO ESTÁTICO
             else:
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis, var_cfg["unit"])
-                
                 if png:
                     st.image(base64.b64decode(png.split(",")[1]), use_column_width=True) 
                     if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
-                    
-                    # TENTA GERAR COM TÍTULO, SE FALHAR USA O SIMPLES
+                    # Botões Imagem
                     try:
-                        t = f"{st.session_state.variavel} {periodo_str} {local_str}"
+                        t = f"{st.session_state.variavel} {local_str}"
                         tb = map_visualizer._make_title_image(t, 800)
                         mp, jp = base64.b64decode(png.split(",")[1]), base64.b64decode(jpg.split(",")[1])
                         cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
-                        final_png = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG') or mp
-                        final_jpg = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG') or jp
-                    except:
-                        final_png, final_jpg = base64.b64decode(png.split(",")[1]), base64.b64decode(jpg.split(",")[1])
+                        fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG') or mp
+                        fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG') or jp
+                    except: fp, fj = base64.b64decode(png.split(",")[1]), base64.b64decode(jpg.split(",")[1])
 
-                    # 1) BOTÕES DE DOWNLOAD DA IMAGEM
                     st.markdown("##### 📥 Baixar Mapa (Imagem)")
                     c1, c2 = st.columns(2)
-                    c1.download_button("💾 Baixar PNG", final_png, "mapa.png", "image/png", use_container_width=True)
-                    c2.download_button("💾 Baixar JPG", final_jpg, "mapa.jpeg", "image/jpeg", use_container_width=True)
+                    c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
+                    c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
 
-            # --- DADOS E TABELA (SEMPRE VISÍVEIS SE HOUVER DADOS) ---
+            # DADOS E TABELA
             if "map_dataframe" in results and not results["map_dataframe"].empty:
                 st.markdown("---")
-                # 2) Ver Tabela
-                with st.expander("📊 Ver Tabela de Dados", expanded=False):
+                with st.expander("📊 Ver Tabela e Baixar Dados (CSV/Excel)", expanded=False):
                     st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True, height=250)
-                    
-                    # 3) Baixar .csv e .xlsx
                     st.markdown("##### 📥 Baixar Dados da Tabela")
                     render_download_buttons(results["map_dataframe"], "dados_climaticos", "map_export")
 
-    # 6. SÉRIES TEMPORAIS
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
 
 def render_polygon_drawer():
-    st.subheader("Desenhe sua Área de Interesse")
+    st.subheader("Desenhe sua Área")
     m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
-    Draw(export=False, draw_options={"polygon": True, "rectangle": True, "circle": False, "marker": False, "polyline": False}).add_to(m)
+    Draw(export=False, draw_options={"polygon": True, "rectangle": True}).add_to(m)
     map_data = st_folium(m, width=None, height=500, returned_objects=["all_drawings"])
     if map_data and map_data.get("all_drawings"):
         st.session_state.drawn_geometry = map_data["all_drawings"][-1]["geometry"]
@@ -397,6 +306,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
