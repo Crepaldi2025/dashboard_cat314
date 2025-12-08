@@ -234,6 +234,18 @@ def render_analysis_results():
 
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
+
+            # --- ADICIONE ESTE AVISO AQUI ---
+            with st.expander("ℹ️ Sobre limites de conexão (Erro 429)", expanded=False):
+                st.info(
+                    "**O que significa 'Erro 429 - Too Many Requests'?**\n\n"
+                    "O Open-Meteo é um serviço gratuito de alta qualidade. Para evitar sobrecarga, "
+                    "eles bloqueiam temporariamente o acesso se receberem muitos pedidos em poucos segundos.\n\n"
+                    "👉 **Dica:** Se isso acontecer, aguarde cerca de **1 minuto** e tente novamente. "
+                    "Evite clicar em 'Gerar' várias vezes seguidas rapidamente."
+                )
+            # --------------------------------
+            
             ui.renderizar_resumo_selecao()
             st.markdown("""<style>div[data-testid="stMetricValue"] {font-size: 1.1rem !important;}</style>""", unsafe_allow_html=True)
             res = st.session_state.skewt_results
@@ -469,6 +481,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
