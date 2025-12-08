@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 import shutil
 import warnings
-import shapefile_handler
+import shapefile_handler  # <--- IMPORTANTE: Importando o novo manipulador
 
 def inicializar_gee():
     try:
@@ -82,93 +82,18 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- FUNÇÃO À PROVA DE BALAS: BOUNDING BOX ---
-def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Feature]:
-    try:
-        import geopandas as gpd
-    except ImportError:
-        st.error("Biblioteca `geopandas` não instalada.")
-        return None, None
-
-    try:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            zip_path = os.path.join(tmp_dir, "data.zip")
-            with open(zip_path, "wb") as f:
-                f.write(uploaded_file.getvalue())
-            
-            try:
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(tmp_dir)
-            except:
-                st.error("ZIP Inválido.")
-                return None, None
-            
-            shp_file = None
-            for root, _, files in os.walk(tmp_dir):
-                for f in files:
-                    if f.endswith(".shp"):
-                        shp_file = os.path.join(root, f)
-                        break
-            
-            if not shp_file:
-                st.error("Nenhum .shp encontrado.")
-                return None, None
-
-            # 1. Leitura
-            gdf = gpd.read_file(shp_file)
-            if gdf.empty: return None, None
-
-            # 2. Conversão de Projeção
-            if not gdf.crs:
-                gdf.set_crs("EPSG:4326", inplace=True)
-            elif gdf.crs != "EPSG:4326":
-                gdf = gdf.to_crs("EPSG:4326")
-
-            # 3. ABORDAGEM INFALÍVEL: Usar apenas a caixa envolvente (Bounds)
-            # Em vez de tentar converter a geometria complexa do rio para GeoJSON,
-            # pegamos apenas os limites [min_x, min_y, max_x, max_y]
-            bounds = gdf.total_bounds
-            
-            # bounds é um array: [minx, miny, maxx, maxy]
-            # Earth Engine espera: [west, south, east, north]
-            # É a mesma ordem!
-            
-            # Cria um retângulo simples no GEE
-            ee_geom = ee.Geometry.Rectangle([float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3])])
-            
-            # Cria um Feature para visualização
-            ee_feat = ee.Feature(ee_geom, {'label': 'Area de Interesse'})
-            
-            st.success(f"✅ Geometria processada (Área: {bounds[0]:.2f}, {bounds[1]:.2f} a {bounds[2]:.2f}, {bounds[3]:.2f})")
-            
-            return ee_geom, ee_feat
-
-    except Exception as e:
-        st.error(f"Erro processamento: {e}")
-        return None, None
-
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
     tipo = session_state.get('tipo_localizacao', 'Estado')
     nav_opt = session_state.get('nav_option')
-
-    def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
-    tipo = session_state.get('tipo_localizacao', 'Estado')
-    nav_opt = session_state.get('nav_option')
     
-    # --- BLOCO SHAPEFILE ---
+    # --- INTEGRAÇÃO COM SHAPEFILE HANDLER ---
     if nav_opt == "Shapefile":
-        uploaded = session_state.get('shapefile_upload') # Note a nova key
-        if uploaded:
-            return shapefile_handler.process_uploaded_shapefile(uploaded)
-        return None, None
-    # -----------------------
-
-      
-    if nav_opt == "Hidrografia":
         uploaded = session_state.get('shapefile_upload')
         if uploaded:
-            return convert_uploaded_shapefile_to_ee(uploaded)
+            # Chama a função no novo arquivo shapefile_handler
+            return shapefile_handler.process_uploaded_shapefile(uploaded)
         return None, None
+    # ----------------------------------------
 
     try:
         if tipo == "Estado":
@@ -342,4 +267,3 @@ def obter_vis_params_interativo(variavel: str):
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
     return nova_config
-
