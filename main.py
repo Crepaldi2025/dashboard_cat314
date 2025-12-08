@@ -126,15 +126,36 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
 
     return results
 
-def run_full_analysis():
-    aba = st.session_state.get("nav_option", "Mapas")
-    
+# --- 1. SKEW-T (COM TRATAMENTO DE ERRO 429) ---
     if aba == "Skew-T":
         lat, lon = st.session_state.get("skew_lat"), st.session_state.get("skew_lon")
         date, hour = st.session_state.get("skew_date"), st.session_state.get("skew_hour")
-        with st.spinner("Gerando Skew-T..."):
-            df = skewt_handler.get_vertical_profile_data(lat, lon, date, hour)
-            st.session_state.skewt_results = {"df": df, "params": (lat, lon, date, hour)}
+        
+        try:
+            with st.spinner("Gerando Skew-T (ERA5/GFS)..."):
+                # Tenta baixar os dados
+                df = skewt_handler.get_vertical_profile_data(lat, lon, date, hour)
+                
+                # Se der certo, salva no session_state
+                st.session_state.skewt_results = {"df": df, "params": (lat, lon, date, hour)}
+                
+        except Exception as e:
+            # --- SE DER ERRO, MOSTRA O AVISO AMIGÁVEL AQUI ---
+            st.session_state.skewt_results = None # Limpa resultados antigos
+            
+            st.warning("⚠️ **Não foi possível obter os dados neste momento.**")
+            
+            with st.expander("ℹ️ Entenda o motivo (Erro 429 / Conexão)", expanded=True):
+                st.info(
+                    "**O que aconteceu?**\n\n"
+                    "O serviço de dados (Open-Meteo) provavelmente bloqueou a conexão temporariamente "
+                    "por excesso de pedidos (Erro 429) ou instabilidade momentânea.\n\n"
+                    "👉 **Solução:** Aguarde cerca de **1 minuto** e tente clicar em 'Gerar Análise' novamente."
+                )
+            
+            # Mostra o erro técnico pequeno abaixo, caso seja outra coisa
+            st.error(f"Detalhe técnico do erro: {e}")
+            
         return
     
     if aba == "Sobreposição (Camadas)":
@@ -376,5 +397,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
