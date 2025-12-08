@@ -183,6 +183,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     with cex1: st.download_button("💾 Exportar CSV", data=csv_data, file_name=f"serie_{variable_clean}.csv", mime="text/csv", use_container_width=True)
     with cex2: 
         if excel_data: st.download_button("💾 Exportar Excel", data=excel_data, file_name=f"serie_{variable_clean}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
 def display_multiaxis_chart(data_dict):
     """
     Gera um único gráfico com múltiplos eixos Y para comparar variáveis.
@@ -198,6 +199,7 @@ def display_multiaxis_chart(data_dict):
     axis_configs = {}
     
     # Configurações de layout para até 4 eixos
+    # O xaxis já é definido aqui com o DOMAIN (margem lateral)
     layout_settings = {
         'xaxis': dict(domain=[0.1, 0.9] if len(data_dict) > 2 else [0, 1]),
         'yaxis': dict(title="Eixo 1", titlefont=dict(color=colors[0]), tickfont=dict(color=colors[0])),
@@ -234,10 +236,13 @@ def display_multiaxis_chart(data_dict):
         
         idx += 1
 
-    # Aplica o layout
+    # --- CORREÇÃO AQUI ---
+    # Adicionamos as configurações de título e grade ao dicionário xaxis existente
+    layout_settings['xaxis'].update(dict(title="Data", showgrid=True))
+
+    # Aplica o layout (Removemos o xaxis duplicado daqui de baixo)
     fig.update_layout(
         title="Comparação Multi-Eixos",
-        xaxis=dict(title="Data", showgrid=True),
         legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"), # Legenda no topo
         height=600,
         margin=dict(l=20, r=20, t=60, b=20),
