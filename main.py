@@ -60,7 +60,7 @@ def render_map_tips():
         st.markdown("""
         * `➕` / `➖` **Zoom:** Aproxime ou afaste a visão do mapa.
         * `⛶` **Tela Cheia:** Expande o mapa para ocupar todo o monitor (ícone lateral).
-        * `🗂️` **Camadas:** (Ícone no topo direito) Alterne o fundo (Satélite/Ruas) e ligue/desligue os dados.
+        * `🗂️` **Camadas:** (Ícone no topo direito) Alterne entre Dados e Contorno.
         """)
         st.markdown("**2️⃣ Desenho e Marcação (Barra Lateral Esquerda)**")
         st.markdown("""
@@ -469,6 +469,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
