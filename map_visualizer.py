@@ -77,16 +77,12 @@ def create_overlay_map(img1, name1, img2, name2, feature, opacity1=1.0, opacity2
     if bounds:
         mapa.fit_bounds(bounds)
     
-    # REDUZIDO AQUI 
     mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
 # 1. MAPA INTERATIVO PADRÃO
 # ------------------------------------------------------------------
 
-# map_visualizer.py
-
-# 1. Adicionado o parâmetro 'opacity' no final
 def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "", opacity: float = 1.0):
     try:
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
@@ -110,7 +106,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     )
     esri_layer.add_to(mapa)
 
-    # 2. Adicionado o argumento 'opacity=opacity' aqui
+    # Adiciona a camada com a opacidade correta
     mapa.addLayer(ee_image, vis_params, "Dados Climáticos", opacity=opacity)
     
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
@@ -130,9 +126,6 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
         mapa.fit_bounds(bounds)
     
     mapa.to_streamlit(height=500, use_container_width=True)
-    
-    # REDUZIDO AQUI 
-    mapa.to_streamlit(height=500, use_container_width=True)
 
 # ------------------------------------------------------------------
 # 2. MAPA ESTÁTICO
@@ -151,7 +144,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
             region = feature.geometry().buffer(dim * 0.05)
         except: region = feature.geometry()
 
-        # Dimensions controla a resolução da imagem gerada, não o tamanho na tela
+        # Dimensions controla a resolução da imagem gerada
         url = final.getThumbURL({"region": region, "dimensions": 800, "format": "png"})
         img_bytes = requests.get(url).content
         img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
@@ -227,6 +220,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     mapa.get_root().add_child(macro)
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
+    # Tamanho ajustado da colorbar estática (menor altura: 0.15)
     fig = plt.figure(figsize=(2.5, 0.15), dpi=220)
     ax = fig.add_axes([0.05, 0.4, 0.90, 0.35])
     try:
@@ -277,9 +271,3 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
-
-
-
-
-
-
