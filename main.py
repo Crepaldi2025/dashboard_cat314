@@ -191,7 +191,18 @@ def render_analysis_results():
     # 1. SKEW-T
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
-            with st.expander("ℹ️ Sobre limites de conexão", expanded=False): st.info("Se der erro 429, aguarde 1 min.")
+
+            # --- AVISO RESTAURADO (COMPLETO) ---
+            with st.expander("ℹ️ Sobre limites de conexão (Erro 429)", expanded=False):
+                st.info(
+                    "**O que significa 'Erro 429 - Too Many Requests'?**\n\n"
+                    "O Open-Meteo é um serviço gratuito de alta qualidade. Para evitar sobrecarga, "
+                    "eles bloqueiam temporariamente o acesso se receberem muitos pedidos em poucos segundos.\n\n"
+                    "👉 **Dica:** Se isso acontecer, aguarde cerca de **1 minuto** e tente novamente. "
+                    "Evite clicar em 'Gerar' várias vezes seguidas rapidamente."
+                )
+            # -----------------------------------            
+            
             ui.renderizar_resumo_selecao()
             res = st.session_state.skewt_results
             if res["df"] is not None:
@@ -365,4 +376,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
