@@ -221,7 +221,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     # Tamanho ajustado da colorbar estática (menor altura: 0.15)
-    fig = plt.figure(figsize=(3.0, 0.25), dpi=220)
+    fig = plt.figure(figsize=(5.0, 0.25), dpi=220)
     ax = fig.add_axes([0.05, 0.45, 0.90, 0.2])
     try:
         N_STEPS = len(palette)
@@ -271,6 +271,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
