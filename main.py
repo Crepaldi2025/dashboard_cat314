@@ -155,30 +155,61 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
+    # --- 1. SKEW-T ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             with st.expander("ℹ️ Sobre limites de conexão (Erro 429)", expanded=False):
-                st.info("Aguarde 1 minuto se houver erro de conexão (bloqueio temporário da API).")
+                st.info("O Open-Meteo bloqueia temporariamente acessos excessivos. Se der erro, aguarde 1 min.")
             ui.renderizar_resumo_selecao()
             st.markdown("""<style>div[data-testid="stMetricValue"] {font-size: 1.1rem !important;}</style>""", unsafe_allow_html=True)
             res = st.session_state.skewt_results
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
                 with st.expander("📥 Exportar Dados da Sondagem"):
-                    st.dataframe(res["df"].astype(str), use_container_width=True)
-                    render_download_buttons(res["df"].astype(str), "sondagem_skewt", "skewt")
+                    try:
+                        df_fmt = pd.DataFrame(res["df"]).copy()
+                        if isinstance(df_fmt.index, pd.DatetimeIndex): df_fmt.reset_index(inplace=True)
+                        for c in df_fmt.columns: 
+                            df_fmt[c] = df_fmt[c].apply(lambda x: getattr(x, 'magnitude', x))
+                            df_fmt[c] = pd.to_numeric(df_fmt[c], errors='ignore')
+                        st.dataframe(df_fmt.astype(str), use_container_width=True)
+                        render_download_buttons(df_fmt.astype(str), "sondagem_skewt", "skewt")
+                    except: 
+                        st.dataframe(res["df"].astype(str), use_container_width=True)
+                        render_download_buttons(res["df"].astype(str), "sondagem_skewt", "skewt")
         return
 
-    if "analysis_results" not in st.session_state or st.session_state.analysis_results is None: return
+    # --- CHECAGEM GERAL ---
+    if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
+        return
+
     results = st.session_state.analysis_results
 
+    # --- TEXTOS DE CABEÇALHO ---
     tipo_periodo = st.session_state.get('tipo_periodo', '')
-    local_str = "Local Selecionado"
-    if aba == "Shapefile": local_str = "na Área Personalizada (Shapefile)"
+    periodo_str = ""
+    if tipo_periodo == "Personalizado": periodo_str = f"de {st.session_state.get('data_inicio').strftime('%d/%m/%Y')} a {st.session_state.get('data_fim').strftime('%d/%m/%Y')}"
+    elif tipo_periodo == "Mensal": periodo_str = f"mensal ({st.session_state.get('mes_mensal')}/{st.session_state.get('ano_mensal')})"
+    elif tipo_periodo == "Anual": periodo_str = f"anual ({st.session_state.get('ano_anual')})"
+    elif tipo_periodo == "Horário Específico": periodo_str = f"em {st.session_state.get('data_horaria').strftime('%d/%m/%Y')} às {st.session_state.get('hora_especifica')}:00"
     
+    local_str = "Local Selecionado"
+    if aba == "Shapefile": 
+        local_str = "na Área Personalizada (Shapefile)"
+        with st.expander("❓ Não tem um Shapefile? Aprenda a criar um em 1 minuto 👇"):
+            st.markdown("1. Vá em **[geojson.io](https://geojson.io/)**.\n2. Desenhe sua área (Polígono).\n3. Menu: **Save > Shapefile**.\n4. Envie o ZIP aqui.")
+    else:
+        tipo = st.session_state.get('tipo_localizacao', '').lower()
+        if tipo == "estado": local_str = f"no estado de {st.session_state.get('estado', '').split(' - ')[0]}"
+        elif tipo == "município": local_str = f"no município de {st.session_state.get('municipio', '')}"
+        elif tipo == "polígono": local_str = "para a área desenhada"
+        elif "círculo" in tipo: local_str = "para o círculo definido"
+
+    # --- 2. SOBREPOSIÇÃO ---
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
-        st.subheader("Mapa de Sobreposição")
+        st.subheader("Mapa de Sobreposição (Overlay)")
         ui.renderizar_resumo_selecao()
+        with st.popover("ℹ️ Controles"): st.markdown("**Use o ícone 🗂️ (Camadas)** no mapa para alternar visualizações.")
         mode = st.session_state.get('overlay_mode', "Transparência")
         map_visualizer.create_overlay_map(
             results["layer1"]["res"]["ee_image"], results["layer1"]["name"], 
@@ -187,34 +218,47 @@ def render_analysis_results():
             opacity1=st.session_state.get('opacity_1', 1.0), 
             opacity2=st.session_state.get('opacity_2', 0.6), mode=mode
         )
-        if mode == "Split Map (Cortina)":
-            st.info("↔️ Dica: Arraste a barra central para alternar entre camadas.")
+        if mode == "Split Map (Cortina)": st.info("↔️ Dica: Arraste a barra central para alternar.")
         return
 
+    # --- 3. MÚLTIPLOS MAPAS ---
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
-        st.markdown("#### 🎨 Tipo de Visualização")
-        modo = st.radio("Formato", ["Estático", "Interativo"], horizontal=True, label_visibility="collapsed")
+        modo = st.radio("Formato", ["Estático (Imagens)", "Interativo (Navegável)"], horizontal=True, label_visibility="collapsed")
         st.markdown("---")
         cols = st.columns(2)
         if "Estático" in modo:
-            for i, var_name in enumerate(results["data"]):
-                res = results["data"][var_name]
+            import base64
+            for i, var in enumerate(results["data"]):
+                res = results["data"][var]
                 with cols[i % 2]:
-                    st.markdown(f"**{var_name}**")
-                    png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
+                    st.markdown(f"**{var}**")
+                    png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var), res["var_cfg"]["unit"])
                     if png:
                         st.image(base64.b64decode(png.split(",")[1]), use_column_width=True) 
                         if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
+                        try:
+                            t = f"{var} {periodo_str} {local_str}"
+                            tb = map_visualizer._make_title_image(t, 800)
+                            mp, jp = base64.b64decode(png.split(",")[1]), base64.b64decode(jpg.split(",")[1])
+                            cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
+                            fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
+                            fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
+                            c1, c2 = st.columns(2)
+                            if fp: c1.download_button("💾 PNG", fp, f"{var}.png", "image/png", key=f"p{i}")
+                            if fj: c2.download_button("💾 JPG", fj, f"{var}.jpg", "image/jpeg", key=f"j{i}")
+                        except: pass
         else:
-            for i, var_name in enumerate(results["data"]):
-                res = results["data"][var_name]
+            render_map_tips()
+            for i, var in enumerate(results["data"]):
+                res = results["data"][var]
                 with cols[i % 2]:
-                    st.markdown(f"##### {var_name}")
-                    map_visualizer.create_interactive_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
+                    st.markdown(f"##### {var}")
+                    map_visualizer.create_interactive_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var), res["var_cfg"]["unit"])
         return
 
+    # --- 4. MÚLTIPLAS SÉRIES ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -223,104 +267,66 @@ def render_analysis_results():
             charts_visualizer.display_multiaxis_chart(results["data"])
         else:
             cols = st.columns(2)
-            for i, var_name in enumerate(results["data"]):
+            for i, var in enumerate(results["data"]):
                 with cols[i % 2]:
-                    st.markdown(f"##### {var_name}")
-                    res = results["data"][var_name]
-                    charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
+                    st.markdown(f"##### {var}")
+                    charts_visualizer.display_time_series_chart(results["data"][var]["time_series_df"], var, results["data"][var]["var_cfg"]["unit"], show_help=False)
         return
 
-    # --- LÓGICA UNIFICADA: MAPAS + SHAPEFILE ---
-    # Este é o ÚNICO lugar onde o mapa principal deve ser desenhado
+    # --- 5. MAPAS E SHAPEFILE (UNIFICADO) ---
     var_cfg = results["var_cfg"]
     st.subheader(f"Análise: {st.session_state.get('variavel')} {local_str}")
-
-    # --- ADICIONE ESTE BLOCO AQUI ---
-    if aba == "Shapefile":
-        with st.expander("❓ Não tem um Shapefile? Aprenda a criar um em 1 minuto!"):
-            st.markdown("""
-            ### 🗺️ Como criar seu Shapefile grátis:
-            1. Acesse o site **[geojson.io](https://geojson.io/)** (clique no link).
-            2. **Navegue no mapa** até encontrar a área desejada (fazenda, bairro, bacia).
-            3. Use a ferramenta de **Polígono** (ícone de pentágono na lateral direita do mapa) e desenhe o contorno clicando ponto a ponto.
-            4. No menu superior, vá em **Save** > **Shapefile**.
-            5. O site baixará automaticamente um arquivo **.zip**.
-            6. Salve este arquivo .zip no seu computador/laptop.                                                       
-            7. **Pronto!** Basta enviar esse arquivo .zip aqui no painel lateral do Clima-Cast.
-            """)
-        
     ui.renderizar_resumo_selecao() 
 
-    # --- 5. LÓGICA UNIFICADA: MAPAS + SHAPEFILE ---
     if aba in ["Mapas", "Shapefile"]:
         if "ee_image" in results:
-            vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
+            vis = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
-            # ========================
-            # 1. RENDERIZAÇÃO DO MAPA
-            # ========================
+            # --- INTERATIVO ---
             if tipo_mapa == "Interativo":
                 render_map_tips()
-                
-                # Controle de Opacidade
-                opacity_val = 1.0 
+                opa = 1.0 
                 if aba == "Shapefile":
                     st.markdown("#### 🎚️ Ajuste de Transparência")
-                    opacity_val = st.slider("Opacidade da Camada", 0.0, 1.0, 0.7, step=0.1, key='shp_opacity')
-
-                # CHAMADA ÚNICA DO MAPA
-                map_visualizer.create_interactive_map(
-                    results["ee_image"], 
-                    results["feature"], 
-                    vis_params, 
-                    var_cfg["unit"],
-                    opacity=opacity_val 
-                )
-
-            else:
-                # Mapa Estático (Com botões de download de imagem)
-                with st.spinner("Gerando imagem..."):
-                    png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
+                    opa = st.slider("Opacidade", 0.0, 1.0, 0.7, 0.1, key='shp_opacity')
                 
+                # MAPA ÚNICO
+                map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis, var_cfg["unit"], opacity=opa)
+
+            # --- ESTÁTICO ---
+            else:
+                with st.spinner("Gerando imagem..."):
+                    png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis, var_cfg["unit"])
                 import base64
                 if png:
                     st.image(base64.b64decode(png.split(",")[1]), use_column_width=True) 
                     if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
-                    
                     try:
-                        title = f"{st.session_state.variavel} {periodo_str} {local_str}"
-                        tb = map_visualizer._make_title_image(title, 800)
-                        mp = base64.b64decode(png.split(",")[1])
-                        jp = base64.b64decode(jpg.split(",")[1])
+                        t = f"{st.session_state.variavel} {periodo_str} {local_str}"
+                        tb = map_visualizer._make_title_image(t, 800)
+                        mp, jp = base64.b64decode(png.split(",")[1]), base64.b64decode(jpg.split(",")[1])
                         cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
-                        
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
-                        
-                        # Botões de Download da IMAGEM
-                        st.markdown("##### 📥 Baixar Mapa (Imagem)")
+                        st.markdown("##### 📥 Baixar Mapa")
                         c1, c2 = st.columns(2)
                         if fp: c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
-            # ========================
-            # 2. EXPORTAÇÃO DE DADOS (RESTAURADA!)
-            # ========================
-            # Colocamos dentro de um expander para não poluir, mas os botões estão lá!
+            # --- EXPORTAÇÃO DE DADOS (EXPANDER) ---
             if "map_dataframe" in results and not results["map_dataframe"].empty:
                 st.markdown("---")
                 with st.expander("📊 Ver Tabela e Baixar Dados (CSV/Excel)", expanded=False):
                     st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True, height=200)
-                    render_download_buttons(results["map_dataframe"], "dados_climaticos", "mapa_export")
+                    render_download_buttons(results["map_dataframe"], "dados_climaticos", "map_export")
 
     # --- 6. SÉRIES TEMPORAIS ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
-
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
@@ -356,6 +362,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
