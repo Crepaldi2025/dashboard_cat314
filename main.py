@@ -377,35 +377,32 @@ def render_analysis_results():
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
+        
+        # Ajuda no topo para fácil acesso
+        render_chart_tips()
+        
+        st.markdown("---") 
 
-        # --- MUDANÇA PONTUAL AQUI ---
-        # Adicionamos um toggle para o usuário escolher o modo de visualização
+        # Toggle para alternar visualização
         usar_grafico_unico = st.toggle("📉 Visualizar em Gráfico Único (Eixos Mistos)", value=False)
         
         if usar_grafico_unico:
-            # Chama a NOVA função que criamos
+            # OPÇÃO A: Apenas o gráfico unificado
             charts_visualizer.display_multiaxis_chart(results["data"])
         else:
-            # MANTÉM O CÓDIGO ANTIGO (Gráficos separados)
-            render_chart_tips()
+            # OPÇÃO B: Apenas os gráficos separados (lado a lado)
             cols = st.columns(2)
             for i, var_name in enumerate(results["data"]):
                 res = results["data"][var_name]
                 with cols[i % 2]:
                     st.markdown(f"##### {var_name}")
-                    charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
-        # -----------------------------
-        
-        render_chart_tips()
-        
-        cols = st.columns(2)
-        for i, var_name in enumerate(results["data"]):
-            res = results["data"][var_name]
-            with cols[i % 2]:
-                st.markdown(f"##### {var_name}")
-                charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
+                    charts_visualizer.display_time_series_chart(
+                        res["time_series_df"], 
+                        var_name, 
+                        res["var_cfg"]["unit"], 
+                        show_help=False
+                    )
         return
-
     var_cfg = results["var_cfg"]
     st.subheader(f"Análise: {st.session_state.get('variavel')} {local_str}")
     ui.renderizar_resumo_selecao() 
@@ -500,6 +497,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
