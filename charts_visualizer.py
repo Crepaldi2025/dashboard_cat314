@@ -251,4 +251,5 @@ def display_multiaxis_chart(data_dict):
     
     st.plotly_chart(fig, use_container_width=True)
     
-    st.info("💡 **Dica:** Dê dois cliques na legenda de uma variável para isolá-la.")
+    st.info("💡 **Dica:** Dê um clique na legenda de uma variável para torná-la não visivel.")
+
