@@ -453,6 +453,8 @@ def render_analysis_results():
     st.subheader(f"Análise: {st.session_state.get('variavel')} {local_str}")
     ui.renderizar_resumo_selecao() 
 
+    # ... (dentro de render_analysis_results) ...
+
     if aba in ["Mapas", "Shapefile"]:
         if "ee_image" in results:
             vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
@@ -460,29 +462,42 @@ def render_analysis_results():
             
             if tipo_mapa == "Interativo":
                 render_map_tips()
-                # --- INÍCIO: CONTROLE DE TRANSPARÊNCIA ---
-                # Padrão = 1.0 (Totalmente visível / Opaco)
+                
+                # --- LÓGICA DE TRANSPARÊNCIA ---
                 opacity_val = 1.0 
                 
-                # Se estivermos na aba Shapefile, mostramos o Slider
                 if aba == "Shapefile":
                     st.markdown("#### 🎚️ Ajuste de Transparência")
                     opacity_val = st.slider(
                         "Opacidade da Camada", 
                         min_value=0.0, 
                         max_value=1.0, 
-                        value=0.7,      # Começa com 70% de visibilidade
+                        value=0.7, 
                         step=0.1, 
                         key='shp_opacity'
                     )
-                # --- FIM: CONTROLE DE TRANSPARÊNCIA ---
-                map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
+                # -------------------------------
+
+                # CHAMADA ÚNICA DO MAPA
+                map_visualizer.create_interactive_map(
+                    results["ee_image"], 
+                    results["feature"], 
+                    vis_params, 
+                    var_cfg["unit"],
+                    opacity=opacity_val 
+                )
+
             else:
+                # Lógica do Mapa Estático
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
+                
+                # Importação de segurança
+                import base64
+                
                 if png:
-                    st.image(png, width=600) 
-                    if cbar: st.image(cbar, width=600)
+                    st.image(base64.b64decode(png.split(",")[1]), width=600) 
+                    if cbar: st.image(base64.b64decode(cbar.split(",")[1]), width=600)
                     try:
                         title = f"{st.session_state.variavel} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
@@ -495,7 +510,6 @@ def render_analysis_results():
                         if fp: c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
-
         
 
     elif aba == "Séries Temporais":
@@ -556,6 +570,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
