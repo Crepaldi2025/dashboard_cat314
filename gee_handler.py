@@ -13,6 +13,7 @@ import tempfile
 import zipfile
 import shutil
 import warnings
+import shapefile_handler
 
 def inicializar_gee():
     try:
@@ -149,9 +150,22 @@ def convert_uploaded_shapefile_to_ee(uploaded_file) -> tuple[ee.Geometry, ee.Fea
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
     tipo = session_state.get('tipo_localizacao', 'Estado')
     nav_opt = session_state.get('nav_option')
+
+    def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
+    tipo = session_state.get('tipo_localizacao', 'Estado')
+    nav_opt = session_state.get('nav_option')
     
+    # --- BLOCO SHAPEFILE ---
+    if nav_opt == "Shapefile":
+        uploaded = session_state.get('shapefile_upload') # Note a nova key
+        if uploaded:
+            return shapefile_handler.process_uploaded_shapefile(uploaded)
+        return None, None
+    # -----------------------
+
+      
     if nav_opt == "Hidrografia":
-        uploaded = session_state.get('hidro_upload')
+        uploaded = session_state.get('shapefile_upload')
         if uploaded:
             return convert_uploaded_shapefile_to_ee(uploaded)
         return None, None
@@ -328,3 +342,4 @@ def obter_vis_params_interativo(variavel: str):
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
     return nova_config
+
