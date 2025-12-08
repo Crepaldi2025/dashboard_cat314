@@ -480,10 +480,7 @@ def render_analysis_results():
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
 
-        st.subheader("Tabela de Dados")
-        if "map_dataframe" in results and not results["map_dataframe"].empty:
-            st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True)
-            render_download_buttons(results["map_dataframe"], "dados_mapa", "map_main")
+        
 
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
@@ -543,6 +540,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
