@@ -381,8 +381,7 @@ def render_analysis_results():
         # Ajuda no topo para fácil acesso
         render_chart_tips()
         
-        st.markdown("---") 
-
+        
         # Toggle para alternar visualização
         usar_grafico_unico = st.toggle("📉 Visualizar em Gráfico Único (Eixos Mistos)", value=False)
         
@@ -497,6 +496,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
