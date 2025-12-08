@@ -232,10 +232,9 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
+    # --- 1. SKEW-T (Lógica isolada) ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
-
-            # --- ADICIONE ESTE AVISO AQUI ---
             with st.expander("ℹ️ Sobre limites de conexão (Erro 429)", expanded=False):
                 st.info(
                     "**O que significa 'Erro 429 - Too Many Requests'?**\n\n"
@@ -244,59 +243,37 @@ def render_analysis_results():
                     "👉 **Dica:** Se isso acontecer, aguarde cerca de **1 minuto** e tente novamente. "
                     "Evite clicar em 'Gerar' várias vezes seguidas rapidamente."
                 )
-            # --------------------------------
-            
             ui.renderizar_resumo_selecao()
             st.markdown("""<style>div[data-testid="stMetricValue"] {font-size: 1.1rem !important;}</style>""", unsafe_allow_html=True)
             res = st.session_state.skewt_results
             if res["df"] is not None:
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
-                
                 with st.expander("📥 Exportar Dados da Sondagem"):
                     try:
-                        # 1. Copia o dataframe
                         df_formatted = pd.DataFrame(res["df"]).copy()
-                        
-                        # 2. Reseta o índice se for data (para não perder informação na conversão)
-                        if isinstance(df_formatted.index, pd.DatetimeIndex):
-                            df_formatted.reset_index(inplace=True)
-
-                        # 3. Limpa unidades físicas (MetPy) e converte para número
+                        if isinstance(df_formatted.index, pd.DatetimeIndex): df_formatted.reset_index(inplace=True)
                         for col in df_formatted.columns:
-                            # Tenta extrair .magnitude (MetPy) ou mantem o valor
                             df_formatted[col] = df_formatted[col].apply(lambda x: getattr(x, 'magnitude', x))
-                            # Tenta converter para numérico para podermos formatar
                             df_formatted[col] = pd.to_numeric(df_formatted[col], errors='ignore')
-
-                        # 4. Formata colunas numéricas (float) para 1 casa decimal
                         for col in df_formatted.select_dtypes(include=['float']).columns:
                             df_formatted[col] = df_formatted[col].apply(lambda x: f"{x:.1f}")
-                        # Ajuste os nomes abaixo conforme as colunas reais 
-                        colunas_unidades = {
-                            "pressure": "Pressão (hPa)",
-                            "temperature": "Temperatura (°C)",
-                            "relative_humidity": "UR (%)",
-                            "u_component": "Vento U (m/s)",
-                            "v_component": "Vento V (m/s)",
-                        }
+                        colunas_unidades = {"pressure": "Pressão (hPa)", "temperature": "Temperatura (°C)", "relative_humidity": "UR (%)", "u_component": "Vento U (m/s)", "v_component": "Vento V (m/s)"}
                         df_formatted = df_formatted.rename(columns=colunas_unidades)
-                        # 5. Converte TUDO para string final (resolve o erro JSON definitivamente)
                         df_final = df_formatted.astype(str)
-
                         st.dataframe(df_final, use_container_width=True)
                         render_download_buttons(df_final, "sondagem_skewt", "skewt")
-                        
-                    except Exception as e:
-                        # Fallback de segurança: apenas converte para string sem formatação bonita
+                    except Exception:
                         st.dataframe(res["df"].astype(str), use_container_width=True)
                         render_download_buttons(res["df"].astype(str), "sondagem_skewt", "skewt")
         return
 
+    # --- VERIFICAÇÃO DE RESULTADOS ---
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
         return
 
     results = st.session_state.analysis_results
 
+    # --- PREPARAÇÃO DE TEXTOS ---
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     periodo_str = ""
     if tipo_periodo == "Personalizado": periodo_str = f"de {st.session_state.get('data_inicio').strftime('%d/%m/%Y')} a {st.session_state.get('data_fim').strftime('%d/%m/%Y')}"
@@ -308,85 +285,49 @@ def render_analysis_results():
     if aba == "Shapefile": local_str = "na Área Personalizada (Shapefile)"
     else:
         tipo_local = st.session_state.get('tipo_localizacao', '').lower()
-        if tipo_local == "estado":
-            val = st.session_state.get('estado', '').split(' - ')[0]
-            local_str = f"no estado de {val}"
-        elif tipo_local == "município":
-            val = st.session_state.get('municipio', '')
-            local_str = f"no município de {val}"
+        if tipo_local == "estado": local_str = f"no estado de {st.session_state.get('estado', '').split(' - ')[0]}"
+        elif tipo_local == "município": local_str = f"no município de {st.session_state.get('municipio', '')}"
         elif tipo_local == "polígono": local_str = "para a área desenhada"
         elif "círculo" in tipo_local: local_str = "para o círculo definido"
 
+    # --- 2. SOBREPOSIÇÃO (CAMADAS) ---
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
         st.subheader("Mapa de Sobreposição (Overlay)")
         ui.renderizar_resumo_selecao()
         with st.popover("ℹ️ Como controlar a visualização?"): 
-            st.markdown("""
-            **Use o ícone 🗂️ (Camadas) no canto superior direito para:**
-            1. **Ligar/Desligar** as camadas de dados (Base/Topo).
-            2. **Exibir ou Ocultar** o Contorno da área (linha vermelha).
-            3. **Visualizar** a imagem de satélite ao fundo.
-            """)
+            st.markdown("""**Use o ícone 🗂️ (Camadas):**\n1. **Ligar/Desligar** camadas.\n2. **Exibir/Ocultar** contorno.\n3. **Visualizar** satélite.""")
         mode = st.session_state.get('overlay_mode', "Transparência")
         map_visualizer.create_overlay_map(
             results["layer1"]["res"]["ee_image"], results["layer1"]["name"], 
             results["layer2"]["res"]["ee_image"], results["layer2"]["name"], 
             results["layer1"]["res"]["feature"], 
             opacity1=st.session_state.get('opacity_1', 1.0), 
-            opacity2=st.session_state.get('opacity_2', 0.6), 
-            mode=mode
+            opacity2=st.session_state.get('opacity_2', 0.6), mode=mode
         )
-
         if mode == "Split Map (Cortina)":
-            st.markdown(
-                "<div style='text-align: center; margin-top: 10px; color: #555; background-color: #f0f2f6; padding: 10px; border-radius: 5px; border: 1px solid #ccc;'>"
-                "↔️ <b>Dica:</b> Clique e arraste a <b>barra vertical central</b> para alternar entre as camadas."
-                "</div>", 
-                unsafe_allow_html=True
-            )
-        
+            st.markdown("<div style='text-align: center; margin-top: 10px; color: #555; background-color: #f0f2f6; padding: 10px; border-radius: 5px; border: 1px solid #ccc;'>↔️ <b>Dica:</b> Clique e arraste a <b>barra vertical central</b> para alternar entre as camadas.</div>", unsafe_allow_html=True)
         return
 
-  
+    # --- 3. MÚLTIPLOS MAPAS ---
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
-        
-        # 1. Escolha do Modo
         st.markdown("#### 🎨 Tipo de Visualização")
-        modo_multiplo = st.radio(
-            "Formato dos Mapas", 
-            ["Estático (Imagens para Download)", "Interativo (Navegável)"], 
-            horizontal=True,
-            label_visibility="collapsed"
-        )
+        modo_multiplo = st.radio("Formato dos Mapas", ["Estático (Imagens para Download)", "Interativo (Navegável)"], horizontal=True, label_visibility="collapsed")
         st.markdown("---")
-
         cols = st.columns(2)
 
-        # 2. Lógica Condicional
         if "Estático" in modo_multiplo:
-            # Importações de segurança
             import base64
-            
-            # --- MODO ANTIGO (Imagens) ---
             for i, var_name in enumerate(results["data"]):
                 res = results["data"][var_name]
                 with cols[i % 2]:
                     st.markdown(f"**{var_name}**")
                     png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
-                    
                     if png:
-                        # CORREÇÃO AQUI:
-                        # 1. Decodificamos o base64 para bytes (mais seguro para o st.image)
-                        # 2. Usamos 'use_column_width=True' (funciona em todas as versões do Streamlit)
                         st.image(base64.b64decode(png.split(",")[1]), use_column_width=True) 
-                        
-                        if cbar: 
-                            st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
-
+                        if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
                         try:
-                            # Botões de download (mantidos)
                             title = f"{var_name} {periodo_str} {local_str}"
                             tb = map_visualizer._make_title_image(title, 800)
                             mp = base64.b64decode(png.split(",")[1])
@@ -399,87 +340,52 @@ def render_analysis_results():
                             if fp: sub_c1.download_button("💾 Baixar PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
                             if fj: sub_c2.download_button("💾 Baixar JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
                         except: pass
-        
         else:
-            # --- NOVO MODO (Interativo) ---
-            # Reutiliza a função create_interactive_map que já existe!
-            
-            # Dica flutuante apenas uma vez
             render_map_tips()
-            
             for i, var_name in enumerate(results["data"]):
                 res = results["data"][var_name]
                 with cols[i % 2]:
                     st.markdown(f"##### {var_name}")
-                    
-                    # Chama o mapa interativo para cada variável
-                    map_visualizer.create_interactive_map(
-                        res["ee_image"], 
-                        res["feature"], 
-                        gee_handler.obter_vis_params_interativo(var_name), 
-                        res["var_cfg"]["unit"]
-                    )
+                    map_visualizer.create_interactive_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
         return
-        
+
+    # --- 4. MÚLTIPLAS SÉRIES ---
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
-        
-        # Ajuda no topo para fácil acesso
         render_chart_tips()
-        
-        
-        # Toggle para alternar visualização
         usar_grafico_unico = st.toggle("📉 Visualizar em Gráfico Único (Eixos Mistos)", value=False)
-        
         if usar_grafico_unico:
-            # OPÇÃO A: Apenas o gráfico unificado
             charts_visualizer.display_multiaxis_chart(results["data"])
         else:
-            # OPÇÃO B: Apenas os gráficos separados (lado a lado)
             cols = st.columns(2)
             for i, var_name in enumerate(results["data"]):
                 res = results["data"][var_name]
                 with cols[i % 2]:
                     st.markdown(f"##### {var_name}")
-                    charts_visualizer.display_time_series_chart(
-                        res["time_series_df"], 
-                        var_name, 
-                        res["var_cfg"]["unit"], 
-                        show_help=False
-                    )
+                    charts_visualizer.display_time_series_chart(res["time_series_df"], var_name, res["var_cfg"]["unit"], show_help=False)
         return
+
     var_cfg = results["var_cfg"]
     st.subheader(f"Análise: {st.session_state.get('variavel')} {local_str}")
     ui.renderizar_resumo_selecao() 
 
-    # ... (dentro de render_analysis_results) ...
-
+    # --- 5. MAPAS E SHAPEFILE (CORRIGIDO E UNIFICADO) ---
     if aba in ["Mapas", "Shapefile"]:
         if "ee_image" in results:
             vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
-            # --- MODO INTERATIVO ---
             if tipo_mapa == "Interativo":
                 render_map_tips()
                 
-                # 1. Define opacidade padrão
+                # Controle de Transparência
                 opacity_val = 1.0 
-                
-                # 2. Se for Shapefile, mostra o slider
                 if aba == "Shapefile":
                     st.markdown("#### 🎚️ Ajuste de Transparência")
-                    opacity_val = st.slider(
-                        "Opacidade da Camada", 
-                        min_value=0.0, 
-                        max_value=1.0, 
-                        value=0.7, 
-                        step=0.1, 
-                        key='shp_opacity'
-                    )
+                    opacity_val = st.slider("Opacidade da Camada", 0.0, 1.0, 0.7, step=0.1, key='shp_opacity')
 
-                # 3. CHAMADA ÚNICA DO MAPA (Sem duplicatas!)
+                # CHAMADA ÚNICA DO MAPA
                 map_visualizer.create_interactive_map(
                     results["ee_image"], 
                     results["feature"], 
@@ -488,38 +394,32 @@ def render_analysis_results():
                     opacity=opacity_val 
                 )
 
-            # --- MODO ESTÁTICO ---
             else:
+                # Mapa Estático
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
-                
-                # Importação de segurança
                 import base64
-                
                 if png:
-                    # Exibe imagens (Decodificando base64 para evitar erros)
-                    st.image(base64.b64decode(png.split(",")[1]), width=600) 
-                    if cbar: st.image(base64.b64decode(cbar.split(",")[1]), width=600)
-                    
+                    st.image(base64.b64decode(png.split(",")[1]), use_column_width=True) 
+                    if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
                     try:
                         title = f"{st.session_state.variavel} {periodo_str} {local_str}"
                         tb = map_visualizer._make_title_image(title, 800)
                         mp = base64.b64decode(png.split(",")[1])
                         jp = base64.b64decode(jpg.split(",")[1])
                         cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
-                        
                         fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
                         fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
-                        
                         c1, c2 = st.columns(2)
                         if fp: c1.download_button("💾 Baixar PNG", fp, "mapa.png", "image/png", use_container_width=True)
                         if fj: c2.download_button("💾 Baixar JPG", fj, "mapa.jpeg", "image/jpeg", use_container_width=True)
                     except: pass
+
+    # --- 6. SÉRIES TEMPORAIS ---
     elif aba == "Séries Temporais":
         if "time_series_df" in results:
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
-
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
@@ -573,6 +473,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
