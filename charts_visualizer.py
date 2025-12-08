@@ -4,14 +4,14 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go # Necessário para o gráfico multi-eixos
+import plotly.graph_objects as go 
 import io
+import re
 
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     
     variable_name = variable.split(" (")[0]
     
-    # Cria o gráfico base JÁ SEM TÍTULO (title=None)
     fig = px.line(
         df,
         x='date',
@@ -24,7 +24,6 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
         markers=True
     )
 
-    # Estilização Científica
     fig.update_layout(
         xaxis=dict(
             showline=True, linecolor='black', linewidth=1, ticks='outside', ticklen=6, tickcolor='black',
@@ -74,7 +73,6 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
 
     df_clean = df.copy()
 
-    # Padronização de colunas
     if 'date' not in df_clean.columns:
         if 'system:time_start' in df_clean.columns: df_clean.rename(columns={'system:time_start': 'date'}, inplace=True)
         elif pd.api.types.is_datetime64_any_dtype(df_clean.iloc[:, 0]): df_clean.rename(columns={df_clean.columns[0]: 'date'}, inplace=True)
@@ -95,7 +93,6 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
         fig.update_layout(margin=dict(t=40, l=60, r=30, b=60))
         st.plotly_chart(fig, use_container_width=True)
         
-        # Título para Download
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
         data_fim = df_clean['date'].max().strftime('%d/%m/%Y')
         fig.update_layout(title=dict(text=f"<b>Série Temporal de {variable}</b><br><sup>({data_ini} a {data_fim})</sup>", font=dict(size=24), x=0, y=0.95))
@@ -105,14 +102,16 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
         return
 
     # 2. Download Imagem
-    variable_clean = variable.split(" (")[0].lower().replace(" ", "_")
+    # --- CORREÇÃO AQUI: Gera um ID único usando o nome completo da variável ---
+    # Removemos caracteres especiais, mas mantemos números e distinções
+    variable_clean = re.sub(r'[^a-zA-Z0-9]', '_', variable).lower()
+    
     col_img1, col_img2, _ = st.columns([1, 1, 2])
     
     try:
         img_png = fig.to_image(format="png", width=1200, height=800, scale=2)
         img_jpg = fig.to_image(format="jpeg", width=1200, height=800, scale=2)
         
-        # KEY adicionada para evitar erro DuplicateWidgetID
         with col_img1: 
             st.download_button(
                 "📷 Baixar Gráfico (PNG)", 
@@ -123,10 +122,9 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
                 key=f"btn_png_{variable_clean}"
             )
         
-        # KEY adicionada para evitar erro DuplicateWidgetID
         with col_img2: 
             st.download_button(
-                "📷 Baixar Gráfico (JPG)", 
+                "💾 Baixar Gráfico (JPG)", 
                 data=img_jpg, 
                 file_name=f"grafico_{variable_clean}.jpg", 
                 mime="image/jpeg", 
@@ -139,7 +137,6 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
 
     # 3. Ajuda
     if show_help:
-        # Importação circular evitada assumindo que essa função é chamada do main ou utils
         pass 
 
     # 4. Estatísticas
@@ -184,10 +181,9 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     
     cex1, cex2 = st.columns(2)
     
-    # KEY adicionada para evitar erro DuplicateWidgetID
     with cex1: 
         st.download_button(
-            "💾 Exportar CSV", 
+            "💾 Baixar CSV", 
             data=csv_data, 
             file_name=f"serie_{variable_clean}.csv", 
             mime="text/csv", 
@@ -195,11 +191,10 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
             key=f"btn_csv_{variable_clean}"
         )
         
-    # KEY adicionada para evitar erro DuplicateWidgetID
     with cex2: 
         if excel_data: 
             st.download_button(
-                "💾 Exportar Excel", 
+                "💾 Baixar Excel", 
                 data=excel_data, 
                 file_name=f"serie_{variable_clean}.xlsx", 
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
@@ -217,11 +212,8 @@ def display_multiaxis_chart(data_dict):
 
     fig = go.Figure()
     
-    # Cores para diferenciar as linhas
     colors = ['#1f77b4', '#d62728', '#2ca02c', '#ff7f0e'] 
-    axis_configs = {}
     
-    # Configurações de layout para até 4 eixos
     layout_settings = {
         'xaxis': dict(domain=[0.1, 0.9] if len(data_dict) > 2 else [0, 1]),
         'yaxis': dict(title="Eixo 1", titlefont=dict(color=colors[0]), tickfont=dict(color=colors[0])),
@@ -232,15 +224,13 @@ def display_multiaxis_chart(data_dict):
 
     idx = 0
     for var_name, res in data_dict.items():
-        if idx >= 4: break # Limite de segurança
+        if idx >= 4: break 
         
         df = res["time_series_df"]
         unit = res["var_cfg"]["unit"]
         
-        # Garante nome correto das colunas
         if 'date' not in df.columns: continue
         
-        # Adiciona a linha (Trace)
         yaxis_name = f"y{idx+1}" if idx > 0 else "y"
         
         fig.add_trace(go.Scatter(
@@ -252,19 +242,16 @@ def display_multiaxis_chart(data_dict):
             mode='lines+markers'
         ))
         
-        # Atualiza o título do eixo correspondente com o nome da variável
         key = f"yaxis{idx+1}" if idx > 0 else "yaxis"
         layout_settings[key]['title'] = f"{var_name} ({unit})"
         
         idx += 1
 
-    # Atualiza as configurações de título e grade no dicionário xaxis existente
     layout_settings['xaxis'].update(dict(title="Data", showgrid=True))
 
-    # Aplica o layout
     fig.update_layout(
         title="Comparação Multi-Eixos",
-        legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"), # Legenda no topo
+        legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"),
         height=600,
         margin=dict(l=20, r=20, t=60, b=20),
         **layout_settings
@@ -272,4 +259,4 @@ def display_multiaxis_chart(data_dict):
     
     st.plotly_chart(fig, use_container_width=True)
     
-    st.info("💡 **Dica:** Dê dois cliques na legenda de uma variável para isolá-la.")
+    st.info("💡 **Dica:** Dê um clique na legenda de uma variável para torná-la não visível.")
