@@ -366,6 +366,9 @@ def render_analysis_results():
 
         # 2. Lógica Condicional
         if "Estático" in modo_multiplo:
+            # Importações de segurança
+            import base64
+            
             # --- MODO ANTIGO (Imagens) ---
             for i, var_name in enumerate(results["data"]):
                 res = results["data"][var_name]
@@ -374,13 +377,13 @@ def render_analysis_results():
                     png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
                     
                     if png:
-                        # --- CORREÇÃO AQUI ---
-                        # O st.image precisa dos bytes reais, então removemos o cabeçalho "data:image..." e decodificamos
-                        st.image(base64.b64decode(png.split(",")[1]), use_container_width=True) 
+                        # CORREÇÃO AQUI:
+                        # 1. Decodificamos o base64 para bytes (mais seguro para o st.image)
+                        # 2. Usamos 'use_column_width=True' (funciona em todas as versões do Streamlit)
+                        st.image(base64.b64decode(png.split(",")[1]), use_column_width=True) 
                         
                         if cbar: 
-                            st.image(base64.b64decode(cbar.split(",")[1]), use_container_width=True)
-                        # ---------------------
+                            st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=True)
 
                         try:
                             # Botões de download (mantidos)
@@ -540,6 +543,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
