@@ -460,6 +460,22 @@ def render_analysis_results():
             
             if tipo_mapa == "Interativo":
                 render_map_tips()
+                # --- INÍCIO: CONTROLE DE TRANSPARÊNCIA ---
+                # Padrão = 1.0 (Totalmente visível / Opaco)
+                opacity_val = 1.0 
+                
+                # Se estivermos na aba Shapefile, mostramos o Slider
+                if aba == "Shapefile":
+                    st.markdown("#### 🎚️ Ajuste de Transparência")
+                    opacity_val = st.slider(
+                        "Opacidade da Camada", 
+                        min_value=0.0, 
+                        max_value=1.0, 
+                        value=0.7,      # Começa com 70% de visibilidade
+                        step=0.1, 
+                        key='shp_opacity'
+                    )
+                # --- FIM: CONTROLE DE TRANSPARÊNCIA ---
                 map_visualizer.create_interactive_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
             else:
                 with st.spinner("Gerando imagem..."):
@@ -540,6 +556,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
