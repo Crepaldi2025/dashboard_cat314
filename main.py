@@ -347,33 +347,70 @@ def render_analysis_results():
         
         return
 
+  
     if aba == "Múltiplos Mapas" and results.get("mode") == "multi_map":
         st.subheader("Comparação de Variáveis")
         ui.renderizar_resumo_selecao()
-        cols = st.columns(2)
-        for i, var_name in enumerate(results["data"]):
-            res = results["data"][var_name]
-            with cols[i % 2]:
-                st.markdown(f"**{var_name}**")
-                png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
-                if png:
-                    st.image(png, use_column_width=True) 
-                    if cbar: st.image(cbar, use_column_width=True)
-                    try:
-                        title = f"{var_name} {periodo_str} {local_str}"
-                        tb = map_visualizer._make_title_image(title, 800)
-                        mp = base64.b64decode(png.split(",")[1])
-                        jp = base64.b64decode(jpg.split(",")[1])
-                        cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
-                        fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
-                        fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
-                        sub_c1, sub_c2 = st.columns(2)
-                        var_slug = var_name.lower().replace(" ", "_")
-                        if fp: sub_c1.download_button("💾 Baixar PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
-                        if fj: sub_c2.download_button("💾 Baixar JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
-                    except: pass
-        return
+        
+        # 1. Escolha do Modo
+        st.markdown("#### 🎨 Tipo de Visualização")
+        modo_multiplo = st.radio(
+            "Formato dos Mapas", 
+            ["Estático (Imagens para Download)", "Interativo (Navegável)"], 
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        st.markdown("---")
 
+        cols = st.columns(2)
+
+        # 2. Lógica Condicional
+        if "Estático" in modo_multiplo:
+            # --- MODO ANTIGO (Imagens) ---
+            for i, var_name in enumerate(results["data"]):
+                res = results["data"][var_name]
+                with cols[i % 2]:
+                    st.markdown(f"**{var_name}**")
+                    png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
+                    if png:
+                        st.image(png, use_container_width=True) 
+                        if cbar: st.image(cbar, use_container_width=True)
+                        try:
+                            # Botões de download (mantidos)
+                            title = f"{var_name} {periodo_str} {local_str}"
+                            tb = map_visualizer._make_title_image(title, 800)
+                            mp = base64.b64decode(png.split(",")[1])
+                            jp = base64.b64decode(jpg.split(",")[1])
+                            cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
+                            fp = map_visualizer._stitch_images_to_bytes(tb, mp, cb, 'PNG')
+                            fj = map_visualizer._stitch_images_to_bytes(tb, jp, cb, 'JPEG')
+                            sub_c1, sub_c2 = st.columns(2)
+                            var_slug = var_name.lower().replace(" ", "_")
+                            if fp: sub_c1.download_button("💾 Baixar PNG", fp, f"{var_slug}.png", "image/png", use_container_width=True, key=f"btn_png_{i}")
+                            if fj: sub_c2.download_button("💾 Baixar JPG", fj, f"{var_slug}.jpg", "image/jpeg", use_container_width=True, key=f"btn_jpg_{i}")
+                        except: pass
+        
+        else:
+            # --- NOVO MODO (Interativo) ---
+            # Reutiliza a função create_interactive_map que já existe!
+            
+            # Dica flutuante apenas uma vez
+            render_map_tips()
+            
+            for i, var_name in enumerate(results["data"]):
+                res = results["data"][var_name]
+                with cols[i % 2]:
+                    st.markdown(f"##### {var_name}")
+                    
+                    # Chama o mapa interativo para cada variável
+                    map_visualizer.create_interactive_map(
+                        res["ee_image"], 
+                        res["feature"], 
+                        gee_handler.obter_vis_params_interativo(var_name), 
+                        res["var_cfg"]["unit"]
+                    )
+        return
+        
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
@@ -496,6 +533,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
