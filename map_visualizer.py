@@ -84,7 +84,10 @@ def create_overlay_map(img1, name1, img2, name2, feature, opacity1=1.0, opacity2
 # 1. MAPA INTERATIVO PADRÃO
 # ------------------------------------------------------------------
 
-def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = ""):
+# map_visualizer.py
+
+# 1. Adicionado o parâmetro 'opacity' no final
+def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "", opacity: float = 1.0):
     try:
         coords = feature.geometry().bounds().getInfo()['coordinates'][0]
         lon_min, lat_min = coords[0][0], coords[0][1]
@@ -107,7 +110,9 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     )
     esri_layer.add_to(mapa)
 
-    mapa.addLayer(ee_image, vis_params, "Dados Climáticos")
+    # 2. Adicionado o argumento 'opacity=opacity' aqui
+    mapa.addLayer(ee_image, vis_params, "Dados Climáticos", opacity=opacity)
+    
     mapa.addLayer(ee.Image().paint(ee.FeatureCollection([feature]), 0, 2), {"palette": "red"}, "Contorno")
     
     tipo_local = st.session_state.get('tipo_localizacao', '')
@@ -123,6 +128,8 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
 
     if bounds:
         mapa.fit_bounds(bounds)
+    
+    mapa.to_streamlit(height=500, use_container_width=True)
     
     # REDUZIDO AQUI 
     mapa.to_streamlit(height=500, use_container_width=True)
@@ -270,6 +277,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
