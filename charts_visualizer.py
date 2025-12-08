@@ -291,7 +291,7 @@ def display_multiaxis_chart(data_dict):
     fig.update_layout(
         title="Comparação Multi-Eixos",
         # y=1.2 sobe a legenda para não bater no título
-        legend=dict(x=0.5, y=1.2, orientation="h", xanchor="center"), 
+        legend=dict(x=0.5, y=-0.2, orientation="h", xanchor="center"), 
         height=650, # Aumentei um pouco a altura total
         # t=100 aumenta a margem do topo (para caber título e legenda)
         # l=50 e r=50 dão respiro nas laterais
@@ -302,3 +302,4 @@ def display_multiaxis_chart(data_dict):
     st.plotly_chart(fig, use_container_width=True)
     
     st.info("💡 **Dica:** Dê um clique na legenda de uma variável para retirar ou retornar.")
+
