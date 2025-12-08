@@ -70,16 +70,23 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
     if not var_cfg: return None
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
-    if aba in ["Mapas", "Shapefile"]:
-                df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
-                if df_map_samples is not None: results["map_dataframe"] = df_map_samples
+    # --- CORREÇÃO DE SEGURANÇA: Inicializa a variável para evitar o erro ---
+    ee_image = None 
 
     if aba in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile"]:
         target_hour = None
         if st.session_state.get('tipo_periodo') == "Horário Específico":
             target_hour = st.session_state.get('hora_especifica')
+        
+        # Busca a imagem no GEE
         ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry, target_hour)
-        if ee_image: results["ee_image"] = ee_image
+        
+        if ee_image:
+            results["ee_image"] = ee_image
+            # Dados para a tabela (se for mapa único)
+            if aba in ["Mapas", "Shapefile"]:
+                df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
+                if df_map_samples is not None: results["map_dataframe"] = df_map_samples
             
     elif aba in ["Séries Temporais", "Múltiplas Séries"]:
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
@@ -349,6 +356,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
