@@ -195,7 +195,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             if opcao == "Shapefile":
                 st.markdown("#### Shapefile")
-                st.info("Envie um arquivo **.ZIP** contendo o shapefile (.shp, .shx, .dbf) da bacia ou rio.")
+                st.info("Envie um arquivo **.ZIP** contendo o polígono de interesse (obrigatório: .shp, .shx, .dbf). Ex: Fazenda, Bacia, Área de Proteção.")
                 
                 uploaded_file = st.file_uploader("Upload ZIP", type=["zip"], key='shapefile_upload', on_change=reset_analysis_state)
                 
@@ -569,6 +569,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
