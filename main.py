@@ -372,9 +372,16 @@ def render_analysis_results():
                 with cols[i % 2]:
                     st.markdown(f"**{var_name}**")
                     png, jpg, cbar = map_visualizer.create_static_map(res["ee_image"], res["feature"], gee_handler.obter_vis_params_interativo(var_name), res["var_cfg"]["unit"])
+                    
                     if png:
-                        st.image(png, use_container_width=True) 
-                        if cbar: st.image(cbar, use_container_width=True)
+                        # --- CORREÇÃO AQUI ---
+                        # O st.image precisa dos bytes reais, então removemos o cabeçalho "data:image..." e decodificamos
+                        st.image(base64.b64decode(png.split(",")[1]), use_container_width=True) 
+                        
+                        if cbar: 
+                            st.image(base64.b64decode(cbar.split(",")[1]), use_container_width=True)
+                        # ---------------------
+
                         try:
                             # Botões de download (mantidos)
                             title = f"{var_name} {periodo_str} {local_str}"
@@ -533,6 +540,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
