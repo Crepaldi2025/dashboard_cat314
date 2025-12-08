@@ -222,6 +222,16 @@ def render_analysis_results():
         ui.renderizar_resumo_selecao()
         mode = st.session_state.get('overlay_mode', "Transparência")
         map_visualizer.create_overlay_map(results["layer1"]["res"]["ee_image"], results["layer1"]["name"], results["layer2"]["res"]["ee_image"], results["layer2"]["name"], results["layer1"]["res"]["feature"], opacity1=st.session_state.get('opacity_1', 1.0), opacity2=st.session_state.get('opacity_2', 0.6), mode=mode)
+        
+        # --- RESTAURADO O AVISO ESTILIZADO AQUI ---
+        if mode == "Split Map (Cortina)":
+            st.markdown(
+                "<div style='text-align: center; margin-top: 10px; color: #555; background-color: #f0f2f6; padding: 10px; border-radius: 5px; border: 1px solid #ccc;'>"
+                "↔️ <b>Dica:</b> Clique e arraste a <b>barra vertical central</b> para alternar entre as camadas."
+                "</div>", 
+                unsafe_allow_html=True
+            )
+        # ------------------------------------------
         return
 
     # 3. MÚLTIPLOS MAPAS
@@ -355,3 +365,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
