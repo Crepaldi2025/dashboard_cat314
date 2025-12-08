@@ -81,7 +81,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         # --- 2. NAVEGAÇÃO PRINCIPAL ---
         st.radio(
             "Modo de Visualização",
-            ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia", "Séries Temporais", "Múltiplas Séries", "Skew-T", "Sobre o Aplicativo"],
+            ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile", "Séries Temporais", "Múltiplas Séries", "Skew-T", "Sobre o Aplicativo"],
             label_visibility="collapsed", 
             key='nav_option',
             on_change=reset_analysis_state
@@ -121,7 +121,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
 
         # --- OPÇÕES GERAIS ---
-        elif opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia", "Séries Temporais", "Múltiplas Séries"]:
+        elif opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile", "Séries Temporais", "Múltiplas Séries"]:
             st.markdown("### ⚙️ Parâmetros da Análise")
             
             # --- 3. BASE DE DADOS ---
@@ -190,11 +190,11 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             st.divider()
 
-            # --- 5. LOCALIZAÇÃO / HIDROGRAFIA ---
+            # --- 5. LOCALIZAÇÃO / SHAPEFILE ---
             tipo_loc = "N/A" 
 
-            if opcao == "Hidrografia":
-                st.markdown("#### 💧 Shapefile de Hidrografia")
+            if opcao == "Shapefile":
+                st.markdown("#### Shapefile")
                 st.info("Envie um arquivo **.ZIP** contendo o shapefile (.shp, .shx, .dbf) da bacia ou rio.")
                 
                 uploaded_file = st.file_uploader("Upload ZIP", type=["zip"], key='hidro_upload', on_change=reset_analysis_state)
@@ -202,7 +202,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 if uploaded_file:
                     st.success("Arquivo recebido! Clique em Gerar Análise.", icon="✅")
                 
-                tipo_loc = "Hidrografia"
+                tipo_loc = "Shapefile"
                 
             else:
                 st.markdown("#### 📍 Localização")
@@ -315,10 +315,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown("#### 📅 Recorte Temporal")
             
             opcoes_periodo = ["Personalizado", "Mensal", "Anual"]
-            if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia"]: 
+            if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile"]: 
                 opcoes_periodo.append("Horário Específico")
             
-            if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia"]:
+            if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile"]:
                 st.selectbox("Tipo de Período", opcoes_periodo, key='tipo_periodo', on_change=reset_analysis_state, label_visibility="collapsed")
             else:
                 st.session_state.tipo_periodo = "Personalizado"
@@ -370,7 +370,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.info("ℹ️ Gera múltiplos gráficos simultâneos.")
             elif opcao == "Sobreposição (Camadas)":
                 pass
-            elif opcao == "Hidrografia":
+            elif opcao == "Shapefile":
                 st.info("ℹ️ Sobrepõe dados climáticos sobre o shapefile enviado.")
 
             # --- 8. BOTÃO DE AÇÃO ---
@@ -383,7 +383,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 vars_sel = st.session_state.get("variaveis_multiplas", [])
                 if not vars_sel or len(vars_sel) > 4: disable = True
             
-            if opcao == "Hidrografia":
+            if opcao == "Shapefile":
                 if not st.session_state.get("hidro_upload"): disable = True
                 else: disable = False
 
@@ -405,7 +405,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     unsafe_allow_html=True
                 )
             else:
-                if opcao == "Hidrografia" and not st.session_state.get("hidro_upload"):
+                if opcao == "Shapefile" and not st.session_state.get("hidro_upload"):
                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Faça upload do arquivo .ZIP.</div>", unsafe_allow_html=True)
                 elif opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                     vars_sel = st.session_state.get("variaveis_multiplas", [])
@@ -461,7 +461,7 @@ def renderizar_pagina_principal(opcao):
             st.success("**Mapas**\nGera mapas para uma única variável (ex: Temperatura) em uma área e data específicas.")
             st.success("**Múltiplos Mapas**\nGera painéis estáticos para comparar até 4 variáveis simultaneamente (ex: Chuva vs Umidade).")
             st.success("**Sobreposição (Camadas)**\nPermite cruzar duas variáveis no mesmo mapa usando transparência ou cortina deslizante.")
-            st.success("**Hidrografia**\nUpload de Shapefile (.zip) próprio para recortar dados em bacias ou rios específicos.")
+            st.success("**Shapefile**\nUpload de Shapefile (.zip) próprio para recortar dados em bacias ou rios específicos.")
 
         with col2:
             st.markdown("#### 📈 Análise Temporal & Vertical")
@@ -524,7 +524,7 @@ def renderizar_resumo_selecao():
         c1, c2, c3 = st.columns(3)
         with c1: st.markdown(f"**{label_titulo}** \n{var_text}")
         with c2:
-            if nav_option == "Hidrografia":
+            if nav_option == "Shapefile":
                 st.markdown("**Local:**\nShapefile Personalizado")
             else:
                 tipo = st.session_state.tipo_localizacao
@@ -569,6 +569,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
