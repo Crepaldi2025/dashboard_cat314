@@ -114,7 +114,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
         
         with col_img1: 
             st.download_button(
-                "📷 Baixar Gráfico (PNG)", 
+                "💾 Baixar PNG", 
                 data=img_png, 
                 file_name=f"grafico_{variable_clean}.png", 
                 mime="image/png", 
@@ -124,7 +124,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
         
         with col_img2: 
             st.download_button(
-                "📷 Baixar Gráfico (JPG)", 
+                "💾 Baixar JPG", 
                 data=img_jpg, 
                 file_name=f"grafico_{variable_clean}.jpg", 
                 mime="image/jpeg", 
@@ -152,8 +152,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     c5.metric("Desvio Padrão", f"{desvio:.1f}", help="Dispersão dos dados em relação à média.")
     
     # 5. Tabela
-    st.markdown("---")
-    
+       
     variable_label = variable.split(" (")[0]
     col_name_display = f"{variable_label} ({unit})"
     
@@ -183,7 +182,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     
     with cex1: 
         st.download_button(
-            "💾 Exportar CSV", 
+            "💾 Baixar CSV", 
             data=csv_data, 
             file_name=f"serie_{variable_clean}.csv", 
             mime="text/csv", 
@@ -194,7 +193,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     with cex2: 
         if excel_data: 
             st.download_button(
-                "💾 Exportar Excel", 
+                "💾 Baixar Excel", 
                 data=excel_data, 
                 file_name=f"serie_{variable_clean}.xlsx", 
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
@@ -259,4 +258,5 @@ def display_multiaxis_chart(data_dict):
     
     st.plotly_chart(fig, use_container_width=True)
     
-    st.info("💡 **Dica:** Dê dois cliques na legenda de uma variável para isolá-la.")
+    st.info("💡 **Dica:** Dê um clique na legenda de uma variável para retirá-la ou retorná-la.")
+
