@@ -110,7 +110,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY", on_change=reset_analysis_state)
             st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC (3 horas à frente de Brasília).", on_change=reset_analysis_state)
 
-            st.caption("ℹ️ **Nota:** Dados de altitude (pressão) disponíveis apenas a partir de **23/03/2021** (limite histórico do modelo GFS). Para datas anteriores, apenas dados de superfície estão disponíveis.")
+            st.warning("ℹ️ **Nota:** Dados de altitude (3D/Perfil Vertical) estão disponíveis apenas a partir de **23/03/2021** "
+                "(limite do GFS). Para datas anteriores, apenas dados de superfície (2D) podem ser consultados.")
 
             st.divider()
             st.button(
@@ -569,6 +570,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
