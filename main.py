@@ -34,7 +34,6 @@ set_background()
 def render_chart_tips():
     with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
         st.markdown("### 📈 Guia de Ferramentas")
-        
         st.markdown("**1️⃣ Barra de Ferramentas (Canto Superior Direito)**")
         st.markdown("""
         * `📷` **Câmera:** Baixa o gráfico atual como imagem (PNG).
@@ -44,7 +43,6 @@ def render_chart_tips():
         * `🏠` **Casinha (Reset):** Retorna o gráfico para a visualização original.
         * `🔲` **Autoscale:** Ajusta os eixos automaticamente para caber todos os dados.
         """)
-        
         st.markdown("**2️⃣ Interação e Atalhos**")
         st.markdown("""
         * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
@@ -60,7 +58,7 @@ def render_map_tips():
         st.markdown("""
         * `➕` / `➖` **Zoom:** Aproxime ou afaste a visão do mapa.
         * `⛶` **Tela Cheia:** Expande o mapa para ocupar todo o monitor (ícone lateral).
-        * `🗂️` **Camadas:** (Ícone no topo direito) Alterne entre Dados e Contorno.
+        * `🗂️` **Camadas:** (Ícone no topo direito) Alterne o fundo (Satélite/Ruas) e ligue/desligue os dados.
         """)
         st.markdown("**2️⃣ Desenho e Marcação (Barra Lateral Esquerda)**")
         st.markdown("""
@@ -80,42 +78,24 @@ def render_map_tips():
 def render_download_buttons(df, filename_prefix, key_suffix):
     if df is None or df.empty:
         return
-
     try:
         df_export = df.astype(str)
     except:
         df_export = df
-
     csv = df_export.to_csv(index=False).encode('utf-8')
-    
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
         df_export.to_excel(writer, index=False)
     excel_data = buffer.getvalue()
-    
     c1, c2 = st.columns(2)
-    c1.download_button(
-        label="💾 Baixar CSV",
-        data=csv,
-        file_name=f"{filename_prefix}.csv",
-        mime="text/csv",
-        key=f"btn_csv_{key_suffix}",
-        use_container_width=True
-    )
-    c2.download_button(
-        label="📊 Baixar Excel",
-        data=excel_data,
-        file_name=f"{filename_prefix}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key=f"btn_xlsx_{key_suffix}",
-        use_container_width=True
-    )
+    c1.download_button(label="💾 Baixar CSV", data=csv, file_name=f"{filename_prefix}.csv", mime="text/csv", key=f"btn_csv_{key_suffix}", use_container_width=True)
+    c2.download_button(label="📊 Baixar Excel", data=excel_data, file_name=f"{filename_prefix}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"btn_xlsx_{key_suffix}", use_container_width=True)
 
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
     if session_state.get('nav_option') == 'Shapefile':
-        uploaded = session_state.get('hidro_upload')
-        return f"hidro:{uploaded.name if uploaded else 'none'}"
+        uploaded = session_state.get('shapefile_upload')
+        return f"shp:{uploaded.name if uploaded else 'none'}"
     key = f"loc_type:{loc_type}"
     if loc_type == "Estado": key += f"|estado:{session_state.get('estado')}"
     elif loc_type == "Município": key += f"|estado:{session_state.get('estado')}|municipio:{session_state.get('municipio')}"
@@ -137,9 +117,7 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
         ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry, target_hour)
         if ee_image:
             results["ee_image"] = ee_image
-            if aba in ["Mapas", "Shapefile"]:
-                df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
-                if df_map_samples is not None: results["map_dataframe"] = df_map_samples
+            # Nota: Removemos map_dataframe daqui pois a tabela foi desativada
             
     elif aba in ["Séries Temporais", "Múltiplas Séries"]:
         df = gee_handler.get_time_series_data(variavel, start_date, end_date, geometry)
@@ -232,7 +210,7 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
-    # --- 1. SKEW-T (Lógica isolada) ---
+    # --- 1. SKEW-T ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state:
             with st.expander("ℹ️ Sobre limites de conexão (Erro 429)", expanded=False):
@@ -267,13 +245,12 @@ def render_analysis_results():
                         render_download_buttons(res["df"].astype(str), "sondagem_skewt", "skewt")
         return
 
-    # --- VERIFICAÇÃO DE RESULTADOS ---
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None:
         return
 
     results = st.session_state.analysis_results
 
-    # --- PREPARAÇÃO DE TEXTOS ---
+    # Strings de cabeçalho
     tipo_periodo = st.session_state.get('tipo_periodo', '')
     periodo_str = ""
     if tipo_periodo == "Personalizado": periodo_str = f"de {st.session_state.get('data_inicio').strftime('%d/%m/%Y')} a {st.session_state.get('data_fim').strftime('%d/%m/%Y')}"
@@ -290,7 +267,7 @@ def render_analysis_results():
         elif tipo_local == "polígono": local_str = "para a área desenhada"
         elif "círculo" in tipo_local: local_str = "para o círculo definido"
 
-    # --- 2. SOBREPOSIÇÃO (CAMADAS) ---
+    # --- 2. SOBREPOSIÇÃO ---
     if aba == "Sobreposição (Camadas)" and results.get("mode") == "overlay":
         st.subheader("Mapa de Sobreposição (Overlay)")
         ui.renderizar_resumo_selecao()
@@ -370,7 +347,8 @@ def render_analysis_results():
     st.subheader(f"Análise: {st.session_state.get('variavel')} {local_str}")
     ui.renderizar_resumo_selecao() 
 
-    # --- 5. MAPAS E SHAPEFILE (CORRIGIDO E UNIFICADO) ---
+    # --- 5. UNIFICADO: MAPAS E SHAPEFILE ---
+    # Este é o bloco corrigido para garantir apenas UM mapa
     if aba in ["Mapas", "Shapefile"]:
         if "ee_image" in results:
             vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
@@ -378,14 +356,11 @@ def render_analysis_results():
             
             if tipo_mapa == "Interativo":
                 render_map_tips()
-                
-                # Controle de Transparência
                 opacity_val = 1.0 
                 if aba == "Shapefile":
                     st.markdown("#### 🎚️ Ajuste de Transparência")
                     opacity_val = st.slider("Opacidade da Camada", 0.0, 1.0, 0.7, step=0.1, key='shp_opacity')
 
-                # CHAMADA ÚNICA DO MAPA
                 map_visualizer.create_interactive_map(
                     results["ee_image"], 
                     results["feature"], 
@@ -393,9 +368,7 @@ def render_analysis_results():
                     var_cfg["unit"],
                     opacity=opacity_val 
                 )
-
             else:
-                # Mapa Estático
                 with st.spinner("Gerando imagem..."):
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis_params, var_cfg["unit"])
                 import base64
@@ -420,6 +393,7 @@ def render_analysis_results():
         if "time_series_df" in results:
             render_chart_tips()
             charts_visualizer.display_time_series_chart(results["time_series_df"], st.session_state.variavel, var_cfg["unit"], show_help=False)
+
 def render_polygon_drawer():
     st.subheader("Desenhe sua Área de Interesse")
     m = folium.Map(location=[-15.78, -47.93], zoom_start=4, tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google")
@@ -473,25 +447,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
