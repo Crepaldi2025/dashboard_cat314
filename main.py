@@ -113,7 +113,7 @@ def render_download_buttons(df, filename_prefix, key_suffix):
 
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
-    if session_state.get('nav_option') == 'Hidrografia':
+    if session_state.get('nav_option') == 'Shapefile':
         uploaded = session_state.get('hidro_upload')
         return f"hidro:{uploaded.name if uploaded else 'none'}"
     key = f"loc_type:{loc_type}"
@@ -130,14 +130,14 @@ def run_analysis_logic(variavel, start_date, end_date, geo_caching_key, aba):
     if not var_cfg: return None
     results = {"geometry": geometry, "feature": feature, "var_cfg": var_cfg}
 
-    if aba in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Hidrografia"]:
+    if aba in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile"]:
         target_hour = None
         if st.session_state.get('tipo_periodo') == "Horário Específico":
             target_hour = st.session_state.get('hora_especifica')
         ee_image = gee_handler.get_era5_image(variavel, start_date, end_date, geometry, target_hour)
         if ee_image:
             results["ee_image"] = ee_image
-            if aba in ["Mapas", "Hidrografia"]:
+            if aba in ["Mapas", "Shapefile"]:
                 df_map_samples = gee_handler.get_sampled_data_as_dataframe(ee_image, geometry, variavel)
                 if df_map_samples is not None: results["map_dataframe"] = df_map_samples
             
@@ -305,7 +305,7 @@ def render_analysis_results():
     elif tipo_periodo == "Horário Específico": periodo_str = f"em {st.session_state.get('data_horaria').strftime('%d/%m/%Y')} às {st.session_state.get('hora_especifica')}:00"
     
     local_str = "Local Selecionado"
-    if aba == "Hidrografia": local_str = "na Bacia Hidrográfica (Shapefile)"
+    if aba == "Shapefile": local_str = "na Área Personalizada (Shapefile)"
     else:
         tipo_local = st.session_state.get('tipo_localizacao', '').lower()
         if tipo_local == "estado":
@@ -453,7 +453,7 @@ def render_analysis_results():
     st.subheader(f"Análise: {st.session_state.get('variavel')} {local_str}")
     ui.renderizar_resumo_selecao() 
 
-    if aba in ["Mapas", "Hidrografia"]:
+    if aba in ["Mapas", "Shapefile"]:
         if "ee_image" in results:
             vis_params = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
             tipo_mapa = st.session_state.get("map_type", "Interativo")
@@ -543,6 +543,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
