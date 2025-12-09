@@ -385,6 +385,7 @@ def render_analysis_results():
     if aba == "Múltiplas Séries" and results.get("mode") == "multi_series":
         st.subheader("Comparação de Séries")
         ui.renderizar_resumo_selecao()
+        render_chart_tips()
         if st.toggle("📉 Gráfico Único (Eixos Mistos)", value=False): 
             charts_visualizer.display_multiaxis_chart(results["data"])
         else:
@@ -509,6 +510,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
