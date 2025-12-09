@@ -1,15 +1,17 @@
 # ==================================================================================
-# gee_handler.py (VERSÃO DEFINITIVA: API IBGE DIRETA PARA GEOMETRIAS)
+# gee_handler.py (VERSÃO ESTÁVEL COM BACKUP OFFLINE)
 # ==================================================================================
 import streamlit as st
 import json
 from collections import defaultdict
 import ee
+import os
+import geobr
 import pandas as pd
 from datetime import date, datetime
 import requests 
 import unicodedata
-import shapefile_handler
+import shapefile_handler 
 
 # --- INICIALIZAÇÃO GEE ---
 def inicializar_gee():
@@ -25,11 +27,11 @@ def inicializar_gee():
             else:
                 ee.Initialize()
         except Exception as e:
-            st.error(f"⚠️ Falha crítica ao conectar no Google Earth Engine: {e}")
+            st.error(f"⚠️ Falha Crítica GEE: {e}")
 
 def initialize_gee(): return inicializar_gee()
 
-# --- VARIÁVEIS ERA5 (SUAS CONFIGURAÇÕES MANTIDAS) ---
+# --- VARIÁVEIS ERA5 (SUAS CONFIGURAÇÕES ORIGINAIS) ---
 ERA5_VARS = {
     "Temperatura do Ar (2m)": { "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": 0, "max": 45, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000', '#800000'], "caption": "Temperatura (°C)"} },
     "Temperatura do Ponto de Orvalho (2m)": { "band": "dewpoint_temperature_2m", "result_band": "dewpoint_temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": -10, "max": 30, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000'], "caption": "Ponto de Orvalho (°C)"} },
@@ -46,148 +48,170 @@ ERA5_VARS = {
 
 FALLBACK_UF_MAP = {'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'}
 
+# --- LISTA DE BACKUP (PARA NÃO TRAVAR O APP SE A API FALHAR) ---
+DADOS_OFFLINE_BACKUP = {
+    "SP": ["São Paulo", "Campinas", "Santos", "Ribeirão Preto", "Sorocaba", "São José dos Campos", "Guarulhos", "Santo André"],
+    "RJ": ["Rio de Janeiro", "Niterói", "São Gonçalo", "Duque de Caxias", "Nova Iguaçu", "Petrópolis"],
+    "MG": ["Belo Horizonte", "Uberlândia", "Contagem", "Juiz de Fora", "Betim", "Uberaba"],
+    "RS": ["Porto Alegre", "Caxias do Sul", "Pelotas", "Canoas", "Santa Maria"],
+    "PR": ["Curitiba", "Londrina", "Maringá", "Ponta Grossa", "Cascavel", "Foz do Iguaçu"],
+    "BA": ["Salvador", "Feira de Santana", "Vitória da Conquista", "Camaçari"],
+    "GO": ["Goiânia", "Aparecida de Goiânia", "Anápolis", "Rio Verde"],
+    "PE": ["Recife", "Jaboatão dos Guararapes", "Olinda", "Caruaru"],
+    "SC": ["Florianópolis", "Joinville", "Blumenau", "São José"],
+    "PA": ["Belém", "Ananindeua", "Santarém", "Marabá"],
+    "AM": ["Manaus", "Parintins", "Itacoatiara"],
+    "CE": ["Fortaleza", "Caucaia", "Juazeiro do Norte"],
+    "DF": ["Brasília"],
+    "MT": ["Cuiabá", "Várzea Grande", "Rondonópolis"],
+    "MS": ["Campo Grande", "Dourados", "Três Lagoas"],
+    "ES": ["Vitória", "Vila Velha", "Serra", "Cariacica"]
+}
+
 # --- HELPER DE NORMALIZAÇÃO ---
 def normalize_text(text):
     if not isinstance(text, str): return str(text)
     return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8').lower().strip()
 
-# --- DADOS DO IBGE (NOMES PARA O MENU) ---
+# --- CARREGAMENTO DA LISTA (API IBGE -> ARQUIVO JSON -> BACKUP) ---
 @st.cache_data(ttl=3600*24)
 def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
     try:
-        # Busca Estados
+        # Tenta pegar da API (Lista completa)
         url_uf = "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome"
-        ufs = requests.get(url_uf, timeout=10).json()
+        ufs = requests.get(url_uf, timeout=5).json()
         mapa_nomes_uf = {u['sigla']: u['nome'] for u in ufs}
-        if not mapa_nomes_uf: mapa_nomes_uf = FALLBACK_UF_MAP
         
-        # Busca Municípios
         url_mun = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome"
-        munis = requests.get(url_mun, timeout=15).json()
+        munis = requests.get(url_mun, timeout=10).json()
+        
         geo_data = defaultdict(list)
+        
+        # --- CORREÇÃO DO ERRO NONE TYPE ---
         for m in munis:
-            uf_sigla = m['microrregiao']['mesorregiao']['UF']['sigla']
-            geo_data[uf_sigla].append(m['nome'])
-            
+            # Uso de .get() para evitar o crash se algum campo vier vazio
+            try:
+                uf_sigla = m.get('microrregiao', {}).get('mesorregiao', {}).get('UF', {}).get('sigla')
+                nome_mun = m.get('nome')
+                
+                if uf_sigla and nome_mun:
+                    geo_data[uf_sigla].append(nome_mun)
+            except:
+                continue # Pula cidade com erro
+        # ----------------------------------
+        
+        if not geo_data: raise Exception("Lista vazia")
         return dict(geo_data), mapa_nomes_uf
+        
     except Exception as e:
-        st.warning(f"Falha ao carregar lista atualizada do IBGE. Usando fallback. Erro: {e}")
-        return {}, FALLBACK_UF_MAP
+        # Se der erro (timeout, json invalido, etc), usa o BACKUP
+        print(f"Erro API IBGE (Usando Offline): {e}")
+        # Mescla o backup com o mapa de estados fallback
+        return DADOS_OFFLINE_BACKUP, FALLBACK_UF_MAP
 
-# --- NOVA FUNÇÃO: BUSCA GEOMETRIA DIRETO NA API DO IBGE ---
-@st.cache_data(ttl=3600*24) # Cache para não repetir a mesma busca
-def _get_municipality_geometry_direct_ibge(uf_sigla, mun_nome):
-    """Busca o ID do município e depois seu GeoJSON direto na API do IBGE."""
+# --- CARREGADORES GEOBR ---
+@st.cache_data
+def _load_all_states_gdf():
+    try: return geobr.read_state()
+    except: return None
+
+@st.cache_data
+def _load_municipalities_gdf(uf):
+    try: return geobr.read_municipality(code_muni=uf, year=2020)
+    except: return None
+
+# --- NOVA FUNÇÃO: GEOMETRIA VIA API DIRETA (Plano B do Geobr) ---
+@st.cache_data(ttl=3600*24)
+def _get_geometry_direct_ibge(mun_nome, uf_sigla):
     try:
-        # 1. Achar o ID do município
+        # 1. Busca ID
         mun_norm = normalize_text(mun_nome)
         url_list = f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf_sigla}/municipios"
-        resp = requests.get(url_list, timeout=10)
-        resp.raise_for_status()
-        munis_uf = resp.json()
+        munis = requests.get(url_list, timeout=5).json()
+        mun_id = next((m['id'] for m in munis if normalize_text(m['nome']) == mun_norm), None)
         
-        mun_id = None
-        # Tenta match exato primeiro
-        for m in munis_uf:
-            if m['nome'] == mun_nome:
-                mun_id = m['id']
-                break
-        # Tenta match normalizado se falhar
-        if not mun_id:
-            for m in munis_uf:
-                if normalize_text(m['nome']) == mun_norm:
-                    mun_id = m['id']
-                    break
-        
-        if not mun_id: return None, None
-
-        # 2. Baixar o GeoJSON específico deste ID
-        url_geo = f"https://servicodados.ibge.gov.br/api/v3/malhas/municipios/{mun_id}?formato=application/vnd.geo+json"
-        resp_geo = requests.get(url_geo, timeout=15)
-        resp_geo.raise_for_status()
-        geojson = resp_geo.json()
-        
-        # Extrai a geometria do FeatureCollection
-        if 'features' in geojson and len(geojson['features']) > 0:
+        if mun_id:
+            # 2. Busca Malha
+            url_geo = f"https://servicodados.ibge.gov.br/api/v3/malhas/municipios/{mun_id}?formato=application/vnd.geo+json"
+            geojson = requests.get(url_geo, timeout=10).json()
             geom_dict = geojson['features'][0]['geometry']
-            ee_geom = ee.Geometry(geom_dict)
-            # Simplifica ligeiramente para evitar erros de complexidade no GEE
-            ee_geom = ee_geom.simplify(maxError=100) 
-            return ee_geom, ee.Feature(ee_geom, {'name_muni': mun_nome, 'uf': uf_sigla, 'ibge_id': mun_id})
-            
-    except Exception as e:
-        print(f"Erro na API direta do IBGE para {mun_nome}: {e}")
-        return None, None
+            ee_geom = ee.Geometry(geom_dict).simplify(maxError=100)
+            return ee_geom, ee.Feature(ee_geom, {'name_muni': mun_nome, 'uf': uf_sigla})
+    except: pass
     return None, None
 
-def _get_state_geometry_direct_ibge(uf_sigla):
-    """Busca GeoJSON do Estado direto do IBGE."""
-    try:
-        url_geo = f"https://servicodados.ibge.gov.br/api/v3/malhas/estados/{uf_sigla}?formato=application/vnd.geo+json"
-        resp_geo = requests.get(url_geo, timeout=20)
-        resp_geo.raise_for_status()
-        geojson = resp_geo.json()
-        if 'features' in geojson and len(geojson['features']) > 0:
-            geom_dict = geojson['features'][0]['geometry']
-            ee_geom = ee.Geometry(geom_dict).simplify(maxError=500)
-            return ee_geom, ee.Feature(ee_geom, {'abbrev_state': uf_sigla})
-    except: return None, None
-
-# --- FUNÇÃO PRINCIPAL DE GEOMETRIA ---
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
     tipo = session_state.get('tipo_localizacao', 'Estado')
     nav_opt = session_state.get('nav_option')
     
-    # 1. Shapefile Uploaded
+    # 1. SHAPEFILE
     if nav_opt == "Shapefile":
         uploaded = session_state.get('shapefile_upload')
         if uploaded: return shapefile_handler.process_uploaded_shapefile(uploaded)
         return None, None
 
-    # 2. Polígono Desenhado
+    # 2. POLIGONO / CIRCULO
     if tipo == "Polígono":
         if not session_state.get('drawn_geometry'): return None, None
         ee_geom = ee.Geometry(session_state.drawn_geometry, proj='EPSG:4326', geodesic=False)
         return ee_geom, ee.Feature(ee_geom, {'type': 'Polygon'})
-
-    # 3. Círculo
-    if tipo == "Círculo (Lat/Lon/Raio)":
+    elif tipo == "Círculo (Lat/Lon/Raio)":
         pt = ee.Geometry.Point([session_state.longitude, session_state.latitude])
         ee_geom = pt.buffer(session_state.raio * 1000)
         return ee_geom, ee.Feature(ee_geom, {'type': 'Circle'})
 
-    # 4. Estado ou Município (VIA API IBGE DIRETA)
+    # 3. ESTADO / MUNICIPIO
     try:
         val = session_state.get('estado', '...')
         uf_sigla = val.split(' - ')[0] if ' - ' in val else val
-        
-        if tipo == "Estado":
-            geom, feat = _get_state_geometry_direct_ibge(uf_sigla)
-            if geom: return geom, feat
+        uf_nome = val.split(' - ')[1] if ' - ' in val else val
 
+        if tipo == "Estado":
+            gdf = _load_all_states_gdf()
+            if gdf is not None:
+                match = gdf[gdf['abbrev_state'] == uf_sigla]
+                if not match.empty:
+                    geom = json.loads(match.to_json())['features'][0]['geometry']
+                    ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
+                    return ee_geom, ee.Feature(ee_geom, {'abbrev_state': uf_sigla})
+        
         elif tipo == "Município":
-            mun_nome = session_state.get('municipio', '...')
-            # Tenta API Direta do IBGE (Mais robusta)
-            geom, feat = _get_municipality_geometry_direct_ibge(uf_sigla, mun_nome)
-            if geom: return geom, feat
+            mun = session_state.get('municipio', '...')
             
-            # Se falhar, tenta FAO GAUL como último recurso (nomes sem acento)
+            # A) Tenta GEOBR (Prioridade - estava no seu código)
+            gdf = _load_municipalities_gdf(uf_sigla)
+            if gdf is not None:
+                match = gdf[gdf['name_muni'] == mun] # Exato
+                if match.empty: # Case Insensitive
+                    match = gdf[gdf['name_muni'].str.lower() == mun.lower()]
+                if match.empty: # Normalizado
+                    match = gdf[gdf['name_muni'].apply(normalize_text) == normalize_text(mun)]
+                
+                if not match.empty:
+                    geom = json.loads(match.iloc[0:1].to_json())['features'][0]['geometry']
+                    ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
+                    return ee_geom, ee.Feature(ee_geom, {'name_muni': mun, 'uf': uf_sigla})
+            
+            # B) Tenta API Direta (Plano B se Geobr falhar)
+            g_api, f_api = _get_geometry_direct_ibge(mun, uf_sigla)
+            if g_api: return g_api, f_api
+            
+            # C) Tenta FAO GAUL (Plano C - Nome sem acento)
             fc = ee.FeatureCollection("FAO/GAUL/2015/level2")
-            mun_norm = normalize_text(mun_nome).title()
             feat_fao = fc.filter(ee.Filter.and_(
-                 ee.Filter.eq('ADM1_NAME', normalize_text(val.split(' - ')[1]).title()),
-                 ee.Filter.eq('ADM2_NAME', mun_norm)
+                ee.Filter.eq('ADM1_NAME', normalize_text(uf_nome).title()),
+                ee.Filter.stringContains('ADM2_NAME', normalize_text(mun).title())
             )).first()
             if feat_fao: return feat_fao.geometry(), feat_fao
-
-        st.error(f"Não foi possível obter a geometria exata do IBGE para a seleção. O serviço pode estar instável. Tente desenhar a área no mapa.")
-        return None, None
+            
+            st.error(f"Geometria não encontrada para '{mun}'. Tente desenhar a área.")
 
     except Exception as e:
-        st.error(f"Erro ao processar geometria: {e}")
+        print(f"Erro geometria: {e}")
         return None, None
+    return None, None
 
-# --- FUNÇÕES AUXILIARES ERA5 (MANTIDAS) ---
+# --- FUNÇÕES ERA5 (MANTIDAS) ---
 def _calc_rh(img):
     T = img.select('temperature_2m').subtract(273.15)
     Td = img.select('dewpoint_temperature_2m').subtract(273.15)
@@ -207,6 +231,7 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
     collection_id = 'ECMWF/ERA5_LAND/HOURLY' if is_hourly else 'ECMWF/ERA5_LAND/DAILY_AGGR'
     band_raw = config.get('band')
     using_era5_global = False
+    
     if is_hourly:
         if variable == "Precipitação Total": band_raw = "total_precipitation"
         elif variable == "Radiação Solar Incidente": 
