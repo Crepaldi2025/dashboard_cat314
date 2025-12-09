@@ -268,7 +268,7 @@ def render_analysis_results():
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
                 
                 # 2. Prepara a Tabela Bonita
-                with st.expander("📊 Ver Tabela de Dados e Exportar", expanded=True):
+                with st.expander("### 📊 Ver Tabela de Dados e Exportar", expanded=True):
                     try:
                         # Cria uma cópia para não estragar o original
                         df_tab = pd.DataFrame(res["df"]).copy()
@@ -511,7 +511,7 @@ def render_analysis_results():
             # --- DADOS E TABELA ---
             if "map_dataframe" in results and not results["map_dataframe"].empty:
                 st.markdown("---")
-                with st.expander("📊 Ver Tabela de Dados", expanded=False):
+                with st.expander("### 📊 Ver Tabela de Dados e Exportar", expanded=False):
                     st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True, height=250)
                     st.markdown("##### 📥 Baixar Dados da Tabela")
                     render_download_buttons(results["map_dataframe"], "dados_climaticos", "map_export")
@@ -553,6 +553,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
