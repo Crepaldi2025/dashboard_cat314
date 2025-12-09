@@ -229,12 +229,12 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
         cb = ColorbarBase(ax, cmap=cmap, norm=norm, boundaries=boundaries, spacing='proportional', orientation="horizontal")
-        cb.set_label(label, fontsize=7)
+        cb.set_label(label, fontsize=6)
         cb.locator = ticker.MaxNLocator(nbins=6)
         formatter = ticker.FormatStrFormatter('%.2f' if (vmax - vmin) < 10 else '%.0f')
         cb.formatter = formatter
         cb.update_ticks()
-        cb.ax.tick_params(labelsize=6, length=2, pad=1)
+        cb.ax.tick_params(labelsize=5, length=2, pad=1)
         buf = io.BytesIO()
         plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
         plt.close(fig)
@@ -271,6 +271,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
