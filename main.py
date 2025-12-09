@@ -186,8 +186,21 @@ def render_analysis_results():
     # --- 1. SKEW-T ---
     if aba == "Skew-T":
         if "skewt_results" in st.session_state and st.session_state.skewt_results:
-            with st.expander("ℹ️ Sobre limites de conexão (Erro 429)", expanded=False):
-                st.info("O Open-Meteo bloqueia temporariamente acessos excessivos. Se der erro, aguarde 1 min.")
+            with st.expander("⏳ Ocorreu um erro de conexão? (Saiba o que fazer)", expanded=False):
+                st.markdown("""
+                ### 🚦 O que é o "Erro 429"?
+                
+                Imagine um semáforo de trânsito. Quando muitos carros tentam passar de uma vez, o sinal fecha para evitar engarrafamento.
+                
+                **Por que isso acontece aqui?**
+                O **Open-Meteo** (nossa fonte de dados) é um serviço gratuito e compartilhado com o mundo todo. Para garantir que ele não saia do ar, ele bloqueia temporariamente quem faz muitos pedidos em poucos segundos.
+
+                **🛠️ Como resolver:**
+                1. **Pare de clicar.** Insistir vai apenas reiniciar o tempo de bloqueio.
+                2. Aguarde cerca de **1 minuto** (tempo para o "sinal abrir" novamente).
+                3. Clique em **Gerar** mais uma vez.
+                """)
+            # ----------------------------------
             
             ui.renderizar_resumo_selecao()
             st.markdown("""<style>div[data-testid="stMetricValue"] {font-size: 1.1rem !important;}</style>""", unsafe_allow_html=True)
@@ -425,6 +438,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
