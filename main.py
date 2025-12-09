@@ -32,9 +32,32 @@ def render_chart_tips():
     with st.expander("ℹ️ Ajuda: Gráficos"):
         st.markdown("* `📷` **Câmera:** Baixa imagem.\n* `🔍` **Zoom:** Aproxima.\n* `🏠` **Reset:** Restaura.")
 
+# --- FUNÇÃO DE AJUDA DO MAPA (AGORA SIM, COMPLETA) ---
 def render_map_tips():
-    with st.popover("ℹ️ Ajuda: Mapa"):
-        st.markdown("* `➕` / `➖` **Zoom:** Aproxima/Afasta.\n* `🗂️` **Camadas:** Alterne dados/satélite.")
+    with st.popover("ℹ️ Ajuda: Ferramentas do Mapa"):
+        st.markdown("### 🗺️ Guia de Navegação")
+        
+        st.markdown("**1️⃣ Controles de Visualização**")
+        st.markdown("""
+        * `➕` / `➖` **Zoom:** Aproxime ou afaste a visão do mapa.
+        * `⛶` **Tela Cheia:** Expande o mapa para ocupar todo o monitor (ícone lateral).
+        * `🗂️` **Camadas:** (Ícone no topo direito) Alterne entre Dados e Contorno.
+        """)
+        
+        st.markdown("**2️⃣ Desenho e Marcação (Barra Lateral Esquerda)**")
+        st.markdown("""
+        * `⬟` **Polígono:** Desenhe áreas livres (clique ponto a ponto).
+        * `⬛` **Retângulo:** Desenhe áreas quadradas (clique e arraste).
+        * `⭕` **Círculo:** Desenhe uma área circular (clique no centro e arraste).
+        * `📍` **Marcador:** Adiciona um pino em um ponto de interesse.
+        * `╱` **Linha:** Desenhe rotas ou meça distâncias.
+        """)
+        
+        st.markdown("**3️⃣ Edição**")
+        st.markdown("""
+        * `📝` **Editar:** Permite ajustar ou mover os desenhos existentes.
+        * `🗑️` **Lixeira:** Remove todos os desenhos ou o item selecionado.
+        """)
 
 def render_download_buttons(df, filename_prefix, key_suffix):
     if df is None or df.empty: return
@@ -402,6 +425,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
