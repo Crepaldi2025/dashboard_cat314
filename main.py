@@ -246,6 +246,9 @@ def render_analysis_results():
                     font-weight: 700 !important;   /* Negrito forte */
                     color: #31333F !important;     /* Cor escura para destaque */
                 }
+                button[title="View fullscreen"] {
+                    display: none !important;
+                }
                 
                 /* Garante que o texto interno herde o tamanho */
                 div[data-testid="stExpander"] details > summary > div {
@@ -553,6 +556,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
