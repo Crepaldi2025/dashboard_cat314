@@ -11,9 +11,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 # -----------------------------------------------------------
-
-
-
 import ui
 import gee_handler
 import map_visualizer
@@ -38,6 +35,21 @@ def set_background():
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
 set_background()
+
+def hide_fullscreen_button():
+    st.markdown("""
+    <style>
+    /* Esconde o botão de fullscreen em TODOS os elementos */
+    button[title="View fullscreen"],
+    button[aria-label="View fullscreen"] {
+        display: none !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# chama logo no início, antes do resto da interface
+set_background()
+hide_fullscreen_button()
 
 # --- HELPERS ---
 def render_chart_tips():
@@ -555,6 +567,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
