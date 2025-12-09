@@ -218,6 +218,7 @@ def render_analysis_results():
                 """)
             
             ui.renderizar_resumo_selecao()
+            st.markdown("""<style>div[data-testid="stMetricValue"] {font-size: 0.9rem !important;}</style>""", unsafe_allow_html=True)
             res = st.session_state.skewt_results
             
             if res["df"] is not None:
@@ -510,6 +511,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
