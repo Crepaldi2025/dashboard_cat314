@@ -183,9 +183,7 @@ def run_full_analysis():
 def render_analysis_results():
     aba = st.session_state.get("nav_option", "Mapas")
 
-    # --- 1. SKEW-T ---
-    if aba == "Skew-T":
-        # 1. SKEW-T
+    # 1. SKEW-T
     if aba == "Skew-T":
         if "skewt_results" in st.session_state and st.session_state.skewt_results:
             # Aviso de Conexão (Didático)
@@ -494,6 +492,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
