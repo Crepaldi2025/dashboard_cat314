@@ -29,8 +29,25 @@ set_background()
 
 # --- HELPERS ---
 def render_chart_tips():
-    with st.expander("ℹ️ Ajuda: Gráficos"):
-        st.markdown("* `📷` **Câmera:** Baixa imagem.\n* `🔍` **Zoom:** Aproxima.\n* `🏠` **Reset:** Restaura.")
+    with st.expander("ℹ️ Ajuda: Entenda os ícones e ferramentas do gráfico"):
+        st.markdown("### 📈 Guia de Ferramentas")
+        
+        st.markdown("**1️⃣ Barra de Ferramentas (Canto Superior Direito)**")
+        st.markdown("""
+        * `📷` **Câmera:** Baixa o gráfico atual como imagem (PNG).
+        * `🔍` **Zoom:** Clique e arraste na tela para aproximar uma área específica.
+        * `✥` **Pan (Mover):** Clique e arraste para mover o gráfico para os lados.
+        * `➕` / `➖` **Zoom In/Out:** Aproxima ou afasta a visualização centralizada.
+        * `🏠` **Casinha (Reset):** Retorna o gráfico para a visualização original.
+        * `🔲` **Autoscale:** Ajusta os eixos automaticamente para caber todos os dados.
+        """)
+        
+        st.markdown("**2️⃣ Interação e Atalhos**")
+        st.markdown("""
+        * **Zoom Rápido (Botões no topo):** Use `1m` (Mês), `6m` (Semestre), `1a` (Ano) ou `Tudo`.
+        * **Valor Exato:** Passe o mouse sobre a linha azul para ver a data e o valor exato (Tooltip).
+        * **Tela Cheia:** Passe o mouse no gráfico e procure o ícone `⛶` para expandir.
+        """)
 
 # --- FUNÇÃO DE AJUDA DO MAPA (AGORA SIM, COMPLETA) ---
 def render_map_tips():
@@ -492,6 +509,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
