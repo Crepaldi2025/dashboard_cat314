@@ -218,8 +218,7 @@ def render_analysis_results():
             # Aviso de Conexão (Didático)
             with st.expander("⏳ Ocorreu um erro de conexão? (Saiba o que fazer)", expanded=False):
                 st.markdown("""
-                ## O que é o "Erro 429"?
-                           
+                                         
                 **Por que isso acontece aqui?**
                 O **Open-Meteo** (nossa fonte de dados) é um serviço gratuito e compartilhado com o mundo todo. Para garantir que ele não saia do ar, ele bloqueia temporariamente quem faz muitos pedidos em poucos segundos.
 
@@ -556,6 +555,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
