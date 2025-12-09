@@ -19,12 +19,7 @@ import re
 # Configuração da Página e Cache
 # ------------------------------
 
-st.set_page_config(
-    page_title="Clima-Cast-Crepaldi",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    page_icon="🌦️"
-)
+
 
 try:
     locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")
@@ -570,6 +565,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
