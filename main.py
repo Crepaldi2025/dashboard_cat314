@@ -506,7 +506,7 @@ def render_analysis_results():
                         final_png = base64.b64decode(png.split(",")[1])
                         final_jpg = base64.b64decode(jpg.split(",")[1])
 
-                    st.markdown("### 📥 Baixar Mapa (Imagem)")
+                    st.markdown("##### 📥 Baixar Mapa (Imagem)")
                     c1, c2 = st.columns(2)
                     if final_png: c1.download_button("💾 Baixar PNG", final_png, "mapa.png", "image/png", use_container_width=True)
                     if final_jpg: c2.download_button("💾 Baixar JPG", final_jpg, "mapa.jpeg", "image/jpeg", use_container_width=True)
@@ -516,7 +516,7 @@ def render_analysis_results():
                 st.markdown("---")
                 with st.expander("##### 📊 Ver Tabela de Dados e Exportar", expanded=False):
                     st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True, height=250)
-                    st.markdown("### 📥 Baixar Dados da Tabela")
+                    st.markdown("##### 📥 Baixar Dados da Tabela")
                     render_download_buttons(results["map_dataframe"], "dados_climaticos", "map_export")
 
     # --- 6. SÉRIES TEMPORAIS ---
@@ -556,6 +556,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
