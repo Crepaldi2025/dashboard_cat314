@@ -188,16 +188,15 @@ def render_analysis_results():
         if "skewt_results" in st.session_state and st.session_state.skewt_results:
             with st.expander("⏳ Ocorreu um erro de conexão? (Saiba o que fazer)", expanded=False):
                 st.markdown("""
-                ### 🚦 O que é o "Erro 429"?
+                ###  O que é o "Erro 429"?
                 
-                Imagine um semáforo de trânsito. Quando muitos carros tentam passar de uma vez, o sinal fecha para evitar engarrafamento.
-                
+                            
                 **Por que isso acontece aqui?**
                 O **Open-Meteo** (nossa fonte de dados) é um serviço gratuito e compartilhado com o mundo todo. Para garantir que ele não saia do ar, ele bloqueia temporariamente quem faz muitos pedidos em poucos segundos.
 
                 **🛠️ Como resolver:**
-                1. **Pare de clicar.** Insistir vai apenas reiniciar o tempo de bloqueio.
-                2. Aguarde cerca de **1 minuto** (tempo para o "sinal abrir" novamente).
+                1. **Pare de clicar em gerar Skew-T.** Insistir vai apenas reiniciar o tempo de bloqueio.
+                2. Aguarde cerca de **1 minuto**.
                 3. Clique em **Gerar** mais uma vez.
                 """)
             # ----------------------------------
@@ -438,6 +437,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
