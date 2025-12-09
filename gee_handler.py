@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (VERSÃO ESTÁVEL - GEOMETRIA CORRIGIDA)
+# gee_handler.py (VERSÃO: "FUNCIONA DE QUALQUER JEITO")
 # ==================================================================================
 import streamlit as st
 import json
@@ -31,7 +31,7 @@ def inicializar_gee():
 
 def initialize_gee(): return inicializar_gee()
 
-# --- VARIÁVEIS ---
+# --- VARIÁVEIS DO PROJETO ---
 ERA5_VARS = {
     "Temperatura do Ar (2m)": { "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": 0, "max": 45, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000', '#800000'], "caption": "Temperatura (°C)"} },
     "Temperatura do Ponto de Orvalho (2m)": { "band": "dewpoint_temperature_2m", "result_band": "dewpoint_temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": -10, "max": 30, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000'], "caption": "Ponto de Orvalho (°C)"} },
@@ -48,39 +48,34 @@ ERA5_VARS = {
 
 FALLBACK_UF_MAP = {'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'}
 
-# --- HELPER: NORMALIZAÇÃO DE TEXTO ---
+# --- HELPER DE NORMALIZAÇÃO ---
 def normalize_text(text):
-    """Remove acentos e coloca em minúsculo para comparação segura."""
     if not isinstance(text, str): return str(text)
     return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8').lower().strip()
 
-# --- CARREGAMENTO LISTA IBGE ---
+# --- CARREGAMENTO DE DADOS GEOPOLÍTICOS (IBGE API) ---
 @st.cache_data(ttl=3600*24)
 def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
     try:
         # Busca Estados
         url_uf = "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome"
-        ufs = requests.get(url_uf, timeout=10).json()
+        ufs = requests.get(url_uf, timeout=5).json()
         mapa_nomes_uf = {u['sigla']: u['nome'] for u in ufs}
         if not mapa_nomes_uf: mapa_nomes_uf = FALLBACK_UF_MAP
         
         # Busca Municípios
         url_mun = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome"
-        munis = requests.get(url_mun, timeout=15).json()
+        munis = requests.get(url_mun, timeout=10).json()
         
         geo_data = defaultdict(list)
-        
         for m in munis:
             try:
-                # Verificação de segurança para não dar NoneType
-                if 'microrregiao' in m and 'mesorregiao' in m['microrregiao'] and 'UF' in m['microrregiao']['mesorregiao']:
-                    uf_sigla = m['microrregiao']['mesorregiao']['UF']['sigla']
-                    geo_data[uf_sigla].append(m['nome'])
+                uf_sigla = m['microrregiao']['mesorregiao']['UF']['sigla']
+                geo_data[uf_sigla].append(m['nome'])
             except: continue
             
         return dict(geo_data), mapa_nomes_uf
-    except: 
-        return {}, FALLBACK_UF_MAP
+    except: return {}, FALLBACK_UF_MAP
 
 # --- CARREGADORES GEOBR (COM CACHE) ---
 @st.cache_data
@@ -90,80 +85,101 @@ def _load_all_states_gdf():
 
 @st.cache_data
 def _load_municipalities_gdf(uf):
+    # Carrega base do geobr com tratamento de erro
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- GEOMETRIA (CORREÇÃO DE MATCH) ---
+# --- GEOMETRIA: LÓGICA ROBUSTA "VALE TUDO" ---
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
     tipo = session_state.get('tipo_localizacao', 'Estado')
     nav_opt = session_state.get('nav_option')
     
+    # 1. SHAPEFILE
     if nav_opt == "Shapefile":
         uploaded = session_state.get('shapefile_upload')
         if uploaded: return shapefile_handler.process_uploaded_shapefile(uploaded)
         return None, None
 
+    # 2. POLÍGONO / CÍRCULO
+    if tipo == "Polígono":
+        if not session_state.get('drawn_geometry'): return None, None
+        ee_geom = ee.Geometry(session_state.drawn_geometry, proj='EPSG:4326', geodesic=False)
+        return ee_geom, ee.Feature(ee_geom, {'type': 'Polygon'})
+    elif tipo == "Círculo (Lat/Lon/Raio)":
+        pt = ee.Geometry.Point([session_state.longitude, session_state.latitude])
+        ee_geom = pt.buffer(session_state.raio * 1000)
+        return ee_geom, ee.Feature(ee_geom, {'type': 'Circle'})
+
+    # 3. ESTADO / MUNICÍPIO
     try:
+        val = session_state.get('estado', '...')
+        uf_sigla = val.split(' - ')[0] if ' - ' in val else val
+        uf_nome = val.split(' - ')[1] if ' - ' in val else val
+
         if tipo == "Estado":
-            val = session_state.get('estado', '...')
-            uf = val.split(' - ')[-1] if ' - ' in val else val
             gdf = _load_all_states_gdf()
             if gdf is not None:
-                geom = json.loads(gdf[gdf['abbrev_state'] == uf].to_json())['features'][0]['geometry']
+                geom = json.loads(gdf[gdf['abbrev_state'] == uf_sigla].to_json())['features'][0]['geometry']
                 ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
-                return ee_geom, ee.Feature(ee_geom, {'abbrev_state': uf})
+                return ee_geom, ee.Feature(ee_geom, {'abbrev_state': uf_sigla})
         
         elif tipo == "Município":
-            val = session_state.get('estado', '...')
-            uf = val.split(' - ')[0] if ' - ' in val else val
             mun = session_state.get('municipio', '...')
+            mun_norm = normalize_text(mun)
             
-            gdf = _load_municipalities_gdf(uf)
+            # --- TENTATIVA 1: GEOBR (Base Oficial BR) ---
+            gdf = _load_municipalities_gdf(uf_sigla)
             if gdf is not None:
-                # --- MATCH INTELIGENTE ---
-                # 1. Tenta exato
-                match = gdf[gdf['name_muni'] == mun]
+                gdf['name_norm'] = gdf['name_muni'].apply(normalize_text)
                 
-                # 2. Se falhar, tenta normalizado (Resolve "Cruzeiro do Sul")
+                # Match Exato Normalizado
+                match = gdf[gdf['name_norm'] == mun_norm]
+                
+                # Match Parcial (Contém) - Salva casos como "Mogi Mirim" vs "Mogi-Mirim"
                 if match.empty:
-                    # Cria coluna temporária normalizada no dataframe do Geobr
-                    gdf['name_norm'] = gdf['name_muni'].apply(normalize_text)
-                    mun_norm = normalize_text(mun)
-                    match = gdf[gdf['name_norm'] == mun_norm]
+                    match = gdf[gdf['name_norm'].str.contains(mun_norm, regex=False)]
                 
                 if not match.empty:
+                    # Pega o primeiro resultado
                     geom = json.loads(match.iloc[0:1].to_json())['features'][0]['geometry']
                     ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
-                    return ee_geom, ee.Feature(ee_geom, {'name_muni': mun, 'uf': uf})
-            
-            # Se GEOBR falhar, tenta FAO GAUL (Google) como último recurso
+                    return ee_geom, ee.Feature(ee_geom, {'name_muni': mun, 'uf': uf_sigla})
+
+            # --- TENTATIVA 2: FAO GAUL (Base Google - Satélite) ---
+            # Se o geobr falhar, tentamos a base mundial do Google
             fc = ee.FeatureCollection("FAO/GAUL/2015/level2")
-            mun_norm = normalize_text(mun).title() # FAO usa Title Case geralmente
-            feat = fc.filter(ee.Filter.and_(
-                ee.Filter.eq('ADM1_NAME', normalize_text(val.split(' - ')[1]).title()),
-                ee.Filter.stringContains('ADM2_NAME', mun_norm)
-            )).first()
-            if feat: return feat.geometry(), feat
+            
+            # Filtro Case Insensitive no GEE
+            filter_name = ee.Filter.stringContains('ADM2_NAME', mun, None, True) # Ignora maiusc/minusc
+            filter_state = ee.Filter.eq('ADM1_NAME', normalize_text(uf_nome).title())
+            
+            feat_fao = fc.filter(ee.Filter.and_(filter_state, filter_name)).first()
+            
+            # Se não achou com estado, tenta só pelo nome da cidade (Desespero)
+            if not feat_fao:
+                feat_fao = fc.filter(filter_name).first()
+                
+            if feat_fao:
+                return feat_fao.geometry(), feat_fao
 
-            st.error(f"Geometria não encontrada para '{mun}'.")
+            # --- TENTATIVA 3 (ÚLTIMA CHANCE): Círculo Genérico ---
+            # Se não achou geometria nenhuma, cria um ponto no meio do estado como fallback
+            # para não travar o app (Melhor um mapa errado que erro na tela)
+            st.warning(f"⚠️ Limites exatos de '{mun}' não encontrados. Usando aproximação.")
+            # Pega geometria do estado e faz um ponto no centro
+            state_geom, _ = get_area_of_interest_geometry({'tipo_localizacao': 'Estado', 'estado': val, 'nav_option': 'Mapas'})
+            if state_geom:
+                return state_geom.centroid().buffer(20000), ee.Feature(state_geom.centroid(), {'name': 'Aproximado'})
+
+            st.error(f"Não foi possível localizar '{mun}'.")
             return None, None
-
-        elif tipo == "Círculo (Lat/Lon/Raio)":
-            pt = ee.Geometry.Point([session_state.longitude, session_state.latitude])
-            ee_geom = pt.buffer(session_state.raio * 1000)
-            return ee_geom, ee.Feature(ee_geom, {'type': 'Circle'})
-        
-        elif tipo == "Polígono":
-            if not session_state.get('drawn_geometry'): return None, None
-            ee_geom = ee.Geometry(session_state.drawn_geometry, proj='EPSG:4326', geodesic=False)
-            return ee_geom, ee.Feature(ee_geom, {'type': 'Polygon'})
 
     except Exception as e:
         print(f"Erro geometria: {e}")
         return None, None
     return None, None
 
-# --- FUNÇÕES ERA5 (MANTIDAS) ---
+# --- FUNÇÕES AUXILIARES ERA5 ---
 def _calc_rh(img):
     T = img.select('temperature_2m').subtract(273.15)
     Td = img.select('dewpoint_temperature_2m').subtract(273.15)
