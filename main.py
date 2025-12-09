@@ -443,8 +443,8 @@ def render_analysis_results():
                     png, jpg, cbar = map_visualizer.create_static_map(results["ee_image"], results["feature"], vis, var_cfg["unit"])
                 
                 if png:
-                    st.image(base64.b64decode(png.split(",")[1]), use_column_width=600) 
-                    if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=600)
+                    st.image(base64.b64decode(png.split(",")[1]), use_column_width=700) 
+                    if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=200)
                     
                     # Preparação do Download com Título Rico
                     final_png, final_jpg = None, None
@@ -511,6 +511,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
