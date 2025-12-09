@@ -358,8 +358,8 @@ def render_analysis_results():
                     st.markdown(f"**{var}**")
                     png, jpg, cbar = map_visualizer.create_static_map(results["data"][var]["ee_image"], results["data"][var]["feature"], gee_handler.obter_vis_params_interativo(var), results["data"][var]["var_cfg"]["unit"])
                     if png:
-                        st.image(base64.b64decode(png.split(",")[1]), use_column_width=600) 
-                        if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=600)
+                        st.image(base64.b64decode(png.split(",")[1]), use_column_width=400) 
+                        if cbar: st.image(base64.b64decode(cbar.split(",")[1]), use_column_width=400)
                         
                         # Botões para Múltiplos Mapas
                         try:
@@ -511,6 +511,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
