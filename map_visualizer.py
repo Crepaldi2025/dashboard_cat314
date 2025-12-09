@@ -115,7 +115,7 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
     if tipo_local == "Círculo (Lat/Lon/Raio)":
         folium.Marker(
             location=[lat_c, lon_c],
-            tooltip=f"Centro: {lat_c:.4f}, {lon_c:.4f}",
+            tooltip=f"Centro: {lat_c:.2f}, {lon_c:.2f}",
             popup=folium.Popup(f"<b>Centro</b><br>Lat: {lat_c:.5f}<br>Lon: {lon_c:.5f}", max_width=200),
             icon=folium.Icon(color='red', icon='info-sign')
         ).add_to(mapa)
@@ -165,7 +165,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
                     try: font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
                     except: font = ImageFont.load_default()
 
-                texto = f"lat={lat_txt:.4f}\nlon={lon_txt:.4f}"
+                texto = f"lat={lat_txt:.2f}\nlon={lon_txt:.2f}"
                 tx, ty = cx + 12, cy - 25
                 draw.text((tx-2, ty), texto, font=font, fill="white")
                 draw.text((tx+2, ty), texto, font=font, fill="white")
@@ -221,7 +221,7 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
 
 def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
     # Tamanho ajustado da colorbar estática (menor altura: 0.15)
-    fig = plt.figure(figsize=(2.0, 0.50), dpi=220)
+    fig = plt.figure(figsize=(2.0, 0.45), dpi=220)
     ax = fig.add_axes([0.05, 0.45, 0.90, 0.20])
     try:
         N_STEPS = len(palette)
@@ -234,7 +234,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         formatter = ticker.FormatStrFormatter('%.2f' if (vmax - vmin) < 10 else '%.0f')
         cb.formatter = formatter
         cb.update_ticks()
-        cb.ax.tick_params(labelsize=5, length=2, pad=1)
+        cb.ax.tick_params(labelsize=4, length=2, pad=1)
         buf = io.BytesIO()
         plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
         plt.close(fig)
@@ -271,6 +271,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
