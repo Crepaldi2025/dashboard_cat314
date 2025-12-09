@@ -141,7 +141,7 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
         try:
             b = feature.geometry().bounds().getInfo()['coordinates'][0]
             dim = max(abs(b[2][0]-b[0][0]), abs(b[2][1]-b[0][1])) * 111000 
-            region = feature.geometry().buffer(dim * 0.05)
+            region = feature.geometry().buffer(dim * 0.01)
         except: region = feature.geometry()
 
         # Dimensions controla a resolução da imagem gerada
@@ -271,6 +271,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
