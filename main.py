@@ -230,17 +230,31 @@ def render_analysis_results():
                 """)
             
             ui.renderizar_resumo_selecao()
+            ui.renderizar_resumo_selecao()
+            
+            # --- ESTILOS CSS REFORÇADOS ---
             st.markdown("""
                 <style>
-                /* 1. Números do Skew-T menores (0.9rem) */
+                /* 1. Números do Skew-T menores e delicados */
                 div[data-testid="stMetricValue"] {
                     font-size: 0.9rem !important;
                 }
                 
-                /* 2. Título do Expander MAIOR (Ver Tabela de Dados) */
-                div[data-testid="stExpander"] summary p {
-                    font-size: 1.2rem !important;  /* Aumentei para 1.2rem */
-                    font-weight: 600 !important;   /* Deixei em negrito */
+                /* 2. Título do Expander MAIOR (Regra de Força Bruta) */
+                /* Tenta pegar pela classe do cabeçalho */
+                .streamlit-expanderHeader p {
+                    font-size: 1.2rem !important;
+                    font-weight: 700 !important;
+                }
+                /* Tenta pegar pela estrutura do summary */
+                div[data-testid="stExpander"] summary span {
+                    font-size: 1.2rem !important;
+                    font-weight: 700 !important;
+                }
+                /* Tenta pegar direto no parágrafo dentro do details */
+                div[data-testid="stExpander"] details summary p {
+                    font-size: 1.2rem !important;
+                    font-weight: 700 !important;
                 }
                 </style>
             """, unsafe_allow_html=True)
@@ -537,6 +551,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
