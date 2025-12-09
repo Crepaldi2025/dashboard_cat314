@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py (VERSÃO HÍBRIDA SEGURA: API IBGE + SEU CÓDIGO GEOBR)
+# gee_handler.py (CORRIGIDO: MATCH INTELIGENTE MUNICIPIOS)
 # ==================================================================================
 import streamlit as st
 import json
@@ -13,8 +13,9 @@ import tempfile
 import zipfile
 import shutil
 import warnings
-import requests # <--- NOVO IMPORT PARA API DO IBGE
-import shapefile_handler  # Mantido seu import importante
+import requests 
+import unicodedata
+import shapefile_handler
 
 def inicializar_gee():
     try:
@@ -33,7 +34,7 @@ def inicializar_gee():
 
 def initialize_gee(): return inicializar_gee()
 
-# --- VARIÁVEIS (MANTIDAS EXATAMENTE AS SUAS) ---
+# --- VARIÁVEIS (SUAS CONFIGURAÇÕES) ---
 ERA5_VARS = {
     "Temperatura do Ar (2m)": { "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": 0, "max": 45, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000', '#800000'], "caption": "Temperatura (°C)"} },
     "Temperatura do Ponto de Orvalho (2m)": { "band": "dewpoint_temperature_2m", "result_band": "dewpoint_temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": -10, "max": 30, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000'], "caption": "Ponto de Orvalho (°C)"} },
@@ -50,39 +51,31 @@ ERA5_VARS = {
 
 FALLBACK_UF_MAP = {'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'}
 
-# --- ALTERAÇÃO AQUI: BUSCA NA API DO IBGE ---
-@st.cache_data(ttl=3600*24) # Cache de 24h
+# --- HELPER DE NORMALIZAÇÃO ---
+def normalize_text(text):
+    if not isinstance(text, str): return str(text)
+    return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8').lower().strip()
+
+# --- DADOS DO IBGE ---
+@st.cache_data(ttl=3600*24)
 def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
     try:
-        # 1. Busca Estados (IBGE)
         url_uf = "https://servicodados.ibge.gov.br/api/v1/localidades/estados"
         ufs = requests.get(url_uf).json()
         ufs = sorted(ufs, key=lambda x: x['nome'])
-        
-        # Cria mapa Sigla -> Nome
         mapa_nomes_uf = {u['sigla']: u['nome'] for u in ufs}
         if not mapa_nomes_uf: mapa_nomes_uf = FALLBACK_UF_MAP
         
-        # 2. Busca Municípios (IBGE)
         url_mun = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios"
         munis = requests.get(url_mun).json()
-        
         geo_data = defaultdict(list)
         for m in munis:
             uf_sigla = m['microrregiao']['mesorregiao']['UF']['sigla']
-            nome_mun = m['nome']
-            geo_data[uf_sigla].append(nome_mun)
+            geo_data[uf_sigla].append(m['nome'])
             
-        # Ordena as listas
-        for uf in geo_data:
-            geo_data[uf].sort()
-            
+        for uf in geo_data: geo_data[uf].sort()
         return dict(geo_data), mapa_nomes_uf
-        
-    except Exception as e:
-        print(f"Erro IBGE: {e}")
-        return {}, FALLBACK_UF_MAP
-# ---------------------------------------------
+    except: return {}, FALLBACK_UF_MAP
 
 @st.cache_data
 def _load_all_states_gdf():
@@ -91,41 +84,98 @@ def _load_all_states_gdf():
 
 @st.cache_data
 def _load_municipalities_gdf(uf):
+    # Carrega todos os municípios do estado de uma vez (mais rápido e seguro)
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
-# --- MANTIDO EXATAMENTE IGUAL AO SEU ORIGINAL ---
+def _get_geometry_from_fao(uf_nome, mun_nome):
+    """Fallback: Busca no FAO GAUL se o Geobr falhar."""
+    try:
+        fc = ee.FeatureCollection("FAO/GAUL/2015/level2")
+        uf_norm = normalize_text(uf_nome)
+        mun_norm = normalize_text(mun_nome)
+        
+        # Filtro Inteligente (Combinações)
+        # Tenta Estado (Norm) + Município (Norm)
+        filtered = fc.filter(ee.Filter.and_(
+             ee.Filter.eq('ADM1_NAME', uf_norm.title()), # FAO usa Title Case geralmente
+             ee.Filter.eq('ADM2_NAME', mun_norm.title())
+        ))
+        
+        # Se falhar, tenta apenas o nome do município (pode dar colisão, mas é um fallback)
+        if filtered.size().getInfo() == 0:
+            filtered = fc.filter(ee.Filter.eq('ADM2_NAME', mun_norm.title()))
+            
+        feat = filtered.first()
+        if feat: return feat.geometry(), feat
+    except: pass
+    return None, None
+
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
     tipo = session_state.get('tipo_localizacao', 'Estado')
     nav_opt = session_state.get('nav_option')
     
-    # --- INTEGRAÇÃO COM SHAPEFILE HANDLER ---
     if nav_opt == "Shapefile":
         uploaded = session_state.get('shapefile_upload')
-        if uploaded:
-            # Chama a função no novo manipulador
-            return shapefile_handler.process_uploaded_shapefile(uploaded)
+        if uploaded: return shapefile_handler.process_uploaded_shapefile(uploaded)
         return None, None
-    # ----------------------------------------
 
     try:
         if tipo == "Estado":
             val = session_state.get('estado', '...')
             uf = val.split(' - ')[-1] if ' - ' in val else val
             gdf = _load_all_states_gdf()
-            if gdf is None: return None, None
-            geom = json.loads(gdf[gdf['abbrev_state'] == uf].to_json())['features'][0]['geometry']
-            ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
-            return ee_geom, ee.Feature(ee_geom, {'abbrev_state': uf})
+            
+            # Tenta GEOBR
+            if gdf is not None:
+                match = gdf[gdf['abbrev_state'] == uf]
+                if not match.empty:
+                    geom = json.loads(match.to_json())['features'][0]['geometry']
+                    ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
+                    return ee_geom, ee.Feature(ee_geom, {'abbrev_state': uf})
+            
+            # Fallback FAO GAUL (Estado)
+            fc_states = ee.FeatureCollection("FAO/GAUL/2015/level1")
+            feat = fc_states.filter(ee.Filter.eq('ADM1_NAME', normalize_text(val.split(' - ')[1]).title())).first()
+            if feat: return feat.geometry(), feat
+
         elif tipo == "Município":
             val = session_state.get('estado', '...')
-            uf = val.split(' - ')[-1] if ' - ' in val else val
-            mun = session_state.get('municipio', '...')
-            gdf = _load_municipalities_gdf(uf)
-            if gdf is None: return None, None
-            geom = json.loads(gdf[gdf['name_muni'] == mun].to_json())['features'][0]['geometry']
-            ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
-            return ee_geom, ee.Feature(ee_geom, {'name_muni': mun, 'uf': uf})
+            uf_sigla = val.split(' - ')[0] if ' - ' in val else val
+            uf_nome = val.split(' - ')[1] if ' - ' in val else val
+            mun_nome = session_state.get('municipio', '...')
+            
+            # 1. Tenta GEOBR (Prioridade)
+            gdf = _load_municipalities_gdf(uf_sigla)
+            
+            if gdf is not None:
+                # MATCH INTELIGENTE
+                # a) Tentativa Exata
+                match = gdf[gdf['name_muni'] == mun_nome]
+                
+                # b) Tentativa Case Insensitive
+                if match.empty:
+                    match = gdf[gdf['name_muni'].str.lower() == mun_nome.lower()]
+                
+                # c) Tentativa Normalizada (Sem acentos)
+                if match.empty:
+                    mun_norm = normalize_text(mun_nome)
+                    # Cria coluna temporária normalizada
+                    gdf['name_norm'] = gdf['name_muni'].apply(normalize_text)
+                    match = gdf[gdf['name_norm'] == mun_norm]
+
+                if not match.empty:
+                    geom = json.loads(match.iloc[0:1].to_json())['features'][0]['geometry']
+                    ee_geom = ee.Geometry(geom, proj='EPSG:4326', geodesic=False)
+                    return ee_geom, ee.Feature(ee_geom, {'name_muni': mun_nome, 'uf': uf_sigla})
+            
+            # 2. Fallback FAO GAUL (Se Geobr falhar ou não achar)
+            geom_fao, feat_fao = _get_geometry_from_fao(uf_nome, mun_nome)
+            if geom_fao: return geom_fao, feat_fao
+            
+            st.error(f"Não foi possível encontrar a geometria para '{mun_nome}'. Tente desenhar a área.")
+            return None, None
+
         elif tipo == "Círculo (Lat/Lon/Raio)":
             pt = ee.Geometry.Point([session_state.longitude, session_state.latitude])
             ee_geom = pt.buffer(session_state.raio * 1000)
@@ -134,7 +184,9 @@ def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Featur
             if not session_state.get('drawn_geometry'): return None, None
             ee_geom = ee.Geometry(session_state.drawn_geometry, proj='EPSG:4326', geodesic=False)
             return ee_geom, ee.Feature(ee_geom, {'type': 'Polygon'})
-    except: return None, None
+    except Exception as e:
+        st.error(f"Erro ao processar geometria: {e}")
+        return None, None
     return None, None
 
 def _calc_rh(img):
@@ -152,16 +204,12 @@ def _calc_rad(img, hourly=False):
 def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee.Geometry, target_hour: int = None) -> ee.Image:
     if variable not in ERA5_VARS: return None
     config = ERA5_VARS[variable]
-    
     is_hourly = target_hour is not None
     collection_id = 'ECMWF/ERA5_LAND/HOURLY' if is_hourly else 'ECMWF/ERA5_LAND/DAILY_AGGR'
-    
     band_raw = config.get('band')
     using_era5_global = False
-    
     if is_hourly:
-        if variable == "Precipitação Total": 
-            band_raw = "total_precipitation"
+        if variable == "Precipitação Total": band_raw = "total_precipitation"
         elif variable == "Radiação Solar Incidente": 
             collection_id = 'ECMWF/ERA5/HOURLY'
             band_raw = "mean_surface_downward_short_wave_radiation_flux"
@@ -171,50 +219,32 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
     if is_hourly and not using_era5_global:
         if variable == "Precipitação Total": bands_needed = ["total_precipitation"]
         elif variable == "Radiação Solar Incidente": bands_needed = ["surface_solar_radiation_downwards"]
-    elif using_era5_global:
-        bands_needed = [band_raw]
+    elif using_era5_global: bands_needed = [band_raw]
 
     try:
         col = ee.ImageCollection(collection_id).filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-        
-        if is_hourly:
-            col = col.filter(ee.Filter.calendarRange(target_hour, target_hour, 'hour'))
-            
+        if is_hourly: col = col.filter(ee.Filter.calendarRange(target_hour, target_hour, 'hour'))
         if col.size().getInfo() == 0: return None
 
         if variable == "Velocidade do Vento (10m)":
-            col = col.map(lambda img: img.addBands(
-                img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m'])
-                    .pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
-            ))
-        elif variable == "Umidade Relativa (2m)":
-            col = col.map(_calc_rh)
+            col = col.map(lambda img: img.addBands(img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m']).pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])))
+        elif variable == "Umidade Relativa (2m)": col = col.map(_calc_rh)
         elif variable == "Radiação Solar Incidente":
-            if using_era5_global:
-                col = col.map(lambda img: img.select(band_raw).rename('radiation_wm2'))
-            else:
-                col = col.map(lambda img: _calc_rad(img, is_hourly))
+            if using_era5_global: col = col.map(lambda img: img.select(band_raw).rename('radiation_wm2'))
+            else: col = col.map(lambda img: _calc_rad(img, is_hourly))
         
         band_agg = config['result_band']
         if is_hourly and variable == "Precipitação Total": band_agg = "total_precipitation"
-
-        if config['aggregation'] == 'mean': 
-            img_agg = col.select(band_agg).mean()
-        elif config['aggregation'] == 'sum': 
-            img_agg = col.select(band_agg).sum()
-        else: 
-            img_agg = col.first().select(band_agg)
+        if config['aggregation'] == 'mean': img_agg = col.select(band_agg).mean()
+        elif config['aggregation'] == 'sum': img_agg = col.select(band_agg).sum()
+        else: img_agg = col.first().select(band_agg)
 
         final = img_agg.clip(geometry).float()
-        
         if config['unit'] == "°C": final = final.subtract(273.15)
         elif config['unit'] == "mm": final = final.multiply(1000)
-
         if final.bandNames().size().getInfo() == 0: return None
         return final
-    except Exception as e:
-        st.error(f"Erro GEE: {e}")
-        return None
+    except: return None
 
 def get_sampled_data_as_dataframe(ee_image: ee.Image, geometry: ee.Geometry, variable: str) -> pd.DataFrame:
     if not ee_image or variable not in ERA5_VARS: return pd.DataFrame()
@@ -259,25 +289,17 @@ def _get_series_generic(variable, start, end, geom):
         return df.dropna().sort_values('date')
     except: return pd.DataFrame()
 
-# --- SUA FUNÇÃO CUSTOMIZADA DE SLIDERS (MANTIDA) ---
 def obter_vis_params_interativo(variavel: str):
-    if variavel not in ERA5_VARS:
-        return {}
-
+    if variavel not in ERA5_VARS: return {}
     config_padrao = ERA5_VARS[variavel]['vis_params']
     padrao_min = float(config_padrao.get('min', 0))
     padrao_max = float(config_padrao.get('max', 100))
-    
-    # Mantive seus sliders exatamente como estavam
     with st.expander(f"🎨 Ajustar Escala de Cores: {variavel}", expanded=False):
         unidade = ERA5_VARS[variavel].get('unit', '')
         st.caption(f"Unidade: {unidade} | Valores Padrão: {padrao_min} a {padrao_max}")
         col1, col2 = st.columns(2)
-        with col1:
-            novo_min = st.number_input("Valor Mínimo", value=padrao_min, step=1.0, format="%.1f", key=f"min_{variavel}")
-        with col2:
-            novo_max = st.number_input("Valor Máximo", value=padrao_max, step=1.0, format="%.1f", key=f"max_{variavel}")
-
+        with col1: novo_min = st.number_input("Valor Mínimo", value=padrao_min, step=1.0, format="%.1f", key=f"min_{variavel}")
+        with col2: novo_max = st.number_input("Valor Máximo", value=padrao_max, step=1.0, format="%.1f", key=f"max_{variavel}")
     nova_config = config_padrao.copy()
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
