@@ -2,6 +2,13 @@
 # main.py 
 # ==================================================================================
 import streamlit as st
+
+st.set_page_config(
+    page_title="Clima-Cast",
+    layout="wide",           # <--- ISSO FAZ O MAPA OCUPAR A TELA TODA
+    initial_sidebar_state="expanded"
+)
+
 import ui
 import gee_handler
 import map_visualizer
@@ -511,6 +518,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
