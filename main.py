@@ -223,7 +223,7 @@ def render_analysis_results():
                 O **Open-Meteo** (nossa fonte de dados) é um serviço gratuito e compartilhado com o mundo todo. Para garantir que ele não saia do ar, ele bloqueia temporariamente quem faz muitos pedidos em poucos segundos.
 
                 **🛠️ Como resolver:**
-                1. **Pare de clicarem Gerar Skew-T.** Insistir vai apenas reiniciar o tempo de bloqueio.
+                1. **Pare de clicar em Gerar Skew-T.** Insistir vai apenas reiniciar o tempo de bloqueio.
                 2. Aguarde cerca de **1 minuto**.
                 3. Clique em **Gerar** mais uma vez.
                 """)
@@ -555,6 +555,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
