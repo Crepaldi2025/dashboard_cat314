@@ -230,7 +230,21 @@ def render_analysis_results():
                 """)
             
             ui.renderizar_resumo_selecao()
-            st.markdown("""<style>div[data-testid="stMetricValue"] {font-size: 0.9rem !important;}</style>""", unsafe_allow_html=True)
+            st.markdown("""
+                <style>
+                /* 1. Números do Skew-T menores (0.9rem) */
+                div[data-testid="stMetricValue"] {
+                    font-size: 0.9rem !important;
+                }
+                
+                /* 2. Título do Expander MAIOR (Ver Tabela de Dados) */
+                div[data-testid="stExpander"] summary p {
+                    font-size: 1.2rem !important;  /* Aumentei para 1.2rem */
+                    font-weight: 600 !important;   /* Deixei em negrito */
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            # --------------------------------------------------------
             res = st.session_state.skewt_results
             
             if res["df"] is not None:
@@ -523,6 +537,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
