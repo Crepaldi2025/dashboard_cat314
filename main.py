@@ -18,17 +18,6 @@ from datetime import timedelta
 import skewt_handler 
 import skewt_visualizer
 
-# --- ADICIONE ESTE BLOCO AQUI ---
-st.set_page_config(
-    page_title="Clima-Cast",
-    page_icon="🌦️",
-    layout="wide",              # <--- ISSO É O QUE DISTRIBUI O CONTEÚDO HORIZONTALMENTE
-    initial_sidebar_state="expanded"
-)
-# --------------------------------
-
-
-
 # --- CONFIGURAÇÃO INICIAL ---
 def set_background():
     image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
@@ -522,6 +511,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
