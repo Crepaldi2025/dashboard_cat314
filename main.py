@@ -2,6 +2,18 @@
 # main.py 
 # ==================================================================================
 import streamlit as st
+
+# --- O CONFIG DEVE FICAR EXATAMENTE AQUI (ANTES DE TUDO) ---
+st.set_page_config(
+    page_title="Clima-Cast",
+    page_icon="🌦️",
+    layout="wide",              # <--- Distribui horizontalmente (Tela Cheia)
+    initial_sidebar_state="expanded"
+)
+# -----------------------------------------------------------
+
+
+
 import ui
 import gee_handler
 import map_visualizer
@@ -511,6 +523,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
