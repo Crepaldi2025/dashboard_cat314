@@ -1,5 +1,5 @@
 # ==================================================================================
-# gee_handler.py
+# gee_handler.py (VERSÃO HÍBRIDA SEGURA: API IBGE + SEU CÓDIGO GEOBR)
 # ==================================================================================
 import streamlit as st
 import json
@@ -13,7 +13,8 @@ import tempfile
 import zipfile
 import shutil
 import warnings
-import shapefile_handler  # <--- IMPORTANTE: Importando o novo manipulador
+import requests # <--- NOVO IMPORT PARA API DO IBGE
+import shapefile_handler  # Mantido seu import importante
 
 def inicializar_gee():
     try:
@@ -32,7 +33,7 @@ def inicializar_gee():
 
 def initialize_gee(): return inicializar_gee()
 
-# --- VARIÁVEIS ---
+# --- VARIÁVEIS (MANTIDAS EXATAMENTE AS SUAS) ---
 ERA5_VARS = {
     "Temperatura do Ar (2m)": { "band": "temperature_2m", "result_band": "temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": 0, "max": 45, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000', '#800000'], "caption": "Temperatura (°C)"} },
     "Temperatura do Ponto de Orvalho (2m)": { "band": "dewpoint_temperature_2m", "result_band": "dewpoint_temperature_2m", "unit": "°C", "aggregation": "mean", "vis_params": {"min": -10, "max": 30, "palette": ['#000080', '#0000FF', '#00AAFF', '#00FFFF', '#00FF00', '#AAFF00', '#FFFF00', '#FFAA00', '#FF0000'], "caption": "Ponto de Orvalho (°C)"} },
@@ -49,28 +50,39 @@ ERA5_VARS = {
 
 FALLBACK_UF_MAP = {'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'}
 
-@st.cache_data
+# --- ALTERAÇÃO AQUI: BUSCA NA API DO IBGE ---
+@st.cache_data(ttl=3600*24) # Cache de 24h
 def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
     try:
-        arquivo = "municipios_ibge.json"
+        # 1. Busca Estados (IBGE)
+        url_uf = "https://servicodados.ibge.gov.br/api/v1/localidades/estados"
+        ufs = requests.get(url_uf).json()
+        ufs = sorted(ufs, key=lambda x: x['nome'])
+        
+        # Cria mapa Sigla -> Nome
+        mapa_nomes_uf = {u['sigla']: u['nome'] for u in ufs}
+        if not mapa_nomes_uf: mapa_nomes_uf = FALLBACK_UF_MAP
+        
+        # 2. Busca Municípios (IBGE)
+        url_mun = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios"
+        munis = requests.get(url_mun).json()
+        
         geo_data = defaultdict(list)
-        uf_name_map = {}
-        if os.path.exists(arquivo):
-            with open(arquivo, 'r', encoding='utf-8') as f:
-                d = json.load(f)
-            if isinstance(d, list): 
-                for m in d:
-                    uf = m.get('microrregiao', {}).get('mesorregiao', {}).get('UF', {})
-                    sigla, nome, mun = uf.get('sigla'), uf.get('nome'), m.get('nome')
-                    if sigla and nome: uf_name_map[sigla] = nome
-                    if sigla and mun: geo_data[sigla].append(mun)
-            elif isinstance(d, dict):
-                geo_data = d.get("municipios_por_uf", {})
-                uf_name_map = d.get("nomes_estados", {})
-        if not uf_name_map: uf_name_map = FALLBACK_UF_MAP
-        return {uf: sorted(geo_data[uf]) for uf in sorted(geo_data)}, uf_name_map
-    except:
+        for m in munis:
+            uf_sigla = m['microrregiao']['mesorregiao']['UF']['sigla']
+            nome_mun = m['nome']
+            geo_data[uf_sigla].append(nome_mun)
+            
+        # Ordena as listas
+        for uf in geo_data:
+            geo_data[uf].sort()
+            
+        return dict(geo_data), mapa_nomes_uf
+        
+    except Exception as e:
+        print(f"Erro IBGE: {e}")
         return {}, FALLBACK_UF_MAP
+# ---------------------------------------------
 
 @st.cache_data
 def _load_all_states_gdf():
@@ -82,6 +94,7 @@ def _load_municipalities_gdf(uf):
     try: return geobr.read_municipality(code_muni=uf, year=2020)
     except: return None
 
+# --- MANTIDO EXATAMENTE IGUAL AO SEU ORIGINAL ---
 def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Feature]:
     tipo = session_state.get('tipo_localizacao', 'Estado')
     nav_opt = session_state.get('nav_option')
@@ -90,7 +103,7 @@ def get_area_of_interest_geometry(session_state) -> tuple[ee.Geometry, ee.Featur
     if nav_opt == "Shapefile":
         uploaded = session_state.get('shapefile_upload')
         if uploaded:
-            # Chama a função no novo arquivo shapefile_handler
+            # Chama a função no novo manipulador
             return shapefile_handler.process_uploaded_shapefile(uploaded)
         return None, None
     # ----------------------------------------
@@ -172,7 +185,7 @@ def get_era5_image(variable: str, start_date: date, end_date: date, geometry: ee
         if variable == "Velocidade do Vento (10m)":
             col = col.map(lambda img: img.addBands(
                 img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m'])
-                   .pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
+                    .pow(2).reduce(ee.Reducer.sum()).sqrt().rename(config['result_band'])
             ))
         elif variable == "Umidade Relativa (2m)":
             col = col.map(_calc_rh)
@@ -246,6 +259,7 @@ def _get_series_generic(variable, start, end, geom):
         return df.dropna().sort_values('date')
     except: return pd.DataFrame()
 
+# --- SUA FUNÇÃO CUSTOMIZADA DE SLIDERS (MANTIDA) ---
 def obter_vis_params_interativo(variavel: str):
     if variavel not in ERA5_VARS:
         return {}
@@ -254,6 +268,7 @@ def obter_vis_params_interativo(variavel: str):
     padrao_min = float(config_padrao.get('min', 0))
     padrao_max = float(config_padrao.get('max', 100))
     
+    # Mantive seus sliders exatamente como estavam
     with st.expander(f"🎨 Ajustar Escala de Cores: {variavel}", expanded=False):
         unidade = ERA5_VARS[variavel].get('unit', '')
         st.caption(f"Unidade: {unidade} | Valores Padrão: {padrao_min} a {padrao_max}")
