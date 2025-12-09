@@ -398,7 +398,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             if not disable:
                 # --- MENSAGEM COM FONTE MAIOR ---
-                st.markdown(
+                st.warning(
                     "<div style='font-size:18px;margin-top:12px;line-height:1.5;'>"
                     "⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>"
                     "Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar."
@@ -570,6 +570,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
