@@ -297,8 +297,19 @@ def render_analysis_results():
     st.subheader(titulo_completo)
     
     if aba == "Shapefile":
-        with st.expander("❓ Como obter um Shapefile?"):
-            st.markdown("Use o site **[geojson.io](https://geojson.io/)**. Desenhe o polígono, salve como Shapefile e envie o ZIP aqui.")
+        local_str = "na Área Personalizada (Shapefile)"
+        # --- EXPLICAÇÃO DIDÁTICA RESTAURADA ---
+        with st.expander("❓ Não tem um Shapefile? Aprenda a criar um em 1 minuto 👇"):
+            st.markdown("""
+            ### 🗺️ Como criar seu Shapefile grátis:
+            1. Acesse o site **[geojson.io](https://geojson.io/)** (clique no link).
+            2. **Navegue no mapa** até encontrar a área desejada (fazenda, bairro, bacia).
+            3. Use a ferramenta de **Polígono** (ícone de pentágono na lateral direita do mapa) e desenhe o contorno clicando ponto a ponto.
+            4. No menu superior, vá em **Save** > **Shapefile**.
+            5. O site baixará automaticamente um arquivo **.zip** (ex: `map.zip`).
+            6. **Pronto!** Basta enviar esse arquivo .zip aqui no painel lateral do Clima-Cast.
+            """)
+        # --------------------------------------
     
     ui.renderizar_resumo_selecao() 
 
@@ -390,4 +401,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
