@@ -229,32 +229,34 @@ def render_analysis_results():
                 3. Clique em **Gerar** mais uma vez.
                 """)
             
-            ui.renderizar_resumo_selecao()
+                                  
             ui.renderizar_resumo_selecao()
             
-            # --- ESTILOS CSS REFORÇADOS ---
+            # --- ESTILOS CSS (VERSÃO DEFINITIVA) ---
             st.markdown("""
                 <style>
-                /* 1. Números do Skew-T menores e delicados */
+                /* 1. Números do Skew-T (Mantém pequeno) */
                 div[data-testid="stMetricValue"] {
                     font-size: 0.9rem !important;
                 }
+
+                /* 2. Título do Expander (Aplicado direto no container do resumo) */
+                div[data-testid="stExpander"] details > summary {
+                    font-size: 1.3rem !important;  /* Aumentei para 1.3 */
+                    font-weight: 700 !important;   /* Negrito forte */
+                    color: #31333F !important;     /* Cor escura para destaque */
+                }
                 
-                /* 2. Título do Expander MAIOR (Regra de Força Bruta) */
-                /* Tenta pegar pela classe do cabeçalho */
-                .streamlit-expanderHeader p {
-                    font-size: 1.2rem !important;
-                    font-weight: 700 !important;
+                /* Garante que o texto interno herde o tamanho */
+                div[data-testid="stExpander"] details > summary > div {
+                    font-size: inherit !important;
+                    font-weight: inherit !important;
                 }
-                /* Tenta pegar pela estrutura do summary */
-                div[data-testid="stExpander"] summary span {
-                    font-size: 1.2rem !important;
-                    font-weight: 700 !important;
-                }
-                /* Tenta pegar direto no parágrafo dentro do details */
-                div[data-testid="stExpander"] details summary p {
-                    font-size: 1.2rem !important;
-                    font-weight: 700 !important;
+                
+                /* Aumenta também a setinha (ícone) para não ficar desproporcional */
+                div[data-testid="stExpander"] details > summary svg {
+                    width: 1.3rem !important;
+                    height: 1.3rem !important;
                 }
                 </style>
             """, unsafe_allow_html=True)
@@ -551,6 +553,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
