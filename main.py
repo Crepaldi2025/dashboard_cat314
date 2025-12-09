@@ -185,32 +185,89 @@ def render_analysis_results():
 
     # --- 1. SKEW-T ---
     if aba == "Skew-T":
+        # 1. SKEW-T
+    if aba == "Skew-T":
         if "skewt_results" in st.session_state and st.session_state.skewt_results:
+            # Aviso de Conexão (Didático)
             with st.expander("⏳ Ocorreu um erro de conexão? (Saiba o que fazer)", expanded=False):
                 st.markdown("""
-                ###  O que é o "Erro 429"?
-                
-                            
+                ## O que é o "Erro 429"?
+                           
                 **Por que isso acontece aqui?**
                 O **Open-Meteo** (nossa fonte de dados) é um serviço gratuito e compartilhado com o mundo todo. Para garantir que ele não saia do ar, ele bloqueia temporariamente quem faz muitos pedidos em poucos segundos.
 
                 **🛠️ Como resolver:**
-                1. **Pare de clicar em gerar Skew-T.** Insistir vai apenas reiniciar o tempo de bloqueio.
+                1. **Pare de clicarem Gerar Skew-T.** Insistir vai apenas reiniciar o tempo de bloqueio.
                 2. Aguarde cerca de **1 minuto**.
                 3. Clique em **Gerar** mais uma vez.
                 """)
-            # ----------------------------------
             
             ui.renderizar_resumo_selecao()
-            st.markdown("""<style>div[data-testid="stMetricValue"] {font-size: 1.1rem !important;}</style>""", unsafe_allow_html=True)
             res = st.session_state.skewt_results
             
             if res["df"] is not None:
+                # 1. Plota o Gráfico
                 skewt_visualizer.render_skewt_plot(res["df"], *res["params"])
-                with st.expander("📥 Exportar Dados da Sondagem"):
-                    render_download_buttons(pd.DataFrame(res["df"]).astype(str), "skewt", "sk")
-        return
+                
+                # 2. Prepara a Tabela Bonita
+                with st.expander("📊 Ver Tabela de Dados e Exportar", expanded=True):
+                    try:
+                        # Cria uma cópia para não estragar o original
+                        df_tab = pd.DataFrame(res["df"]).copy()
+                        
+                        # Se a pressão estiver no índice, move para coluna
+                        if isinstance(df_tab.index, pd.DatetimeIndex) or df_tab.index.name == 'pressure':
+                            df_tab.reset_index(inplace=True)
 
+                        # Limpa unidades físicas (MetPy) se existirem
+                        for col in df_tab.columns:
+                            df_tab[col] = df_tab[col].apply(lambda x: getattr(x, 'magnitude', x))
+                            df_tab[col] = pd.to_numeric(df_tab[col], errors='ignore')
+
+                        # --- MAPEAMENTO DE NOMES (Sua Solicitação) ---
+                        # Ajuste as chaves da esquerda ('pressure', etc) se o seu dataframe original usar outros nomes
+                        mapa_colunas = {
+                            "pressure": "Pressão (hPa)",
+                            "geopotential_height": "Altitude (m)",
+                            "height": "Altitude (m)", # Caso venha com esse nome
+                            "temperature": "Temp. (°C)",
+                            "dewpoint": "Ponto Orvalho (°C)",
+                            "relative_humidity": "Umidade Rel. (%)",
+                            "speed": "Vel. Vento (m/s)",
+                            "wind_speed": "Vel. Vento (m/s)",
+                            "direction": "Dir. Vento (°)",
+                            "wind_direction": "Dir. Vento (°)",
+                            "u_component": "Vento U (m/s)", # Caso não tenha velocidade calculada
+                            "v_component": "Vento V (m/s)"
+                        }
+                        
+                        # Renomeia as colunas que existirem
+                        df_tab = df_tab.rename(columns=mapa_colunas)
+                        
+                        # Seleciona apenas as colunas que conseguimos traduzir (para filtrar lixo)
+                        cols_finais = [c for c in mapa_colunas.values() if c in df_tab.columns]
+                        if cols_finais:
+                            df_tab = df_tab[cols_finais]
+
+                        # Formatação de Casas Decimais
+                        df_tab = df_tab.round(1) 
+                        
+                        # Converte para string para exibição limpa no Streamlit
+                        df_display = df_tab.astype(str)
+
+                        # Mostra a Tabela
+                        st.dataframe(df_display, use_container_width=True, hide_index=True)
+                        
+                        # Botões de Download
+                        st.markdown("##### 📥 Baixar Tabela")
+                        render_download_buttons(df_display, "sondagem_skewt", "sk")
+                        
+                    except Exception as e:
+                        st.warning(f"Não foi possível formatar a tabela perfeitamente: {e}")
+                        # Fallback: mostra como estava antes se der erro
+                        st.dataframe(res["df"].astype(str), use_container_width=True)
+                        render_download_buttons(res["df"].astype(str), "sondagem_skewt", "sk")
+        return
     if "analysis_results" not in st.session_state or st.session_state.analysis_results is None: return
     results = st.session_state.analysis_results
 
@@ -437,6 +494,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
