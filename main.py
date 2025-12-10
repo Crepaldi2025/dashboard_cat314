@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # --- 🚧 MODO MANUTENÇÃO (COLOQUE True PARA ATIVAR) ---
-EM_MANUTENCAO = True  # <--- Mude para False quando quiser liberar o site
+EM_MANUTENCAO = False  # <--- Mude para False quando quiser liberar o site
 
 if EM_MANUTENCAO:
     st.markdown("""
@@ -595,6 +595,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
