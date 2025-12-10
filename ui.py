@@ -215,11 +215,15 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 # 👇 --- INSIRA O BLOCO AQUI (ANTES DO INFO/UPLOAD) --- 👇
                 with st.sidebar.expander("❓ Não tem um Shapefile? Aprenda a criar!", expanded=False):
                     st.markdown("""
-                    1. Acesse o site **[GeoJSON.io](https://geojson.io)**.
-                    2. Use as ferramentas de desenho (lado direito) para marcar sua área no mapa.
-                    3. No menu superior, clique em **Save** > **Shapefile**.
-                    4. Um arquivo `.zip` será baixado. **Envie este arquivo .zip abaixo!**
+                    1. Acesse o site **[GeoJSON.io](https://geojson.io)** (clique no link).
+                    2. Navegue no mapa até encontrar a área desejada (fazenda, bairro, bacia).
+                    3. Use a ferramenta de Polígono (ícone de pentágono na lateral direita do mapa) e desenhe o contorno clicando ponto a ponto.
+                    4. No menu superior, vá em Save > Shapefile.
+                    5. O site baixará automaticamente um arquivo .zip. 6 Salve este aquivo .zip no seu computador/laptop
+                    6. Pronto! Basta enviar esse arquivo .zip aqui no painel lateral do Clima-Cast.
                     """)
+
+                               
                 # --------------------------------------------------------
                 
                 st.info("Envie um arquivo **.ZIP** contendo o polígono de interesse (obrigatório: .shp, .shx, .dbf). Ex: Fazenda, Bacia, Área de Proteção.")
@@ -608,6 +612,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
