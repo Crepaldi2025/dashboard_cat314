@@ -547,6 +547,18 @@ def render_polygon_drawer():
 
 def main():
     if 'gee_initialized' not in st.session_state:
+
+        # Mostra um spinner enquanto conecta
+        with st.spinner("🌍 Conectando ao Google Earth Engine e carregando IBGE..."):
+            gee_handler.inicializar_gee()
+            st.session_state.gee_initialized = True
+        
+        # Mensagem de Sucesso (Pop-up temporário)
+        st.toast("✅ Conectado ao Google Earth Engine com sucesso!", icon="🛰️")
+        
+        # Se preferir fixo na barra lateral, descomente a linha abaixo:
+        st.sidebar.success("GEE Conectado")
+     
         gee_handler.inicializar_gee()
         st.session_state.gee_initialized = True
     
@@ -567,6 +579,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
