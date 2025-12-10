@@ -215,16 +215,4 @@ def render_skewt_plot(df, lat, lon, date, hour):
     
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-    st.download_button("📷 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
-
-
-
-
-
-
-
-
-
-
-
-
+    st.download_button("💾 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
