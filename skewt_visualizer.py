@@ -155,7 +155,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
             help="**Convective Inhibition**.\nEnergia que inibe o disparo da convecção (a 'tampa' da panela de pressão).")
         
         c3.metric("LCL", fmt(lcl_p, "hPa"), 
-            help="Lifted Condensation Level.\nNível de Condensação por Levantamento. Aproximação da altura da base das nuvens.")
+            help="**Lifted Condensation Level**.\nNível de Condensação por Levantamento. Aproximação da altura da base das nuvens.")
         
         c4.metric("LFC", fmt(lfc_p, "hPa"), 
             help="**Level of Free Convection**.\nNível a partir do qual a parcela fica mais quente que o ambiente e sobe sozinha (início da tempestade).")
@@ -216,6 +216,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
+
 
 
 
