@@ -87,7 +87,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         # --- OPÇÃO SKEW-T ---
         if opcao == "Skew-T":
             st.markdown("### 🌪️ Diagrama Skew-T")
-            st.info("Obtém perfil vertical da atmosfera (semelhante a radiossonda) usando dados do modelo ERA5..")
+            st.info("Obtém perfil vertical da atmosfera (semelhante a radiossonda) usando dados do modelo ERA5. inclui perfil de temperatura do ar, temperatura do ponto de orvalho, trajetória da parcela, informações dos ventos, além alguns índices termodinâmicos.")
 
             st.markdown(
                 """
@@ -597,6 +597,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
