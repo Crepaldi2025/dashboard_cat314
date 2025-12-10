@@ -1,5 +1,5 @@
 # ==================================================================================
-# skewt_visualizer.py (COM CÁLCULO DE ALTA RESOLUÇÃO)
+# skewt_visualizer.py (VERSÃO CORRIGIDA COM INTERPOLAÇÃO PANDAS)
 # ==================================================================================
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -24,172 +24,164 @@ def render_skewt_plot(df, lat, lon, date, hour):
         st.warning("Sem dados para plotar.")
         return
 
-    # --- 1. PREPARAÇÃO DOS DADOS (Unidades MetPy) ---
+    # --- 1. AUMENTO DE RESOLUÇÃO (INTERPOLAÇÃO SEGURA) ---
+    # Isso resolve o problema de pular o LFC (de 870 para 550 hPa)
     try:
-        # Dados originais (podem ter baixa resolução vertical)
-        p_raw = df['pressure'].values * units.hPa
-        T_raw = df['temperature'].values * units.degC
-        rh_raw = df['relative_humidity'].values / 100.0
+        # Garante ordenação correta (Pressão decrescente: 1000 -> 100)
+        df = df.sort_values("pressure", ascending=False).reset_index(drop=True)
         
-        # Componentes do vento (originais)
-        u_raw = (df['u_component'].values * units('m/s')).to('knots')
-        v_raw = (df['v_component'].values * units('m/s')).to('knots')
-
-        # Calcula Td original
-        Td_raw = mpcalc.dewpoint_from_relative_humidity(T_raw, rh_raw)
-
-        # --- 1.1 INTERPOLAÇÃO DE ALTA RESOLUÇÃO (A CORREÇÃO) ---
-        # Cria uma malha fina de 5 em 5 hPa para capturar o LFC exato (ex: 870hPa)
-        # O np.interp precisa dos dados ordenados (crescente), por isso usamos [::-1]
+        # Cria um novo índice de pressão mais fino (de 10 em 10 hPa)
+        # Pega o máximo (chão) e mínimo (topo) dos dados originais
+        p_max = int(df["pressure"].max())
+        p_min = int(df["pressure"].min())
         
-        # Define novo eixo de pressão (do chão até o topo)
-        max_p = int(p_raw.max().m)
-        min_p = int(p_raw.min().m)
-        p_dense = np.arange(max_p, min_p, -5) * units.hPa
+        # Cria a nova grade (ex: 1000, 990, 980... até 100)
+        new_levels = range(p_max, p_min - 10, -10) 
         
-        # Interpola Temperatura e Ponto de Orvalho
-        # Nota: p_raw geralmente vem decrescente (1000->100), np.interp quer xp crescente
-        T_dense = np.interp(p_dense.m, p_raw.m[::-1], T_raw.m[::-1]) * units.degC
-        Td_dense = np.interp(p_dense.m, p_raw.m[::-1], Td_raw.m[::-1]) * units.degC
+        # Reindexa e interpola
+        df_interp = df.set_index("pressure").reindex(new_levels)
+        df_interp = df_interp.interpolate(method='linear') # Preenche os buracos
+        df_interp = df_interp.reset_index().rename(columns={'index': 'pressure'})
         
-        # Usamos as variáveis _dense para CÁLCULOS (precisão)
-        # Usamos as variáveis _raw para PLOTAR VENTO (para não poluir o gráfico com mil setas)
+        # Usa o dataframe interpolado daqui para frente
+        data_source = df_interp
         
-        p, T, Td = p_dense, T_dense, Td_dense
-
     except Exception as e:
-        st.error(f"Erro nos dados físicos: {e}")
+        # Se der erro na interpolação, usa o original como fallback
+        # st.warning(f"Usando resolução padrão (Erro interpolação: {e})")
+        data_source = df
+
+    # --- 2. PREPARAÇÃO DOS DADOS FÍSICOS ---
+    try:
+        # Extrai valores e aplica unidades
+        p = data_source['pressure'].values * units.hPa
+        T = data_source['temperature'].values * units.degC
+        
+        # Umidade (Evita valores NaN que podem quebrar o cálculo)
+        rh_vals = data_source['relative_humidity'].values
+        rh_vals = np.nan_to_num(rh_vals, nan=0.0) # Troca NaN por 0
+        rh = rh_vals / 100.0
+        
+        # Vento (m/s para nós)
+        u = (data_source['u_component'].values * units('m/s')).to('knots')
+        v = (data_source['v_component'].values * units('m/s')).to('knots')
+
+        # Calcula Ponto de Orvalho (MetPy)
+        Td = mpcalc.dewpoint_from_relative_humidity(T, rh)
+        
+    except Exception as e:
+        st.error(f"Erro ao processar dados físicos: {e}")
         return
 
-    # --- 2. CÁLCULOS TERMODINÂMICOS AVANÇADOS ---
-    # Inicializa variáveis com None
+    # --- 3. CÁLCULOS TERMODINÂMICOS ---
     cape, cin = None, None
     lcl_p, lfc_p, el_p = None, None, None
     li, k_idx, pw = None, None, None
+    prof = None
 
     try:
-        # Perfil da Parcela (Surface Based usando dados densos)
+        # Perfil da Parcela (Começando da superfície)
         prof = mpcalc.parcel_profile(p, T[0], Td[0]).to('degC')
         
         # CAPE e CIN
         cape, cin = mpcalc.surface_based_cape_cin(p, T, Td)
         
-        # Níveis Significativos (LCL, LFC, EL)
+        # Níveis (LCL, LFC, EL)
         lcl_p, lcl_t = mpcalc.lcl(p[0], T[0], Td[0])
         lfc_p, lfc_t = mpcalc.lfc(p, T, Td)
         el_p, el_t = mpcalc.el(p, T, Td)
 
-        # Índices de Instabilidade
-        li = mpcalc.lifted_index(p, T, prof)[0] # Lifted Index
+        # Índices
+        li = mpcalc.lifted_index(p, T, prof)[0]
+        pw = mpcalc.precipitable_water(p, Td)
         
-        # K-Index (Usa dados originais para garantir níveis padrão 850/700/500 se existirem)
-        try: k_idx = mpcalc.k_index(p_raw, T_raw, Td_raw)
+        # K-Index (Tenta calcular, se faltar nível ignora)
+        try: k_idx = mpcalc.k_index(p, T, Td)
         except: pass
 
-        # Água Precipitável
-        pw = mpcalc.precipitable_water(p, Td)
-
     except Exception as e:
-        # print(f"Aviso Calc: {e}") 
+        # Debug silencioso: print(f"Erro Calc: {e}")
         pass
 
-    # --- 3. EXIBIÇÃO DAS MÉTRICAS ---
+    # --- 4. EXIBIÇÃO ---
     st.markdown("### 📊 Índices Termodinâmicos")
     
     with st.container(border=True):
-        # Linha 1: Energias e Níveis
         c1, c2, c3, c4 = st.columns(4)
         
-        cape_val = f"{cape.magnitude:.0f} J/kg" if cape is not None else "--"
-        c1.metric("CAPE", cape_val, 
-            help="Convective Available Potential Energy.\nEnergia potencial disponível para tempestades.")
+        # Formatadores seguros
+        def fmt(val, unit=""):
+            return f"{val.magnitude:.0f} {unit}" if val is not None else "--"
         
-        cin_val = f"{cin.magnitude:.0f} J/kg" if cin is not None else "--"
-        c2.metric("CIN", cin_val, 
-            help="Convective Inhibition.\nEnergia que inibe o disparo da convecção.")
-        
-        lcl_val = f"{lcl_p.magnitude:.0f} hPa" if lcl_p is not None else "--"
-        c3.metric("LCL", lcl_val, 
-            help="Lifted Condensation Level.\nBase das nuvens.")
-        
-        lfc_val = f"{lfc_p.magnitude:.0f} hPa" if lfc_p is not None else "--"
-        c4.metric("LFC", lfc_val, 
-            help="Level of Free Convection.\nNível onde a parcela sobe livremente. Agora com cálculo de alta precisão.")
+        c1.metric("CAPE", fmt(cape, "J/kg"), help="Energia potencial para tempestades.")
+        c2.metric("CIN", fmt(cin, "J/kg"), help="Inibição convectiva (tampa).")
+        c3.metric("LCL", fmt(lcl_p, "hPa"), help="Base das nuvens.")
+        c4.metric("LFC", fmt(lfc_p, "hPa"), help="Nível de convecção livre (início da subida espontânea).")
 
-        # Linha 2: Índices de Estabilidade e Umidade
         c5, c6, c7, c8 = st.columns(4)
         
-        li_val = f"{li.magnitude:.1f}" if li is not None else "--"
-        c5.metric("LI", li_val, help="Lifted Index.")
+        li_str = f"{li.magnitude:.1f}" if li is not None else "--"
+        c5.metric("LI", li_str, help="Lifted Index.")
         
-        k_val = f"{k_idx.magnitude:.0f}" if k_idx is not None else "--"
-        c6.metric("K-Index", k_val, help="Potencial de trovoadas.")
+        k_str = f"{k_idx.magnitude:.0f}" if k_idx is not None else "--"
+        c6.metric("K-Index", k_str, help="Potencial de trovoadas.")
         
-        pw_val = f"{pw.magnitude:.1f} mm" if pw is not None else "--"
-        c7.metric("Água Precipitável", pw_val, help="Umidade total na coluna.")
+        pw_str = f"{pw.magnitude:.1f} mm" if pw is not None else "--"
+        c7.metric("Água Precipitável", pw_str, help="Umidade total na coluna.")
         
-        el_val = f"{el_p.magnitude:.0f} hPa" if el_p is not None else "--"
-        c8.metric("EL", el_val, help="Nível de Equilíbrio (Topo da nuvem).")
+        c8.metric("EL", fmt(el_p, "hPa"), help="Topo da nuvem (Nível de Equilíbrio).")
 
-    # --- TABELA DE REFERÊNCIA ---
-    with st.expander("📚 Tabela de Referência: Limiares de Severidade", expanded=False):
-        st.markdown("""
-        | Índice | Estável / Fraco | Moderado | Forte / Severo |
-        | :--- | :---: | :---: | :---: |
-        | **CAPE** (J/kg) | < 1000 | 1000 a 2500 | > 2500 |
-        | **CIN** (J/kg) | 0 a -50 | -50 a -200 | < -200 |
-        | **LI** | > 0 | -3 a 0 | < -6 |
-        """)
-        
-    # --- 4. PLOTAGEM DO GRÁFICO ---
+    # Tabela Referência
+    with st.expander("📚 Tabela de Referência", expanded=False):
+        st.markdown("| Índice | Estável | Instável |\n|---|---|---|\n| CAPE | < 1000 | > 2500 |\n| LI | > 0 | < -4 |")
+
+    # --- 5. GRÁFICO SKEW-T ---
     fig = plt.figure(figsize=(9, 9))
     skew = SkewT(fig, rotation=45)
 
-    # Plota curvas usando DADOS DENSOS (Curva suave)
+    # Plota as curvas (usando dados interpolados para suavidade)
     skew.plot(p, T, 'r', linewidth=2, label='Temperatura')
     skew.plot(p, Td, 'g', linewidth=2, label='Ponto de Orvalho')
 
-    # Perfil da Parcela
     try:
-        if 'prof' in locals() and prof is not None:
+        if prof is not None:
             skew.plot(p, prof, 'k', linewidth=1.5, linestyle='--', label='Parcela')
-            
-            # Áreas sombreadas (CAPE/CIN)
             if cape is not None and cape.magnitude > 0:
                 skew.shade_cape(p, T, prof, alpha=0.2)
             if cin is not None and cin.magnitude < 0:
                 skew.shade_cin(p, T, prof, alpha=0.2)
-
-        # Pontos importantes
-        if lcl_p is not None: skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', label='LCL')
-        if lfc_p is not None: skew.plot(lfc_p, lfc_t, 'bo', markerfacecolor='blue', label='LFC')
-        if el_p is not None: skew.plot(el_p, el_t, 'ro', markerfacecolor='red', label='EL')
-    except Exception as e: pass
-
-    # Barbelas de Vento (Usando dados ORIGINAIS para não poluir)
-    try:
-        # Pula níveis para não ficar amontoado (ex: a cada 50hPa)
-        mask = p_raw.m % 50 == 0 
-        if not any(mask): mask = slice(None, None, 2)
-        skew.plot_barbs(p_raw[mask], u_raw[mask], v_raw[mask])
+                
+        # Marcadores dos Níveis
+        if lcl_p is not None: skew.plot(lcl_p, lcl_t, 'ko', label='LCL')
+        if lfc_p is not None: skew.plot(lfc_p, lfc_t, 'bo', label='LFC')
+        if el_p is not None: skew.plot(el_p, el_t, 'ro', label='EL')
+            
     except: pass
 
-    # Linhas de fundo
+    # Barbelas de Vento (Reduz densidade para não poluir)
+    try:
+        # Plota a cada 50 hPa para ficar limpo
+        mask = (p.m % 50 == 0)
+        if np.any(mask):
+            skew.plot_barbs(p[mask], u[mask], v[mask])
+        else:
+            # Fallback se a grade não casar com 50
+            skew.plot_barbs(p[::5], u[::5], v[::5])
+    except: pass
+
+    # Decoração
     skew.plot_dry_adiabats(alpha=0.3)
     skew.plot_moist_adiabats(alpha=0.3)
     skew.plot_mixing_lines(linestyle='dotted', alpha=0.4)
-
-    # Limites e Título
     skew.ax.set_ylim(1000, 100)
     skew.ax.set_xlim(-40, 50)
     
+    # Título Seguro
     real_date = df.attrs.get('real_date', date)
-    src = df.attrs.get('source', '')
-    if isinstance(real_date, (str)): date_str = real_date
-    else: date_str = real_date.strftime('%d/%m/%Y')
+    d_str = real_date if isinstance(real_date, str) else real_date.strftime('%d/%m/%Y')
+    src = df.attrs.get('source', 'ERA5/GFS')
     
-    title_txt = f"Skew-T Log-P | {date_str} {hour}:00 UTC\nLocal: {lat:.4f}, {lon:.4f} | Fonte: {src}"
-    plt.title(title_txt, loc='left', fontsize=10)
+    plt.title(f"Skew-T | {d_str} {hour}:00 UTC\n{lat:.2f}, {lon:.2f} | {src}", loc='left')
     skew.ax.legend(loc='upper right')
 
     st.pyplot(fig)
@@ -197,4 +189,4 @@ def render_skewt_plot(df, lat, lon, date, hour):
     # Download
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-    st.download_button("📷 Baixar Gráfico (PNG)", buf.getvalue(), "skewt.png", "image/png", use_container_width=True)
+    st.download_button("📷 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
