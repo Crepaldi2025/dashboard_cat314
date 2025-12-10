@@ -245,6 +245,18 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.selectbox("Município", lista_muns, key='municipio', on_change=reset_analysis_state)
                 
                 elif tipo_loc == "Círculo (Lat/Lon/Raio)":
+
+                    st.markdown(
+                        """
+                        <div style="font-size: 0.85rem; color: #444; background-color: #f0f2f6; padding: 8px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #ffbd45;">
+                        💡 <b>Como obter as coordenadas:</b><br>
+                        Abra o <b>Google Maps</b>, clique com o <b>botão direito</b> no local desejado e os números aparecerão no topo da lista (ex: -22.42, -45.45).
+                        </div>
+                        """, 
+                        unsafe_allow_html=True
+                    )
+
+                    
                     c1, c2 = st.columns(2)
                     with c1: st.number_input("Lat", value=-22.42, format="%.4f", key='latitude', on_change=reset_analysis_state)
                     with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
@@ -565,6 +577,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
