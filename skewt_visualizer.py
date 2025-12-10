@@ -175,6 +175,20 @@ def render_skewt_plot(df, lat, lon, date, hour):
         c8.metric("EL", fmt(el_p, "hPa"), 
             help="**Equilibrium Level**.\nNível de Equilíbrio. Onde a parcela para de subir (topo da nuvem bigorna).")
 
+    # --- TABELA DE REFERÊNCIA ---
+    with st.expander("📚 Tabela de Referência: Limiares de Severidade", expanded=False):
+        st.markdown("""
+        | Índice | Estável / Fraco | Moderado | Forte / Severo | Descrição Rápida |
+        | :--- | :---: | :---: | :---: | :--- |
+        | **CAPE** (J/kg) | < 1000 | 1000 a 2500 | > 2500 | Combustível para a tempestade. |
+        | **CIN** (J/kg) | 0 a -50 | -50 a -200 | < -200 | "Tampa" que impede a subida do ar. |
+        | **Lifted (LI)** | > 0 | -3 a 0 | < -6 | Instabilidade (T_amb - T_parcela). |
+        | **K-Index** | < 20 | 26 a 35 | > 35 | Potencial para trovoadas/chuva. |
+        | **Água Prec.** (mm) | < 25 | 25 a 45 | > 50 | Umidade disponível na coluna. |
+        """)
+        st.caption("⚠️ Nota: Valores de referência gerais. Regiões tropicais podem apresentar valores basais mais altos.")
+
+    
     # --- 5. PLOTAGEM ---
     fig = plt.figure(figsize=(9, 9))
     skew = SkewT(fig, rotation=45)
@@ -216,3 +230,4 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("💾 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
+
