@@ -23,7 +23,7 @@ if EM_MANUTENCAO:
     
     st.title("🚧 Site em Manutenção")
     st.warning("Estamos realizando atualizações importantes para melhorar a estabilidade dos dados.")
-    st.image("https://media.giphy.com/media/l2JJEWNd8t3tbZOFi/giphy.gif", width=300) # Opcional: GIF de construção
+    
     st.markdown("### ⏳ Por favor, retorne mais tarde.")
     st.markdown("Agradecemos a compreensão!")
     
@@ -595,6 +595,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
