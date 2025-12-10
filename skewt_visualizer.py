@@ -120,6 +120,26 @@ def render_skewt_plot(df, lat, lon, date, hour):
 
     # --- 4. EXIBIÇÃO ---
     st.markdown("### 📊 Índices Termodinâmicos")
+
+    st.markdown("""
+        <style>
+        /* Aumenta o número (Valor: 0 J/kg, 935 hPa...) */
+        div[data-testid="stMetricValue"] {
+            font-size: 1.6rem !important; /* Aumente este valor se quiser maior */
+            font-weight: bold;
+        }
+        
+        /* Aumenta o título (Rótulo: CAPE, CIN, LCL...) */
+        div[data-testid="stMetricLabel"] {
+            font-size: 1.1rem !important;
+            font-weight: 600;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    # ------------------------------------
+
+
+    
     with st.container(border=True):
         c1, c2, c3, c4 = st.columns(4)
         def fmt(val, unit=""): return f"{val.magnitude:.0f} {unit}" if val is not None else "--"
@@ -177,3 +197,4 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
+
