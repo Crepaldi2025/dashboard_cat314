@@ -211,6 +211,17 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
             if opcao == "Shapefile":
                 st.markdown("#### Shapefile")
+
+                # 👇 --- INSIRA O BLOCO AQUI (ANTES DO INFO/UPLOAD) --- 👇
+                with st.expander("❓ Não tem um Shapefile? Aprenda a criar um em 1 minuto!", expanded=False):
+                    st.markdown("""
+                    1. Acesse o site **[GeoJSON.io](https://geojson.io)**.
+                    2. Use as ferramentas de desenho (lado direito) para marcar sua área no mapa.
+                    3. No menu superior, clique em **Save** > **Shapefile**.
+                    4. Um arquivo `.zip` será baixado. **Envie este arquivo .zip abaixo!**
+                    """)
+                # --------------------------------------------------------
+                
                 st.info("Envie um arquivo **.ZIP** contendo o polígono de interesse (obrigatório: .shp, .shx, .dbf). Ex: Fazenda, Bacia, Área de Proteção.")
                 
                 uploaded_file = st.file_uploader("Upload ZIP", type=["zip"], key='shapefile_upload', on_change=reset_analysis_state)
@@ -597,6 +608,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
