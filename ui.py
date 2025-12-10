@@ -87,7 +87,17 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
         # --- OPÇÃO SKEW-T ---
         if opcao == "Skew-T":
             st.markdown("### 🌪️ Diagrama Skew-T")
-            st.info("Gera um perfil vertical da atmosfera (Sondagem).")
+            st.info("Obtém perfil vertical da atmosfera (semelhante a radiossonda) usando dados do modelo ERA5..")
+
+            st.markdown(
+                """
+                <div style="font-size: 0.85rem; color: #444; background-color: #f0f2f6; padding: 8px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #ffbd45;">
+                💡 <b>Como obter as coordenadas:</b><br>
+                Abra o <b>Google Maps</b>, clique com o <b>botão direito</b> no local desejado e os números aparecerão no topo da lista (ex: -23.55, -46.63).
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
             
             st.divider()
             st.markdown("#### 📍 Localização Pontual")
@@ -587,6 +597,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
