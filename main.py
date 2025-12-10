@@ -10,7 +10,26 @@ st.set_page_config(
     layout="wide",              # <--- Distribui horizontalmente (Tela Cheia)
     initial_sidebar_state="expanded"
 )
-# -----------------------------------------------------------
+
+# --- 🚧 MODO MANUTENÇÃO (COLOQUE True PARA ATIVAR) ---
+EM_MANUTENCAO = True  # <--- Mude para False quando quiser liberar o site
+
+if EM_MANUTENCAO:
+    st.markdown("""
+        <style>
+        .block-container { padding-top: 5rem; text-align: center; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("🚧 Site em Manutenção")
+    st.warning("Estamos realizando atualizações importantes para melhorar a estabilidade dos dados.")
+    st.image("https://media.giphy.com/media/l2JJEWNd8t3tbZOFi/giphy.gif", width=300) # Opcional: GIF de construção
+    st.markdown("### ⏳ Por favor, retorne mais tarde.")
+    st.markdown("Agradecemos a compreensão!")
+    
+    st.stop() # <--- ISSO É O SEGREDO! O código para de ler aqui e não carrega o resto.
+# -----------------------------------------------------
+
 import ui
 import gee_handler
 import map_visualizer
@@ -576,6 +595,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
