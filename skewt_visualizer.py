@@ -126,7 +126,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
         /* Aumenta o número (Valor: 0 J/kg, 935 hPa...) */
         div[data-testid="stMetricValue"] {
             font-size: 1.2rem !important; /* Aumente este valor se quiser maior */
-            font-weight: bold;
+            font-weight: 600;
         }
         
         /* Aumenta o título (Rótulo: CAPE, CIN, LCL...) */
@@ -197,5 +197,6 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
+
 
 
