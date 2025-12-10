@@ -137,24 +137,37 @@ def render_skewt_plot(df, lat, lon, date, hour):
         </style>
     """, unsafe_allow_html=True)
     # ------------------------------------
-
-
-    
+   
     with st.container(border=True):
         c1, c2, c3, c4 = st.columns(4)
         def fmt(val, unit=""): return f"{val.magnitude:.0f} {unit}" if val is not None else "--"
         
-        c1.metric("CAPE", fmt(cape, "J/kg"))
-        c2.metric("CIN", fmt(cin, "J/kg"))
-        c3.metric("LCL", fmt(lcl_p, "hPa"))
-        c4.metric("LFC", fmt(lfc_p, "hPa"), help="Calculado via detecção térmica direta (Primeiro cruzamento > LCL).")
+        c1.metric("CAPE", fmt(cape, "J/kg"), 
+            help="Convective Available Potential Energy.\nEnergia potencial disponível para que a parcela suba livremente. Valores elevados indicam ambiente instável.")
+        
+        c2.metric("CIN", fmt(cin, "J/kg"), 
+            help="Convective Inhibition.\nEnergia que inibe o disparo da convecção (a 'tampa' da panela de pressão).")
+        
+        c3.metric("LCL", fmt(lcl_p, "hPa"), 
+            help="Lifted Condensation Level.\nNível de Condensação por Levantamento. Aproximação da altura da base das nuvens.")
+        
+        c4.metric("LFC", fmt(lfc_p, "hPa"), 
+            help="Level of Free Convection.\nNível a partir do qual a parcela fica mais quente que o ambiente e sobe sozinha (início da tempestade).")
 
         c5, c6, c7, c8 = st.columns(4)
+        
         li_str = f"{li.magnitude:.1f}" if li is not None else "--"
-        c5.metric("LI", li_str)
-        c6.metric("K-Index", f"{k_idx.magnitude:.0f}" if k_idx is not None else "--")
-        c7.metric("Água Prec.", f"{pw.magnitude:.1f} mm" if pw is not None else "--")
-        c8.metric("EL", fmt(el_p, "hPa"))
+        c5.metric("LI", li_str, 
+            help="Lifted Index.\nDiferença de temperatura (Ambiente - Parcela) em 500hPa. Valores negativos indicam instabilidade.")
+        
+        c6.metric("K-Index", f"{k_idx.magnitude:.0f}" if k_idx is not None else "--", 
+            help="Índice K.\nCombina temperatura e umidade para estimar potencial de trovoadas e chuvas fortes.")
+        
+        c7.metric("Água Prec.", f"{pw.magnitude:.1f} mm" if pw is not None else "--", 
+            help="Água Precipitável.\nQuantidade total de água na coluna atmosférica. Indica potencial para chuvas volumosas.")
+        
+        c8.metric("EL", fmt(el_p, "hPa"), 
+            help="Equilibrium Level.\nNível de Equilíbrio. Onde a parcela para de subir (topo da nuvem bigorna).")
 
     # --- 5. PLOTAGEM ---
     fig = plt.figure(figsize=(9, 9))
@@ -197,6 +210,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
+
 
 
 
