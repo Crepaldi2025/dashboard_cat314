@@ -109,6 +109,17 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 "(limite do GFS). Para datas anteriores, apenas dados de superfície (2D) podem ser consultados.")
 
             st.divider()
+
+            st.markdown(
+                """
+                <div style="font-size: 0.8rem; color: #666; margin-bottom: 10px; margin-top: 15px;">
+                ⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>
+                Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar.
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+            
             st.button(
                 "🚀 Gerar Skew-T", 
                 type="primary", 
@@ -577,6 +588,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
