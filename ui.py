@@ -213,7 +213,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.markdown("#### Shapefile")
 
                 # 👇 --- INSIRA O BLOCO AQUI (ANTES DO INFO/UPLOAD) --- 👇
-                with st.expander("❓ Não tem um Shapefile? Aprenda a criar um em 1 minuto!", expanded=False):
+                with st.sidebar.expander("❓ Não tem um Shapefile? Aprenda a criar!", expanded=False):
                     st.markdown("""
                     1. Acesse o site **[GeoJSON.io](https://geojson.io)**.
                     2. Use as ferramentas de desenho (lado direito) para marcar sua área no mapa.
@@ -608,6 +608,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
