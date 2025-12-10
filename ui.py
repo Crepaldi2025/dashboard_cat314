@@ -114,7 +114,6 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 """
                 <div style="font-size: 0.8rem; color: #666; margin-bottom: 10px; margin-top: 15px;">
                 ⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>
-                Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar.
                 </div>
                 """, 
                 unsafe_allow_html=True
@@ -275,7 +274,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     
                     with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
                         st.markdown("**1️⃣ Coordenadas (Latitude e Longitude)**")
-                        st.markdown("Devem estar em **Graus Decimais** (ex: `-22.42`).\n* **Dica:** No Google Maps, clique com o botão direito no local desejado para copiar.")
+                        st.markdown("Devem estar em **Graus Decimais** (ex: `-22.42`).\n*")
                         st.markdown("") 
                         st.markdown("**2️⃣ Raio**")
                         st.markdown("Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.")
@@ -588,6 +587,7 @@ def renderizar_pagina_sobre():
     except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
     finally: 
         if path and os.path.exists(path): os.remove(path)
+
 
 
 
