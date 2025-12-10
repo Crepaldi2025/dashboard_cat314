@@ -160,9 +160,9 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
                 r = 5
                 draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill="black", outline="white", width=1)
                 
-                try: font = ImageFont.truetype("arial.ttf", 24)
+                try: font = ImageFont.truetype("arial.ttf", 14)
                 except: 
-                    try: font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
+                    try: font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
                     except: font = ImageFont.load_default()
 
                 texto = f"lat={lat_txt:.2f}\nlon={lon_txt:.2f}"
@@ -271,6 +271,7 @@ def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes
         final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
         return buf.getvalue()
     except: return None
+
 
 
 
