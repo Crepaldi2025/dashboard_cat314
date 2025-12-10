@@ -131,7 +131,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
         
         /* Aumenta o título (Rótulo: CAPE, CIN, LCL...) */
         div[data-testid="stMetricLabel"] {
-            font-size: 1.5rem !important;
+            font-size: 1.3rem !important;
             font-weight: 600;
         }
 
@@ -216,6 +216,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
+
 
 
 
