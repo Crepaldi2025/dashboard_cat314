@@ -49,7 +49,7 @@ import skewt_visualizer
 # --- CONFIGURAÇÃO INICIAL ---
 def set_background():
     image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
-    opacity = 0.7
+    opacity = 0.8
     page_bg_img = f"""<style>.stApp {{background-image: linear-gradient(rgba(255, 255, 255, {opacity}), rgba(255, 255, 255, {opacity})), url("{image_url}"); background-size: cover; background-position: center center; background-repeat: no-repeat; background-attachment: fixed;}}</style>"""
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
@@ -595,6 +595,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
