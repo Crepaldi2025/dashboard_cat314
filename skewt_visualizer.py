@@ -134,6 +134,12 @@ def render_skewt_plot(df, lat, lon, date, hour):
             font-size: 1.3rem !important;
             font-weight: 600;
         }
+
+        [data-testid="stMetricLabel"] > div {
+            font-size: 1.3rem !important;
+            font-weight: 600 !important;
+            color: #31333F !important; /* Garante cor escura legível */
+        }
         </style>
     """, unsafe_allow_html=True)
     # ------------------------------------
@@ -210,6 +216,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("📷 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
+
 
 
 
