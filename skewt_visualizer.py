@@ -122,24 +122,24 @@ def render_skewt_plot(df, lat, lon, date, hour):
     st.markdown("### 📊 Índices Termodinâmicos")
 
     st.markdown("""
-    <style>
-    /* NÚMERO do metric (valor numérico: 0 J/kg, 935 hPa, etc.) */
-    div[data-testid="stMetricValue"],
-    div[data-testid="stMetricValue"] > span {
-        font-size: 1.4rem !important;   /* aumente/diminua aqui */
-        font-weight: 600 !important;
-    }
+        <style>
+        /* NÚMERO do metric (valor numérico: 0 J/kg, 935 hPa, etc.) */
+        div[data-testid="stMetricValue"],
+        div[data-testid="stMetricValue"] > span {
+            font-size: 1.2rem !important;   /* aumente/diminua aqui */
+            font-weight: 600 !important;
+        }
     
-    /* RÓTULO do metric (texto: CAPE, CIN, LCL, LFC, etc.) */
-    div[data-testid="stMetricLabel"],
-    div[data-testid="stMetricLabel"] > span,
-    div[data-testid="stMetricLabel"] > p {
-        font-size: 1.3rem !important;   /* aumente/diminua aqui */
-        font-weight: 700 !important;
-        color: #31333F !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
+        /* RÓTULO do metric (texto: CAPE, CIN, LCL, LFC, etc.) */
+        div[data-testid="stMetricLabel"],
+        div[data-testid="stMetricLabel"] > span,
+        div[data-testid="stMetricLabel"] > p {
+            font-size: 1.3rem !important;   /* aumente/diminua aqui */
+            font-weight: 700 !important;
+            color: #31333F !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
    
     with st.container(border=True):
@@ -228,5 +228,6 @@ def render_skewt_plot(df, lat, lon, date, hour):
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     st.download_button("💾 Baixar Gráfico", buf.getvalue(), "skewt.png", "image/png")
+
 
 
