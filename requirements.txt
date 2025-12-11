@@ -1,5 +1,5 @@
 # ======================================
-# Dependencias principais (Pinadas para estabilidade)
+# Dependencias principais 
 # ======================================
 numpy==1.26.4
 pandas==2.2.3
@@ -16,7 +16,6 @@ pooch
 streamlit==1.38.0
 streamlit-folium==0.22.0
 folium==0.17.0
-# kaleido fixo na 0.2.1 é crucial para exportação de imagens no Streamlit Cloud
 kaleido==0.2.1
 
 # ======================================
@@ -37,5 +36,5 @@ python-docx==1.2.0
 pypandoc==1.15
 requests==2.32.5
 pytz
-# setuptools é OBRIGATÓRIO para o geemap funcionar no Python 3.12+
 setuptools==75.1.0
+
