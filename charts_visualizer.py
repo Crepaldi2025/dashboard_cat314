@@ -90,12 +90,12 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     # 1. Gráfico
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
-        fig.update_layout(margin=dict(t=40, l=60, r=30, b=60))
+        fig.update_layout(margin=dict(t=100, l=60, r=30, b=60))
         st.plotly_chart(fig, use_container_width=True)
         
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
         data_fim = df_clean['date'].max().strftime('%d/%m/%Y')
-        fig.update_layout(title=dict(text=f"<b>Série Temporal de {variable}</b><br><sup>({data_ini} a {data_fim})</sup>", font=dict(size=24), x=0, y=0.95))
+        fig.update_layout(title=dict(text=f"<b>Série Temporal de {variable}</b><br><sup>({data_ini} a {data_fim})</sup>", font=dict(size=24), x=0, y=0.98))
         
     except Exception as e:
         st.error(f"Erro ao plotar gráfico: {e}")
@@ -302,4 +302,5 @@ def display_multiaxis_chart(data_dict):
     st.plotly_chart(fig, use_container_width=True)
     
     st.info("💡 **Dica:** Dê um clique na legenda de uma variável para retirar ou retornar.")
+
 
