@@ -90,7 +90,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
     # 1. Gráfico
     try:
         fig = _create_chart_figure(df_clean, variable, unit)
-        fig.update_layout(margin=dict(t=100, l=60, r=30, b=60))
+        fig.update_layout(margin=dict(t=150, l=60, r=30, b=60))
         st.plotly_chart(fig, use_container_width=True)
         
         data_ini = df_clean['date'].min().strftime('%d/%m/%Y')
@@ -302,5 +302,6 @@ def display_multiaxis_chart(data_dict):
     st.plotly_chart(fig, use_container_width=True)
     
     st.info("💡 **Dica:** Dê um clique na legenda de uma variável para retirar ou retornar.")
+
 
 
