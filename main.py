@@ -129,7 +129,7 @@ def render_download_buttons(df, filename_prefix, key_suffix):
     excel_data = buffer.getvalue()
     c1, c2 = st.columns(2)
     c1.download_button("💾 Baixar CSV", csv, f"{filename_prefix}.csv", "text/csv", key=f"btn_csv_{key_suffix}", use_container_width=True)
-    c2.download_button("📊 Baixar Excel", excel_data, f"{filename_prefix}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"btn_xlsx_{key_suffix}", use_container_width=True)
+    c2.download_button("💾 Baixar Excel", excel_data, f"{filename_prefix}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"btn_xlsx_{key_suffix}", use_container_width=True)
 
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
@@ -583,6 +583,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
