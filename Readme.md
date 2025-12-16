@@ -4,7 +4,7 @@ Plataforma interativa para consulta, análise e visualização de dados meteorol
 
 ---
 
-## Sobre o Aplicativo – Clima-Cast-Crepaldi
+## Sobre o Aplicativo
 
 O **Clima-Cast-Crepaldi** é um sistema interativo desenvolvido como parte do projeto da disciplina **CAT314 – Ferramentas de Previsão de Curtíssimo Prazo (Nowcasting)**, do curso de Ciências Atmosféricas da **Universidade Federal de Itajubá (UNIFEI)**. O aplicativo tem como propósito integrar dados meteorológicos provenientes de fontes de reanálise global e disponibilizá-los em uma plataforma visual, dinâmica e acessível, favorecendo tanto a análise científica quanto o uso didático.
 
