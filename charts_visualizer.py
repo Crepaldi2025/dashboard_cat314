@@ -1,6 +1,22 @@
-# ==================================================================================
+# ====================
 # charts_visualizer.py
-# ==================================================================================
+# ====================
+"""
+Módulo de visualização de séries temporais do Clima-Cast-Crepaldi.
+
+Objetivo no Clima-Cast-Crepaldi
+-------------------------------
+Centraliza a geração e a exibição de gráficos e tabelas de séries temporais no Streamlit,
+com foco em variáveis meteorológicas derivadas de fontes como ERA5-Land (via Google Earth Engine).
+
+Responsabilidades
+-----------------
+- Gerar gráficos de linha (Plotly) para séries temporais padronizadas.
+- Exibir estatísticas descritivas básicas (média, máximo, mínimo, amplitude e desvio padrão).
+- Disponibilizar exportação dos resultados em PNG/JPG (imagem), CSV e Excel.
+- Fornecer visualização comparativa multi-eixos (até 4 variáveis simultâneas).
+
+"""
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -9,6 +25,9 @@ import io
 import re
 
 def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
+    """
+    Cria uma figura Plotly (linha) para uma série temporal padronizada.
+    """
     
     variable_name = variable.split(" (")[0]
     
@@ -59,12 +78,20 @@ def _create_chart_figure(df: pd.DataFrame, variable: str, unit: str):
     return fig
 
 def _convert_df_to_excel(df: pd.DataFrame) -> bytes:
+    """
+    Converte um DataFrame em arquivo Excel (.xlsx) em memória.
+    """
+    
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Dados')
     return excel_buffer.getvalue()
 
 def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_help: bool = True):
+    """
+    Renderiza no Streamlit um painel completo de série temporal: gráfico, downloads, estatísticas e tabela com exportação.
+    """
+    
     st.markdown("""<style>div[data-testid="stMetricValue"] { font-size: 1.1rem; }</style>""", unsafe_allow_html=True)
     
     if df is None or df.empty:
@@ -102,8 +129,7 @@ def display_time_series_chart(df: pd.DataFrame, variable: str, unit: str, show_h
         return
 
     # 2. Download Imagem
-    # --- CORREÇÃO AQUI: Gera um ID único usando o nome completo da variável ---
-    # Removemos caracteres especiais, mas mantemos números e distinções
+    
     variable_clean = re.sub(r'[^a-zA-Z0-9]', '_', variable).lower()
     
     col_img1, col_img2, _ = st.columns([1, 1, 2])
@@ -212,9 +238,8 @@ def display_multiaxis_chart(data_dict):
     
     colors = ['#1f77b4', '#d62728', '#2ca02c', '#ff7f0e'] 
     
-    # --- 1. CONTROLE DE ESPAÇO LATERAL (Domínio) ---
-    # Se tiver muitos eixos, "espreme" o gráfico (0.2 a 0.8) para dar espaço aos números laterais.
-    # Ajuste aqui: [Espaço Esquerda, Espaço Direita]
+    # 1. CONTROLE DE ESPAÇO LATERAL
+    
     x_domain = [0.15, 0.85] if len(data_dict) > 2 else [0, 1]
 
     layout_settings = {
@@ -287,7 +312,7 @@ def display_multiaxis_chart(data_dict):
 
     layout_settings['xaxis'].update(dict(title="Data", showgrid=True))
 
-    # --- 3. CONTROLE DE MARGENS E LEGENDA ---
+    # 2. CONTROLE DE MARGENS E LEGENDA
     fig.update_layout(
         title="Comparação Multi-Eixos",
         # y=1.2 sobe a legenda para não bater no título
@@ -302,6 +327,7 @@ def display_multiaxis_chart(data_dict):
     st.plotly_chart(fig, use_container_width=True)
     
     st.info("💡 **Dica:** Dê um clique na legenda de uma variável para retirar ou retornar.")
+
 
 
 
