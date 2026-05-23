@@ -553,7 +553,7 @@ def render_polygon_drawer():
         st.rerun()
 
 def main():
-    def main():
+    
     if 'gee_initialized' not in st.session_state:
 
         with st.spinner("🌍 Conectando ao Google Earth Engine e carregando IBGE..."):
