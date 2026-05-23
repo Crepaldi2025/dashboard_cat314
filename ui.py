@@ -441,12 +441,48 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             if not disable:
                 # --- MENSAGEM COM FONTE MAIOR ---
                 st.markdown(
-                    "<div style='font-size:18px;margin-top:12px;line-height:1.5;'>"
-                    "⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>"
-                    "Consultas de períodos longos ou áreas muito grandes podem levar mais tempo para carregar."
-                    "</div>", 
+                """
+                <div style="
+                    margin-top: 14px;
+                    padding: 14px 16px;
+                    border-radius: 12px;
+                    background: linear-gradient(135deg, #fff8e1, #fff3cd);
+                    border-left: 5px solid #f59e0b;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    font-size: 15.5px;
+                    line-height: 1.55;
+                    color: #3f2f00;
+                ">
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-weight: 700;
+                        font-size: 17px;
+                        margin-bottom: 8px;
+                    ">
+                        <span style="font-size: 22px;">⚠️</span>
+                        <span>Atenção antes de gerar</span>
+                        </div>
+                
+                        <div style="margin-bottom: 6px;">
+                            Confira se os filtros de <b>localização</b>, <b>variável</b> e <b>período</b> estão corretos.
+                        </div>
+                
+                        <ul style="
+                            margin: 8px 0 0 18px;
+                            padding: 0;
+                        ">
+                            <li>Consultas com períodos longos podem demorar mais.</li>
+                            <li>Áreas muito grandes aumentam o tempo de processamento.</li>
+                            <li>Períodos sem dados disponíveis podem não gerar resultados.</li>
+                        </ul>
+                    </div>
+                    """,
                     unsafe_allow_html=True
                 )
+
+            
             else:
                 if opcao == "Shapefile" and not st.session_state.get("shapefile_upload"):
                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Faça upload do arquivo .ZIP.</div>", unsafe_allow_html=True)
