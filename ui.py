@@ -463,7 +463,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     ">
                         <span style="font-size: 22px;">⚠️</span>
                         <span>Atenção antes de gerar</span>
-                        </div>
+                    </div>
                 
                         <div style="margin-bottom: 6px;">
                             Confira se os filtros de <b>localização</b>, <b>variável</b> e <b>período</b> estão corretos.
