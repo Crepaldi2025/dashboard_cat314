@@ -553,18 +553,37 @@ def render_polygon_drawer():
         st.rerun()
 
 def main():
-    if 'gee_initialized' not in st.session_state:
+    #if 'gee_initialized' not in st.session_state:
 
         # Mostra um spinner enquanto conecta
+        #with st.spinner("🌍 Conectando ao Google Earth Engine e carregando IBGE..."):
+        #   gee_handler.inicializar_gee()
+        #   st.session_state.gee_initialized = True
+    
+    if 'gee_initialized' not in st.session_state:
+
         with st.spinner("🌍 Conectando ao Google Earth Engine e carregando IBGE..."):
-            gee_handler.inicializar_gee()
-            st.session_state.gee_initialized = True
+            try:
+                gee_handler.inicializar_gee()
+                st.session_state.gee_initialized = True
+                st.sidebar.success("GEE Conectado")
+
+            except Exception as e:
+                st.session_state.gee_initialized = False
+                st.sidebar.error("Falha GEE")
+                st.error(f"⚠️ Falha ao conectar ao Google Earth Engine: {e}")
+                st.stop()
              
         # Se preferir fixo na barra lateral, descomente a linha abaixo:
-        st.sidebar.success("GEE Conectado")
+        #st.sidebar.success("GEE Conectado")
      
-        gee_handler.inicializar_gee()
-        st.session_state.gee_initialized = True
+        #gee_handler.inicializar_gee()
+        #st.session_state.gee_initialized = True
+
+
+
+
+    
     
     dados_geo, mapa_nomes_uf = gee_handler.get_brazilian_geopolitical_data_local()
     opcao_menu = ui.renderizar_sidebar(dados_geo, mapa_nomes_uf)
