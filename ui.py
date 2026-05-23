@@ -480,7 +480,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     </div>
                     """,
                     unsafe_allow_html=True
-                )
+            )
             
             else:
                 if opcao == "Shapefile" and not st.session_state.get("shapefile_upload"):
