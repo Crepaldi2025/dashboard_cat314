@@ -14,22 +14,55 @@ import unicodedata
 import shapefile_handler
 
 # --- INICIALIZAÇÃO GEE ---
+# --- INICIALIZAÇÃO GEE ---
 def inicializar_gee():
-    try:
-        ee.Image.constant(0).getInfo()
-    except ee.EEException:
-        try:
-            if "earthengine_service_account" in st.secrets:
-                service_account = st.secrets["earthengine_service_account"]["client_email"]
-                private_key = st.secrets["earthengine_service_account"]["private_key"]
-                credentials = ee.ServiceAccountCredentials(service_account, key_data=private_key)
-                ee.Initialize(credentials=credentials)
-            else:
-                ee.Initialize()
-        except Exception as e:
-            st.error(f"⚠️ Falha GEE: {e}")
+    """
+    Inicializa o Google Earth Engine usando o projeto definido em st.secrets.
 
-def initialize_gee(): 
+    Espera encontrar no Streamlit Secrets:
+        gee_project_id = "cat314"
+
+    E, no Streamlit Cloud, também:
+        [earthengine_service_account]
+        client_email = "..."
+        private_key = "..."
+    """
+    try:
+        PROJECT_ID = st.secrets.get("gee_project_id", "cat314")
+
+        # Caso esteja no Streamlit Cloud com service account
+        if "earthengine_service_account" in st.secrets:
+            service_account = st.secrets["earthengine_service_account"]["client_email"]
+            private_key = st.secrets["earthengine_service_account"]["private_key"]
+
+            credentials = ee.ServiceAccountCredentials(
+                service_account,
+                key_data=private_key
+            )
+
+            ee.Initialize(
+                credentials=credentials,
+                project=PROJECT_ID
+            )
+
+        # Caso esteja rodando localmente no computador
+        else:
+            ee.Initialize(project=PROJECT_ID)
+
+        # Teste real de comunicação com o GEE
+        ee.data.getAlgorithms()
+
+        return True
+
+    except Exception as e:
+        st.error(
+            f"⚠️ Falha GEE: {e}\n\n"
+            f"Projeto usado: {st.secrets.get('gee_project_id', 'cat314')}"
+        )
+        return False
+
+
+def initialize_gee():
     return inicializar_gee()
 
 # --- VARIÁVEIS ---
