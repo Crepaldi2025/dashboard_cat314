@@ -15,22 +15,15 @@ import shapefile_handler
 
 # --- INICIALIZAÇÃO GEE ---
 # --- INICIALIZAÇÃO GEE ---
+# --- INICIALIZAÇÃO GEE ---
 def inicializar_gee():
     """
-    Inicializa o Google Earth Engine usando o projeto definido em st.secrets.
-
-    Espera encontrar no Streamlit Secrets:
-        gee_project_id = "cat314"
-
-    E, no Streamlit Cloud, também:
-        [earthengine_service_account]
-        client_email = "..."
-        private_key = "..."
+    Inicializa o Google Earth Engine usando o projeto cat314
+    e, quando disponível, uma service account definida no Streamlit Secrets.
     """
     try:
         PROJECT_ID = st.secrets.get("gee_project_id", "cat314")
 
-        # Caso esteja no Streamlit Cloud com service account
         if "earthengine_service_account" in st.secrets:
             service_account = st.secrets["earthengine_service_account"]["client_email"]
             private_key = st.secrets["earthengine_service_account"]["private_key"]
@@ -45,11 +38,10 @@ def inicializar_gee():
                 project=PROJECT_ID
             )
 
-        # Caso esteja rodando localmente no computador
         else:
             ee.Initialize(project=PROJECT_ID)
 
-        # Teste real de comunicação com o GEE
+        # Teste real de comunicação com o servidor do Earth Engine
         ee.data.getAlgorithms()
 
         return True
@@ -61,6 +53,9 @@ def inicializar_gee():
         )
         return False
 
+
+def initialize_gee():
+    return inicializar_gee()
 
 def initialize_gee():
     return inicializar_gee()
