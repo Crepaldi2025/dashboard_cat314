@@ -67,8 +67,58 @@ def hide_fullscreen_button():
     """, unsafe_allow_html=True)
 
 # chama logo no início, antes do resto da interface
-set_background()
+#set_background()
 hide_fullscreen_button()
+
+def force_scrollbars():
+    st.markdown(
+        """
+<style>
+/* Garante rolagem vertical na página inteira */
+html, body, [data-testid="stAppViewContainer"], .stApp {
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+}
+
+/* Força a barra vertical a aparecer sempre, mesmo quando a página é curta */
+body {
+    overflow-y: scroll !important;
+}
+
+/* Área principal do Streamlit */
+section.main, div[data-testid="stMain"], div[data-testid="stAppViewContainer"] {
+    overflow-y: auto !important;
+}
+
+/* Barra lateral também com rolagem própria */
+section[data-testid="stSidebar"] {
+    overflow-y: auto !important;
+}
+
+/* Aparência da barra de rolagem — Chrome, Edge, Safari */
+::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(240, 240, 240, 0.75);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(120, 120, 120, 0.65);
+    border-radius: 10px;
+    border: 2px solid rgba(240, 240, 240, 0.75);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(80, 80, 80, 0.8);
+}
+</style>
+        """,
+        unsafe_allow_html=True
+    )
 
 # --- HELPERS ---
 def render_chart_tips():
