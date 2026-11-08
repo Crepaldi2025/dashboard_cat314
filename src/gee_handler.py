@@ -260,7 +260,7 @@ def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
     """
     from pathlib import Path
 
-    arquivo = Path(__file__).resolve().parent / "data" / "municipios_ibge.json"
+    arquivo = Path(__file__).resolve().parent.parent / "data" / "municipios_ibge.json"
 
     try:
         with arquivo.open("r", encoding="utf-8") as f:
