@@ -517,7 +517,7 @@ def renderizar_pagina_principal(opcao):
         # --- AQUI ESTÁ A NOTA DIDÁTICA ---
        
         
-                col1, col2 = st.columns(2, gap="medium")
+        col1, col2 = st.columns(2, gap="medium")
 
         with col1:
             st.markdown("#### 🗺️ Análise Espacial")
