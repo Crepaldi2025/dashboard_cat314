@@ -489,7 +489,8 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 # -----------------------------
 
 def renderizar_pagina_principal(opcao):
-    st.markdown("""<style>.block-container{padding-top:1rem!important;padding-bottom:1rem!important}h1{margin-top:0rem!important}.stExpander{border:1px solid #f0f2f6;border-radius:8px}</style>""", unsafe_allow_html=True)
+    
+  st.markdown("""<style>.block-container {    padding-top: 1rem !important;    padding-bottom: 1rem !important;}h1 {    margin-top: 0rem !important;}.stExpander {    border: 1px solid #f0f2f6;    border-radius: 8px;}[data-testid="stAppViewContainer"] {    overflow-y: scroll !important;    scrollbar-gutter: stable;}</style>""", unsafe_allow_html=True)
     fuso_br = pytz.timezone('America/Sao_Paulo')
     agora, agora_utc = datetime.now(fuso_br), datetime.now(pytz.utc)
     
