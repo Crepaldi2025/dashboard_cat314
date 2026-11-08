@@ -503,7 +503,8 @@ def renderizar_pagina_principal(opcao):
         with lc: 
             if os.path.exists("assets/logo.png"): st.image("assets/logo.png", width=100)
             else: st.write("🌐")
-        with tc: st.title(f"{opcao}")
+        with tc:
+            st.markdown(f"## {opcao}")
     with c2:
         st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
     
@@ -516,14 +517,14 @@ def renderizar_pagina_principal(opcao):
 
     if not has_results and not has_skewt and not is_generating:
         
-        st.markdown("### 👋 Bem-vindo ao Clima-Cast!")
+        st.markdown("### Bem-vindo ao Clima-Cast!")
         
         # --- AQUI ESTÁ A NOTA DIDÁTICA ---
               
         col1, col2 = st.columns(2, gap="medium")
 
         with col1:
-            st.markdown("#### 🗺️ Análise Espacial")
+            st.markdown("#### Análise Espacial")
             st.markdown("""
             **Mapas** — Visualização espacial de uma variável meteorológica para a área e o período selecionados.
             
@@ -535,7 +536,7 @@ def renderizar_pagina_principal(opcao):
             """)
 
         with col2:
-            st.markdown("#### 📈 Análise Temporal e Vertical")
+            st.markdown("#### Análise Temporal e Vertical")
             st.markdown("""
             **Séries Temporais** — Análise da evolução de uma variável meteorológica ao longo do tempo.
             
