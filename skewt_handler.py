@@ -130,6 +130,14 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
     # ----------------------------------------------------------------------
     try:
         ts = data["hourly"].get("time", [])
+        p_surface = data["hourly"].get("surface_pressure", [])
+
+        if idx < len(p_surface) and p_surface[idx] is not None:
+            st.caption(
+                f"Pressão de superfície: {p_surface[idx]:.1f} hPa"
+            )
+        else:
+            st.warning("Pressão de superfície indisponível.")
         if not ts: return None
         
         # Garante que o índice existe
