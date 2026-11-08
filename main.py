@@ -30,21 +30,21 @@ if EM_MANUTENCAO:
     st.stop() # <--- ISSO É O SEGREDO! O código para de ler aqui e não carrega o resto.
 # -----------------------------------------------------
 
-import ui
+from src import ui
 from src import gee_handler
 from src import map_visualizer
 from src import charts_visualizer
 from src import utils
 from src import skewt_handler
+from src import skewt_visualizer
+from folium.plugins import Draw 
+from streamlit_folium import st_folium
+from datetime import timedelta 
 import base64 
 import io
 import pandas as pd
 import time
 import folium
-from folium.plugins import Draw 
-from streamlit_folium import st_folium
-from datetime import timedelta 
-from src import skewt_visualizer
 
 # --- CONFIGURAÇÃO INICIAL ---
 def set_background():
