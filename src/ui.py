@@ -114,8 +114,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.date_input("Data", value=data_padrao, max_value=hoje, key='skew_date', format="DD/MM/YYYY", on_change=reset_analysis_state)
             st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC (3 horas à frente de Brasília).", on_change=reset_analysis_state)
 
-            st.warning("ℹ️ **Nota:** Dados de altitude (3D/Perfil Vertical) estão disponíveis apenas a partir de **23/03/2021** "
-                "(limite do GFS). Para datas anteriores, apenas dados de superfície (2D) podem ser consultados.")
+
+            st.info(
+            "ℹ️ **Sobre os dados:** Os resultados utilizam agregações temporais "
+            "que dependem da variável meteorológica, como médias ou acumulados. "
+            "Para consultar um horário específico, selecione **Horário Específico** "
+            "e informe a hora em UTC."
+        )
 
             st.divider()
 
