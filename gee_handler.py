@@ -248,38 +248,55 @@ def normalize_text(text):
         return str(text)
     return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8').lower().strip()
 
-# --- CARREGAMENTO LISTA IBGE ---
-@st.cache_data(ttl=3600*24)
+
+# --- CARREGAMENTO LOCAL DOS MUNICÍPIOS IBGE ---
+@st.cache_data
 def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
+    """
+    Carrega os municípios brasileiros a partir do arquivo JSON local.
+    Retorna:
+        geo_data: {sigla_uf: [nomes_dos_municipios]}
+        mapa_nomes_uf: {sigla_uf: nome_do_estado}
+    """
+    from pathlib import Path
+
+    arquivo = Path(__file__).resolve().parent / "data" / "municipios_ibge.json"
+
     try:
-        # Busca Estados
-        url_uf = "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome"
-        ufs = requests.get(url_uf, timeout=10).json()
-        mapa_nomes_uf = {u['sigla']: u['nome'] for u in ufs}
-        if not mapa_nomes_uf:
-            mapa_nomes_uf = FALLBACK_UF_MAP
-        
-        # Busca Municípios
-        url_mun = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome"
-        munis = requests.get(url_mun, timeout=15).json()
-        
+        with arquivo.open("r", encoding="utf-8") as f:
+            municipios = json.load(f)
+
+        if not isinstance(municipios, list) or not municipios:
+            raise ValueError("Arquivo JSON vazio ou estrutura inválida.")
+
         geo_data = defaultdict(list)
-        
-        for m in munis:
-            try:
-                if (
-                    'microrregiao' in m and
-                    'mesorregiao' in m['microrregiao'] and
-                    'UF' in m['microrregiao']['mesorregiao']
-                ):
-                    uf_sigla = m['microrregiao']['mesorregiao']['UF']['sigla']
-                    geo_data[uf_sigla].append(m['nome'])
-            except:
-                continue
-            
-        return dict(geo_data), mapa_nomes_uf
-    except: 
-        return {}, FALLBACK_UF_MAP
+
+        for municipio in municipios:
+            uf = municipio["microrregiao"]["mesorregiao"]["UF"]["sigla"]
+            nome = municipio["nome"]
+
+            if uf not in FALLBACK_UF_MAP:
+                raise ValueError(f"UF inválida no arquivo: {uf}")
+
+            geo_data[uf].append(nome)
+
+        geo_data = {
+            uf: sorted(set(nomes))
+            for uf, nomes in geo_data.items()
+        }
+
+        if set(geo_data) != set(FALLBACK_UF_MAP):
+            raise ValueError(
+                "Arquivo não contém municípios de todas as 27 UFs."
+            )
+
+        return geo_data, FALLBACK_UF_MAP.copy()
+
+    except (OSError, ValueError, KeyError, TypeError) as erro:
+        st.error(
+            f"Falha ao carregar os municípios do arquivo local: {erro}"
+        )
+        return {}, FALLBACK_UF_MAP.copy()
 
 # --- CARREGADORES GEOBR (COM CACHE) ---
 @st.cache_data
