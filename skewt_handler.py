@@ -98,7 +98,11 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
     "start_date": date_str,
     "end_date": date_str,
     "hourly": ",".join(
-        vars_list + ["surface_pressure"]
+    vars_list + [
+        "surface_pressure",
+        "temperature_2m",
+        "relative_humidity_2m"
+    ]
     ),
     "timeformat": "unixtime",
     "timezone": "UTC",
