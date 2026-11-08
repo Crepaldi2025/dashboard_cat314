@@ -271,12 +271,33 @@ def get_brazilian_geopolitical_data_local() -> tuple[dict, dict]:
 
         geo_data = defaultdict(list)
 
+        
         for municipio in municipios:
-            uf = municipio["microrregiao"]["mesorregiao"]["UF"]["sigla"]
             nome = municipio["nome"]
+            uf = None
+
+            regiao_imediata = municipio.get("regiao-imediata")
+
+            if isinstance(regiao_imediata, dict):
+                intermediaria = regiao_imediata.get("regiao-intermediaria")
+                if isinstance(intermediaria, dict):
+                    dados_uf = intermediaria.get("UF")
+                    if isinstance(dados_uf, dict):
+                        uf = dados_uf.get("sigla")
+
+            if uf is None:
+                microrregiao = municipio.get("microrregiao")
+                if isinstance(microrregiao, dict):
+                    mesorregiao = microrregiao.get("mesorregiao")
+                    if isinstance(mesorregiao, dict):
+                        dados_uf = mesorregiao.get("UF")
+                        if isinstance(dados_uf, dict):
+                            uf = dados_uf.get("sigla")
 
             if uf not in FALLBACK_UF_MAP:
-                raise ValueError(f"UF inválida no arquivo: {uf}")
+                raise ValueError(
+                    f"UF ausente ou inválida para o município {nome}"
+                )
 
             geo_data[uf].append(nome)
 
