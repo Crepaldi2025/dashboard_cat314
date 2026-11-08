@@ -523,11 +523,8 @@ def renderizar_pagina_principal(opcao):
             st.markdown("#### 🗺️ Análise Espacial")
             st.markdown("""
             **Mapas** — Visualização espacial de uma variável meteorológica para a área e o período selecionados.
-            
             **Múltiplos Mapas** — Comparação de até quatro variáveis em painéis estáticos.
-            
             **Sobreposição de Camadas** — Comparação de duas variáveis no mesmo mapa, com transparência ou cortina deslizante.
-            
             **Shapefile** — Importação de arquivos geográficos para delimitar áreas de análise.
             """)
 
