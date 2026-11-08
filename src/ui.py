@@ -551,6 +551,14 @@ def renderizar_pagina_principal(opcao):
             "e informe a hora em UTC."
         )
         st.markdown(
+            "<div style='font-size:0.82rem; color:#64748b; margin:4px 0 0 0;'>"
+            "<b>Fontes de dados:</b> ERA5-Land/ECMWF, via Google Earth Engine, "
+            "para mapas e séries temporais; Open-Meteo, para perfis atmosféricos "
+            "modelados utilizados no Skew-T."
+            "</div>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
             "<div style='text-align:center; font-size:0.9rem; "
             "color:#64748b; margin-top:4px;'>"
             "◀ Selecione a análise e configure os parâmetros na barra lateral."
