@@ -498,7 +498,7 @@ def renderizar_pagina_principal(opcao):
     with c1:
         lc, tc = st.columns([1, 5])
         with lc: 
-            if os.path.exists("logo.png"): st.image("logo.png", width=70)
+            if os.path.exists("assets/logo.png"): st.image("assets/logo.png", width=70)
             else: st.write("🌐")
         with tc: st.title(f"{opcao}")
     with c2:
