@@ -125,12 +125,11 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.divider()
 
             st.markdown(
-                """
-                <div style="font-size: 0.8rem; color: #666; margin-bottom: 10px; margin-top: 15px;">
-                ⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.<br>
-                </div>
-                """, 
-                unsafe_allow_html=True
+            "<div style='text-align:center; font-size:0.9rem; "
+            "color:#64748b; margin-top:4px;'>"
+            "◀ Selecione a análise e configure os parâmetros na barra lateral."
+            "</div>",
+            unsafe_allow_html=True
             )
             
             st.button(
