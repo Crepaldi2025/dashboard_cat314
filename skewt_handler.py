@@ -93,13 +93,15 @@ def get_vertical_profile_data(lat, lon, date_obj, hour):
         ])
 
     params.update({
-        "latitude": lat,
-        "longitude": lon,
-        "start_date": date_str,
-        "end_date": date_str,
-        "hourly": ",".join(vars_list),
-        "timeformat": "unixtime",
-        "timezone": "UTC",
+    "latitude": lat,
+    "longitude": lon,
+    "start_date": date_str,
+    "end_date": date_str,
+    "hourly": ",".join(
+        vars_list + ["surface_pressure"]
+    ),
+    "timeformat": "unixtime",
+    "timezone": "UTC",
     })
 
     # ----------------------------------------------------------------------
