@@ -46,6 +46,19 @@ import pandas as pd
 import time
 import folium
 
+
+import importlib.metadata as metadata
+
+with st.expander("Diagnóstico do ambiente Python", expanded=False):
+    st.write("Versões das bibliotecas instaladas:")
+
+    for pacote in ["metpy", "pint", "scipy", "xarray", "pooch"]:
+        try:
+            st.write(f"{pacote}: {metadata.version(pacote)}")
+        except metadata.PackageNotFoundError:
+            st.write(f"{pacote}: não instalado")
+            
+
 # --- CONFIGURAÇÃO INICIAL ---
 def set_background():
     image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
