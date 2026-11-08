@@ -44,7 +44,7 @@ from folium.plugins import Draw
 from streamlit_folium import st_folium
 from datetime import timedelta 
 import skewt_handler 
-import skewt_visualizer
+from src import skewt_visualizer
 
 # --- CONFIGURAÇÃO INICIAL ---
 def set_background():
