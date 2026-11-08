@@ -517,21 +517,29 @@ def renderizar_pagina_principal(opcao):
         # --- AQUI ESTÁ A NOTA DIDÁTICA ---
        
         
-        col1, col2 = st.columns(2)
+                col1, col2 = st.columns(2, gap="medium")
 
         with col1:
             st.markdown("#### 🗺️ Análise Espacial")
-            st.success("**Mapas**\nGera mapas para uma única variável (ex: Temperatura) em uma área e data específicas.")
-            st.success("**Múltiplos Mapas**\nGera painéis estáticos para comparar até 4 variáveis simultaneamente (ex: Chuva vs Umidade).")
-            st.success("**Sobreposição (Camadas)**\nPermite cruzar duas variáveis no mesmo mapa usando transparência ou cortina deslizante.")
-            st.success("**Shapefile**\nUpload de Shapefile (.zip) próprio para recortar dados em bacias ou rios específicos.")
+            st.markdown("""
+            **Mapas** — Visualização espacial de uma variável meteorológica para a área e o período selecionados.
+            
+            **Múltiplos Mapas** — Comparação de até quatro variáveis em painéis estáticos.
+            
+            **Sobreposição de Camadas** — Comparação de duas variáveis no mesmo mapa, com transparência ou cortina deslizante.
+            
+            **Shapefile** — Importação de arquivos geográficos para delimitar áreas de análise.
+            """)
 
         with col2:
-            st.markdown("#### 📈 Análise Temporal & Vertical")
-            st.success("**Séries Temporais**\nGera gráficos interativos mostrando a evolução de uma variável ao longo do tempo.")
-            st.success("**Múltiplas Séries**\nPlota gráficos comparativos de várias variáveis para identificar correlações temporais.")
-            st.success("**Skew-T (Sondagem)**\nGera diagramas termodinâmicos verticais da atmosfera (perfil de temperatura e orvalho).")
-
+            st.markdown("#### 📈 Análise Temporal e Vertical")
+            st.markdown("""
+            **Séries Temporais** — Análise da evolução de uma variável meteorológica ao longo do tempo.
+            
+            **Múltiplas Séries** — Comparação temporal de diferentes variáveis meteorológicas.
+            
+            **Skew-T/log-P** — Visualização de perfis atmosféricos modelados de temperatura, ponto de orvalho e vento, com parâmetros termodinâmicos.
+            """)
         
 
         st.info(
