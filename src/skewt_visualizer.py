@@ -95,6 +95,41 @@ def render_skewt_plot(df, lat, lon, date, hour):
             st.warning(f"Não foi possível obter o ponto de orvalho: {exc}")
     Td = Td_values * units.degC
 
+    # Exportação dos níveis efetivamente utilizados no Skew-T.
+    # Mantém lacunas como células vazias; não interpola nem inventa medições.
+    export_data = data[[
+        "pressure", "temperature", "relative_humidity",
+        "u_component", "v_component",
+    ]].copy()
+    export_data["relative_humidity"] = rh_values
+    export_data.insert(3, "dewpoint_C", Td_values)
+    export_data = export_data.rename(columns={
+        "pressure": "pressure_hPa",
+        "temperature": "temperature_C",
+        "relative_humidity": "relative_humidity_pct",
+        "u_component": "wind_u_ms",
+        "v_component": "wind_v_ms",
+    })
+    source_date = df.attrs.get("real_date", date)
+    if isinstance(source_date, (datetime, Date)):
+        iso_date = source_date.strftime("%Y-%m-%d")
+    else:
+        iso_date = str(source_date)
+    export_data.insert(0, "date_UTC", iso_date)
+    export_data.insert(1, "hour_UTC", str(hour))
+    export_data.insert(2, "latitude_deg", float(lat))
+    export_data.insert(3, "longitude_deg", float(lon))
+    export_data.insert(4, "data_source", str(df.attrs.get("source", "Não informada")))
+    csv_bytes = export_data.to_csv(index=False, na_rep="", float_format="%.5f").encode("utf-8-sig")
+    st.download_button(
+        "Exportar perfil vertical (CSV)",
+        data=csv_bytes,
+        file_name=f"climacast_perfil_{iso_date}.csv",
+        mime="text/csv",
+        help="Níveis originais do perfil modelado, sem interpolação. "
+             "Campos vazios representam dados indisponíveis.",
+    )
+
     # Para índices de parcela de superfície, todo o perfil deve ter T e Td válidos.
     complete_thermo = np.all(np.isfinite(Td_values))
     cape = cin = lcl_p = lcl_t = lfc_p = lfc_t = el_p = el_t = None
