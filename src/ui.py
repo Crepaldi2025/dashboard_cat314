@@ -85,13 +85,13 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
         # --- OPÇÃO SKEW-T ---
         if opcao == "Skew-T":
-            st.markdown("### 🌪️ Diagrama Skew-T")
+            st.markdown("### Diagrama Skew-T")
             st.info("Obtém perfil vertical da atmosfera (semelhante a radiossonda) usando dados do modelo GFS. Inclui perfil de temperatura do ar, temperatura do ponto de orvalho, trajetória da parcela, informações dos ventos, além de alguns índices termodinâmicos.")
 
             st.markdown(
                 """
                 <div style="font-size: 0.85rem; color: #444; background-color: #f0f2f6; padding: 8px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #ffbd45;">
-                💡 <b>Como obter as coordenadas:</b><br>
+                <b>Como obter as coordenadas:</b><br>
                 Abra o <b>Google Maps</b>, clique com o <b>botão direito</b> no local desejado e os números aparecerão no topo da lista (ex: -23.55, -46.63).
                 </div>
                 """, 
@@ -99,14 +99,14 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             )
             
             st.divider()
-            st.markdown("#### 📍 Localização Pontual")
+            st.markdown("#### Localização Pontual")
             
             c1, c2 = st.columns(2)
             with c1: st.number_input("Lat", value=-23.55, format="%.4f", key='skew_lat', on_change=reset_analysis_state)
             with c2: st.number_input("Lon", value=-46.63, format="%.4f", key='skew_lon', on_change=reset_analysis_state)
             
             st.divider()
-            st.markdown("#### 📅 Momento")
+            st.markdown("#### Momento")
             
             hoje = datetime.now()
             data_padrao = hoje - relativedelta(days=0) 
@@ -116,7 +116,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
 
             st.warning(
-                "ℹ️ **Nota:** Dados de altitude (3D/Perfil Vertical) estão disponíveis apenas a partir de **23/03/2021** "
+                "**Nota:** Dados de altitude (3D/Perfil Vertical) estão disponíveis apenas a partir de **23/03/2021** "
                 "(limite do GFS). Para datas anteriores, apenas dados de superfície (2D) podem ser consultados."
             )
 
@@ -125,14 +125,14 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.markdown(
                 """
                 <div style="font-size:0.8rem; color:#666; margin-bottom:10px; margin-top:15px;">
-                ⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.
+                <b>Atenção:</b> Confira os filtros antes de gerar.
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
             st.button(
-                "🚀 Gerar Skew-T", 
+                "Gerar Skew-T", 
                 type="primary", 
                 use_container_width=True, 
                 on_click=lambda: st.session_state.update(analysis_triggered=True)
@@ -140,10 +140,10 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
 
         # --- OPÇÕES GERAIS ---
         elif opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile", "Séries Temporais", "Múltiplas Séries"]:
-            st.markdown("### ⚙️ Parâmetros da Análise")
+            st.markdown("### Parâmetros da Análise")
             
             # --- 3. BASE DE DADOS ---
-            st.markdown("#### 🛰️ Base de Dados", help="Reanálise climática global de alta resolução (ECMWF).")
+            st.markdown("#### Base de Dados", help="Reanálise climática global de alta resolução (ECMWF).")
             st.selectbox(
                 "Selecione a Base de Dados", 
                 ["ERA5-LAND"], 
@@ -155,7 +155,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.divider()
 
             # --- 4. VARIÁVEL ---
-            st.markdown("#### 🌡️ Variável Meteorológica")
+            st.markdown("#### Variável Meteorológica")
             
             lista_vars = [
                 "Temperatura do Ar (2m)", 
@@ -180,7 +180,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     on_change=reset_analysis_state
                 )
                 if len(vars_sel) > 4:
-                    st.warning(f"⚠️ Você selecionou {len(vars_sel)} variáveis. O limite recomendado é 4 para não travar o sistema.", icon="🛑")
+                    st.warning(f"Você selecionou {len(vars_sel)} variáveis. O limite recomendado é 4 para não travar o sistema.")
             
             elif opcao == "Sobreposição (Camadas)":
                 st.caption("Selecione duas variáveis para comparar:")
@@ -192,7 +192,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 vis_mode = st.radio("Estilo de Comparação:", ["Transparência", "Split Map (Cortina)"], horizontal=True, key='overlay_mode', on_change=reset_analysis_results_only)
                 
                 if vis_mode == "Transparência":
-                    st.markdown("🎚️ **Controle de Opacidade**")
+                    st.markdown("**Controle de Opacidade**")
                     c_op1, c_op2 = st.columns(2)
                     with c_op1: st.slider("Base", 0.0, 1.0, 1.0, key='opacity_1', on_change=reset_analysis_results_only)
                     with c_op2: st.slider("Topo", 0.0, 1.0, 0.6, key='opacity_2', on_change=reset_analysis_results_only)
@@ -215,7 +215,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 st.markdown("#### Shapefile")
 
                 # 👇 --- INSIRA O BLOCO AQUI (ANTES DO INFO/UPLOAD) --- 👇
-                with st.sidebar.expander("❓ Não tem um Shapefile? Aprenda a criar!", expanded=False):
+                with st.sidebar.expander("Não tem um Shapefile? Aprenda a criar!", expanded=False):
                     st.markdown("""
                     1. Acesse o site **[GeoJSON.io](https://geojson.io)** (clique no link).
                     2. Navegue no mapa até encontrar a área desejada (fazenda, bairro, bacia).
@@ -233,12 +233,12 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 uploaded_file = st.file_uploader("Upload ZIP", type=["zip"], key='shapefile_upload', on_change=reset_analysis_state)
                 
                 if uploaded_file:
-                    st.success("Arquivo recebido! Clique em Gerar Análise.", icon="✅")
+                    st.success("Arquivo recebido! Clique em Gerar Análise.")
                 
                 tipo_loc = "Shapefile"
                 
             else:
-                st.markdown("#### 📍 Localização")
+                st.markdown("#### Localização")
                 st.selectbox(
                     "Tipo de Recorte", 
                     ["Estado", "Município", "Círculo (Lat/Lon/Raio)", "Polígono"], 
@@ -286,7 +286,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     st.markdown(
                         """
                         <div style="font-size: 0.85rem; color: #444; background-color: #f0f2f6; padding: 8px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #ffbd45;">
-                        💡 <b>Como obter as coordenadas:</b><br>
+                        <b>Como obter as coordenadas:</b><br>
                         Abra o <b>Google Maps</b>, clique com o <b>botão direito</b> no local desejado e os números aparecerão no topo da lista (ex: -22.42, -45.45).
                         </div>
                         """, 
@@ -299,33 +299,33 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     with c2: st.number_input("Lon", value=-45.46, format="%.4f", key='longitude', on_change=reset_analysis_state)
                     st.number_input("Raio (km)", min_value=1.0, value=10.0, step=1.0, key='raio', on_change=reset_analysis_state)
                     
-                    with st.popover("ℹ️ Ajuda: Definindo o Círculo"):
-                        st.markdown("**1️⃣ Coordenadas (Latitude e Longitude)**")
+                    with st.popover("Ajuda: Definindo o Círculo"):
+                        st.markdown("**1. Coordenadas (Latitude e Longitude)**")
                         st.markdown("Devem estar em **Graus Decimais** (ex: `-22.42`).\n*")
                         st.markdown("") 
-                        st.markdown("**2️⃣ Raio**")
+                        st.markdown("**2. Raio**")
                         st.markdown("Defina a distância em **Quilômetros (km)** do centro até a borda do círculo.")
                     
                     st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o círculo.</div>", unsafe_allow_html=True)
                 
                 elif tipo_loc == "Polígono":
                     if st.session_state.get('drawn_geometry'): 
-                        st.success("✅ Polígono Definido", icon="🛡️")
+                        st.success("Polígono Definido")
                     else: 
-                        st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>👉 Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
+                        st.markdown("<div style='background-color:#e0f7fa;padding:10px;border-radius:5px;border-left:5px solid #00acc1;font-size:0.85em;'><b style='color:#006064;'>Desenhe no Mapa Principal</b><br>Utilize as ferramentas na lateral esquerda do mapa.<br><br><b>Atenção:</b> se o recorte temporal for redefinido é necessário redesenhar o polígono.</div>", unsafe_allow_html=True)
                     
-                    with st.popover("ℹ️ Guia de Ferramentas"): 
-                        st.markdown("### 🧭 Guia de Uso")
-                        st.markdown("**🎛️ Controles de Visualização**")
-                        st.markdown("* `➕` `➖` **Zoom:** Aproxima ou afasta a visão.\n* `⛶` **Tela Cheia:** Expande o mapa.\n* `🗂️` **Camadas:** Alterna entre Satélite e Mapa de Ruas.")
+                    with st.popover("Guia de Ferramentas"): 
+                        st.markdown("### Guia de Uso")
+                        st.markdown("**Controles de Visualização**")
+                        st.markdown("*  **Zoom:** Aproxima ou afasta a visão.\n*  **Tela Cheia:** Expande o mapa.\n*  **Camadas:** Alterna entre Satélite e Mapa de Ruas.")
                         st.markdown("---")
-                        st.markdown("**✏️ Ferramentas de Desenho**")
-                        st.markdown("* `⬟` **Polígono:** Clique ponto a ponto para fechar uma área livre.\n* `⬛` **Retângulo:** Clique e arraste para criar uma área quadrada.\n* `⭕` **Círculo:** Clique no centro e arraste para definir o raio.\n* `📍` **Marcador:** Adiciona um pino em um local específico.\n* `╱` **Linha:** Desenhe uma linha (útil para medir distâncias).")
+                        st.markdown("**Ferramentas de Desenho**")
+                        st.markdown("*  **Polígono:** Clique ponto a ponto para fechar uma área livre.\n*  **Retângulo:** Clique e arraste para criar uma área quadrada.\n*  **Círculo:** Clique no centro e arraste para definir o raio.\n*  **Marcador:** Adiciona um pino em um local específico.\n*  **Linha:** Desenhe uma linha (útil para medir distâncias).")
                         st.markdown("---")
-                        st.markdown("**🛠️ Edição e Limpeza**")
-                        st.markdown("* `📝` **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.\n* `🗑️` **Lixeira:** Apaga todos os desenhos feitos no mapa.")
+                        st.markdown("**Edição e Limpeza**")
+                        st.markdown("*  **Editar:** Habilita os nós (pontos brancos) para ajustar o desenho.\n*  **Lixeira:** Apaga todos os desenhos feitos no mapa.")
                     
-                    with st.expander("📝 Inserir Coordenadas Manualmente"):
+                    with st.expander("Inserir Coordenadas Manualmente"):
                         st.caption("Cole as coordenadas abaixo (formato: `Latitude, Longitude`), uma por linha.")
                         texto_coords = st.text_area("Coordenadas:", height=150, placeholder="-22.123, -45.123\n-22.150, -45.100\n-22.200, -45.200")
                         
@@ -341,7 +341,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                                         pontos.append([lon, lat])
                                 
                                 if len(pontos) < 3:
-                                    st.error("⚠️ Um polígono precisa de pelo menos 3 pontos.")
+                                    st.error("Um polígono precisa de pelo menos 3 pontos.")
                                 else:
                                     if pontos and pontos[0] != pontos[-1]:
                                         pontos.append(pontos[0])
@@ -350,14 +350,14 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                                     st.success("Polígono processado com sucesso!")
                                     st.rerun()
                             except ValueError:
-                                st.error("❌ Erro no formato. Certifique-se de usar apenas números e vírgulas/pontos.")
+                                st.error("Erro no formato. Certifique-se de usar apenas números e vírgulas/pontos.")
                             except Exception as e:
-                                st.error(f"❌ Erro ao processar: {e}")
+                                st.error(f"Erro ao processar: {e}")
             
             st.divider()
 
             # --- 6. PERÍODO ---
-            st.markdown("#### 📅 Recorte Temporal")
+            st.markdown("#### Recorte Temporal")
             
             opcoes_periodo = ["Personalizado", "Mensal", "Anual"]
             if opcao in ["Mapas", "Múltiplos Mapas", "Sobreposição (Camadas)", "Shapefile"]: 
@@ -400,23 +400,23 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 data_padrao = hoje - relativedelta(months=4)
                 st.date_input("Data", value=data_padrao, min_value=min_data, max_value=max_data, key='data_horaria', on_change=reset_analysis_state, format="DD/MM/YYYY")
                 st.slider("Hora (UTC)", 0, 23, 12, key='hora_especifica', on_change=reset_analysis_state, help="Hora em UTC (3 horas à frente de Brasília).")
-                st.info("ℹ️ **Nota:** Esta opção retorna um dado pontual (snapshot) apenas para a hora escolhida.", icon="🕒")
+                st.info("**Nota:** Esta opção retorna um dado pontual (snapshot) apenas para a hora escolhida.")
             
             st.divider()
 
             # --- 7. VISUALIZAÇÃO ---
             if opcao == "Mapas":
-                st.markdown("#### 🎨 Visualização")
+                st.markdown("#### Visualização")
                 st.radio("Formato", ["Interativo", "Estático"], key='map_type', horizontal=True, on_change=reset_analysis_results_only, label_visibility="collapsed")
                 st.divider()
             elif opcao == "Múltiplos Mapas":
-                st.info("ℹ️ Modo Múltiplo gera mapas estáticos para comparação.")
+                st.info("Modo Múltiplo gera mapas estáticos para comparação.")
             elif opcao == "Múltiplas Séries":
-                st.info("ℹ️ Gera múltiplos gráficos simultâneos.")
+                st.info("Gera múltiplos gráficos simultâneos.")
             elif opcao == "Sobreposição (Camadas)":
                 pass
             elif opcao == "Shapefile":
-                st.info("ℹ️ Sobrepõe dados climáticos sobre o shapefile enviado.")
+                st.info("Sobrepõe dados climáticos sobre o shapefile enviado.")
 
             # --- 8. BOTÃO DE AÇÃO ---
             disable = st.session_state.get('date_error', False)
@@ -433,7 +433,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                 else: disable = False
 
             st.button(
-                "🚀 Gerar Análise", 
+                "Gerar Análise", 
                 type="primary", 
                 use_container_width=True, 
                 disabled=disable,
@@ -451,7 +451,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
               <div style="display:flex; align-items:center; gap:10px;
               font-weight:700; font-size:17px; margin-bottom:10px;">
-                <span style="font-size:23px;">⚠️</span>
+                
                 <span>Atenção antes de gerar</span>
               </div>
             
@@ -472,15 +472,15 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             else:
                 if opcao == "Shapefile" and not st.session_state.get("shapefile_upload"):
-                    st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Faça upload do arquivo .ZIP.</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'><b>Obrigatório:</b> Faça upload do arquivo .ZIP.</div>", unsafe_allow_html=True)
                 elif opcao in ["Múltiplos Mapas", "Múltiplas Séries"]:
                     vars_sel = st.session_state.get("variaveis_multiplas", [])
                     if not vars_sel:
-                        st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
+                        st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'><b>Obrigatório:</b> Selecione pelo menos uma variável.</div>", unsafe_allow_html=True)
                     elif len(vars_sel) > 4:
-                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Erro:</b> Remova variáveis até ficar com no máximo 4.</div>", unsafe_allow_html=True)
+                         st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'><b>Erro:</b> Remova variáveis até ficar com no máximo 4.</div>", unsafe_allow_html=True)
                 else:
-                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'>⚠️ <b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
+                     st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'><b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
             st.markdown("---")
             st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v1.0.0 | 2025</div>", unsafe_allow_html=True)
@@ -504,7 +504,7 @@ def renderizar_pagina_principal(opcao):
             if os.path.exists("assets/logo.png"): st.image("assets/logo.png", width=100)
             else: st.write("🌐")
         with tc:
-            st.markdown(f"## {opcao}")
+            st.markdown(f"### {opcao}")
     with c2:
         st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
     
