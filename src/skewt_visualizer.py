@@ -132,9 +132,23 @@ def render_skewt_plot(df, lat, lon, date, hour):
             except (ValueError, TypeError, IndexError) as exc:
                 failures.append(f"LI: {exc}")
         try:
-            # PW integra somente o intervalo amostrado: não extrapolar ao topo da atmosfera.
-            pw = _valid_quantity(mpcalc.precipitable_water(p, Td))
-        except (ValueError, TypeError, IndexError) as exc:
+            # Água precipitável na camada amostrada, sem integração de Pint.Quantity.
+            # p está ordenada da maior para a menor pressão.
+            p_pa = np.asarray(p.to("pascal").magnitude, dtype=float)
+            e_pa = np.asarray(
+                mpcalc.saturation_vapor_pressure(Td).to("pascal").magnitude,
+                dtype=float,
+            )
+            epsilon = 0.6219569  # Razão entre massas molares do vapor e do ar seco
+            q = epsilon * e_pa / (p_pa - (1.0 - epsilon) * e_pa)
+            if (len(p_pa) < 2 or not np.all(np.isfinite(q))
+                    or np.any(p_pa <= e_pa)
+                    or not np.all(np.diff(p_pa) < 0)):
+                raise ValueError("Perfil inválido para integrar a água precipitável.")
+            integrate = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+            pw_mm = -float(integrate(q, p_pa)) / 9.80665
+            pw = _valid_quantity(pw_mm * units.millimeter)
+        except (ValueError, TypeError, IndexError, AttributeError) as exc:
             failures.append(f"Água precipitável: {exc}")
         try:
             k_idx = _valid_quantity(mpcalc.k_index(p, T, Td))
