@@ -130,7 +130,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             "◀ Selecione a análise e configure os parâmetros na barra lateral."
             "</div>",
             unsafe_allow_html=True
-            )
+        )
             
             st.button(
                 "🚀 Gerar Skew-T", 
