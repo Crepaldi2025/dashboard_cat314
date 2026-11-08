@@ -32,7 +32,7 @@ if EM_MANUTENCAO:
 
 import ui
 import gee_handler
-import map_visualizer
+from src import map_visualizer
 from src import charts_visualizer
 from src import utils
 import base64 
