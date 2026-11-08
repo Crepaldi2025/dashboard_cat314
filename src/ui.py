@@ -614,24 +614,100 @@ def renderizar_resumo_selecao():
 # -------------------------------------
 
 def renderizar_pagina_sobre():
-    st.title("Sobre o Clima-Cast-Crepaldi")
-    st.markdown("---")
-    url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/docs/sobre.docx"
-    try:
-        with st.spinner("Carregando documentação..."):
-            r = requests.get(url)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-                tmp.write(r.content)
-                path = tmp.name
-        try: pypandoc.get_pandoc_version()
-        except: pypandoc.download_pandoc()
-        html = pypandoc.convert_file(path, "html", format="docx", extra_args=["--embed-resources"])
-        html = re.sub(r'<img src="([^"]+)"', r'<div style="display:flex;justify-content:center;margin:20px 0;"><img src="\1" style="max-width:600px;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);"', html)
-        html += "</div>" 
-        st.markdown(html, unsafe_allow_html=True)
-    except Exception as e: st.error(f"Erro ao carregar sobre: {e}")
-    finally: 
-        if path and os.path.exists(path): os.remove(path)
+    """Página Sobre do ClimaCast, sem conversão de DOCX para HTML."""
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parent.parent
+    imagens = raiz / "assets"
+
+    st.title("Sobre o ClimaCast")
+    st.caption("Plataforma de consulta, análise e visualização de dados meteorológicos")
+    st.markdown(
+        "O Clima-Cast-Crepaldi foi desenvolvido no âmbito da disciplina "
+        "CAT314 — Ferramentas de Previsão de Curtíssimo Prazo (Nowcasting), "
+        "do curso de Ciências Atmosféricas da Universidade Federal de Itajubá (UNIFEI). "
+        "A plataforma apoia atividades didáticas de exploração e análise de dados meteorológicos."
+    )
+
+    st.subheader("Objetivo")
+    st.write(
+        "Oferecer acesso interativo a informações meteorológicas por meio de mapas, "
+        "séries temporais e perfis verticais, com explicitação das fontes e limitações dos dados."
+    )
+
+    st.subheader("Funcionalidades")
+    st.markdown(
+        "- **Mapas estáticos e interativos:** representação espacial de variáveis meteorológicas.\n"
+        "- **Séries temporais:** análise de sua evolução e de estatísticas descritivas.\n"
+        "- **Seleção de áreas:** estados, municípios e recortes geográficos disponibilizados pela aplicação.\n"
+        "- **Perfis atmosféricos Skew-T:** apresentação de temperatura, ponto de orvalho, vento e índices termodinâmicos.\n"
+        "- **Exportação:** imagens e tabelas, conforme a funcionalidade selecionada."
+    )
+
+    st.subheader("Fontes de dados e processamento")
+    st.write(
+        "Para os produtos de superfície, a aplicação consulta os conjuntos "
+        "ERA5-Land do ECMWF por meio do Google Earth Engine. "
+        "Os mapas e as séries são produzidos mediante seleção de área, período e variável, "
+        "seguida de agregação espacial e/ou temporal apropriada ao produto."
+    )
+    st.write(
+        "Os perfis Skew-T são obtidos separadamente da Open-Meteo, com dados de modelos "
+        "atmosféricos. Não devem ser identificados como perfis observados por radiossonda "
+        "nem como perfis diretamente extraídos do ERA5-Land."
+    )
+    st.markdown(
+        "**Fontes técnicas:** "
+        "[ERA5-Land horário](https://developers.google.com/earth-engine/datasets/catalog/ECMWF_ERA5_LAND_HOURLY) · "
+        "[ERA5-Land diário](https://developers.google.com/earth-engine/datasets/catalog/ECMWF_ERA5_LAND_DAILY_AGGR) · "
+        "[Open-Meteo](https://open-meteo.com/en/docs)"
+    )
+
+    fluxo = imagens / "fluxo.png"
+    if fluxo.is_file():
+        with st.expander("Fluxo de processamento", expanded=False):
+            st.image(str(fluxo), caption="Esquema ilustrativo do processamento da aplicação.", width=580)
+
+    st.subheader("Limitações científicas")
+    st.markdown(
+        "- O ERA5-Land é uma **reanálise**, não uma observação pontual direta.\n"
+        "- Sua resolução espacial nominal é da ordem de **9 km**; pequenas variações locais podem não ser resolvidas.\n"
+        "- Agregações diárias podem ocultar eventos de curta duração.\n"
+        "- A disponibilidade temporal e a latência dependem do produto e da atualização do catálogo.\n"
+        "- Os perfis modelados e os índices convectivos dependem do modelo e da resolução vertical; "
+        "não substituem uma radiossondagem."
+    )
+
+    st.subheader("Exemplos de produtos")
+    exemplos = [
+        ("mapa_interativo.png", "Exemplo de mapa interativo"),
+        ("mapa_estatico.png", "Exemplo de mapa estático"),
+        ("serie_temporal.png", "Exemplo de série temporal"),
+    ]
+    for nome, legenda in exemplos:
+        caminho = imagens / nome
+        if caminho.is_file():
+            st.image(str(caminho), caption=legenda, width=620)
+        else:
+            st.caption(f"Imagem ilustrativa indisponível: {nome}")
+
+    st.subheader("Público-alvo")
+    st.write(
+        "Estudantes, docentes, pesquisadores e profissionais das Ciências Atmosféricas "
+        "e áreas relacionadas."
+    )
+
+    st.subheader("Autoria e documentação")
+    st.write("**Autor:** Paulo C. Crepaldi")
+    st.write("**Instituição:** Universidade Federal de Itajubá (UNIFEI), Instituto de Recursos Naturais")
+    st.write("**Orientador acadêmico do projeto original:** Prof. Dr. Enrique Vieira Mattos")
+    st.write("**Projeto iniciado em:** 2025")
+    st.markdown("**Código-fonte:** [dashboard_cat314](https://github.com/Crepaldi2025/dashboard_cat314)")
+    st.caption(
+        "A licença e os termos de reutilização devem ser consultados no arquivo "
+        "LICENSE do repositório, quando disponível."
+    )
+
 
 
 
