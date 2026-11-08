@@ -47,9 +47,9 @@ def get_municipios_ibge(uf_sigla):
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             return sorted([m['nome'] for m in response.json()])
-    except:
-        pass
-    return []
+    except Exception as e:
+    st.error(f"Falha na consulta ao IBGE: {type(e).__name__}: {e}")
+return []
 
 # -----------------------
 # Apagar dados da memória
