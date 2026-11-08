@@ -501,8 +501,31 @@ def renderizar_pagina_principal(opcao):
     is_generating = st.session_state.get("analysis_triggered", False)
 
     if not has_results and not has_skewt and not is_generating:
-        
+        # Fundo meteorológico exclusivo da apresentação inicial.
+        # O arquivo de imagem deve estar em assets/fundo_climacast.png.
+        from pathlib import Path
+        import base64
+        fundo = Path(__file__).resolve().parent.parent / "assets" / "fundo_climacast.png"
+        if fundo.is_file():
+            imagem_base64 = base64.b64encode(fundo.read_bytes()).decode("ascii")
+            st.markdown(
+                "<style>[data-testid='stAppViewContainer'] {"
+                "background-image: linear-gradient(rgba(255,255,255,0.84), "
+                "rgba(255,255,255,0.84)), "
+                f"url('data:image/png;base64,{imagem_base64}');"
+                "background-size: cover; background-position: center center;"
+                "background-repeat: no-repeat; background-attachment: fixed;"
+                "}</style>",
+                unsafe_allow_html=True
+            )
+
         st.markdown("### Bem-vindo ao Clima-Cast!")
+        st.markdown(
+            "<div style='font-size:0.9rem;color:#475569;margin:0 0 6px 0;'>"
+            "◀ Selecione a análise e configure os parâmetros na barra lateral."
+            "</div>",
+            unsafe_allow_html=True
+        )
         
         # --- AQUI ESTÁ A NOTA DIDÁTICA ---
               
@@ -541,13 +564,6 @@ def renderizar_pagina_principal(opcao):
             "<b>Fontes de dados:</b> ERA5-Land/ECMWF, via Google Earth Engine, "
             "para mapas e séries temporais; Open-Meteo, para perfis atmosféricos "
             "modelados utilizados no Skew-T."
-            "</div>",
-            unsafe_allow_html=True
-        )
-        st.markdown(
-            "<div style='text-align:center; font-size:0.9rem; "
-            "color:#64748b; margin-top:4px;'>"
-            "◀ Selecione a análise e configure os parâmetros na barra lateral."
             "</div>",
             unsafe_allow_html=True
         )
