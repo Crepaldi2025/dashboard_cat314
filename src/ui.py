@@ -115,23 +115,22 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             st.slider("Hora (UTC)", 0, 23, 12, key='skew_hour', help="Hora em UTC (3 horas à frente de Brasília).", on_change=reset_analysis_state)
 
 
-            st.info(
-            "ℹ️ **Sobre os dados:** Os resultados utilizam agregações temporais "
-            "que dependem da variável meteorológica, como médias ou acumulados. "
-            "Para consultar um horário específico, selecione **Horário Específico** "
-            "e informe a hora em UTC."
-        )
+            st.warning(
+                "ℹ️ **Nota:** Dados de altitude (3D/Perfil Vertical) estão disponíveis apenas a partir de **23/03/2021** "
+                "(limite do GFS). Para datas anteriores, apenas dados de superfície (2D) podem ser consultados."
+            )
 
             st.divider()
 
             st.markdown(
-            "<div style='text-align:center; font-size:0.9rem; "
-            "color:#64748b; margin-top:4px;'>"
-            "◀ Selecione a análise e configure os parâmetros na barra lateral."
-            "</div>",
-            unsafe_allow_html=True
-        )
-            
+                """
+                <div style="font-size:0.8rem; color:#666; margin-bottom:10px; margin-top:15px;">
+                ⚠️ <b>Atenção:</b> Confira os filtros antes de gerar.
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
             st.button(
                 "🚀 Gerar Skew-T", 
                 type="primary", 
@@ -545,16 +544,17 @@ def renderizar_pagina_principal(opcao):
             **Skew-T/log-P** — Visualização de perfis atmosféricos modelados de temperatura, ponto de orvalho e vento, com parâmetros termodinâmicos.
             """)
         
-            st.info(
+        st.info(
             "ℹ️ **Sobre os dados:** Os resultados utilizam agregações temporais "
             "que dependem da variável meteorológica, como médias ou acumulados. "
             "Para consultar um horário específico, selecione **Horário Específico** "
             "e informe a hora em UTC."
-            )
+        )
         st.markdown(
-            "<div style='text-align: center; font-size: 1.2rem; color: #333; margin-top: 20px;'>"
-            "👈 <b>Comece configurando os parâmetros na barra lateral.</b>"
-            "</div>", 
+            "<div style='text-align:center; font-size:0.9rem; "
+            "color:#64748b; margin-top:4px;'>"
+            "◀ Selecione a análise e configure os parâmetros na barra lateral."
+            "</div>",
             unsafe_allow_html=True
         )
 
