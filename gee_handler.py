@@ -11,7 +11,7 @@ import pandas as pd
 from datetime import date, datetime
 import requests 
 import unicodedata
-import shapefile_handler
+from src import shapefile_handler
 
 # --- INICIALIZAÇÃO GEE ---
 # --- INICIALIZAÇÃO GEE ---
