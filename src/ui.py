@@ -501,32 +501,37 @@ def renderizar_pagina_principal(opcao):
     is_generating = st.session_state.get("analysis_triggered", False)
 
     if not has_results and not has_skewt and not is_generating:
-        # Fundo meteorológico exclusivo da apresentação inicial.
-        # O arquivo de imagem deve estar em assets/fundo_climacast.png.
+        # Boas-vindas com fundo meteorológico somente na tela inicial.
+        # O fundo fica neste painel para não afetar mapas, gráficos ou resultados.
         from pathlib import Path
         import base64
+
         fundo = Path(__file__).resolve().parent.parent / "assets" / "fundo_climacast.png"
         if fundo.is_file():
             imagem_base64 = base64.b64encode(fundo.read_bytes()).decode("ascii")
-            st.markdown(
-                "<style>[data-testid='stAppViewContainer'] {"
-                "background-image: linear-gradient(rgba(255,255,255,0.84), "
-                "rgba(255,255,255,0.84)), "
+            estilo_fundo = (
+                "background-image:linear-gradient("
+                "rgba(255,255,255,0.48),rgba(255,255,255,0.48)),"
                 f"url('data:image/png;base64,{imagem_base64}');"
-                "background-size: cover; background-position: center center;"
-                "background-repeat: no-repeat; background-attachment: fixed;"
-                "}</style>",
-                unsafe_allow_html=True
+                "background-position:center 44%;"
+                "background-size:cover;"
             )
+        else:
+            estilo_fundo = "background:#edf4fb;"
 
-        st.markdown("### Bem-vindo ao Clima-Cast!")
         st.markdown(
-            "<div style='font-size:0.9rem;color:#475569;margin:0 0 6px 0;'>"
+            "<div style='" + estilo_fundo +
+            "border:1px solid #dbe5f0;border-radius:9px;"
+            "padding:15px 18px;margin:0 0 4px 0;'>"
+            "<div style='font-size:1.28rem;font-weight:650;"
+            "color:#172b4d;line-height:1.3;margin:0 0 5px 0;'>"
+            "Bem-vindo ao Clima-Cast!</div>"
+            "<div style='font-size:0.91rem;color:#334155;line-height:1.45;'>"
             "◀ Selecione a análise e configure os parâmetros na barra lateral."
-            "</div>",
+            "</div></div>",
             unsafe_allow_html=True
         )
-        
+
         # --- AQUI ESTÁ A NOTA DIDÁTICA ---
               
         col1, col2 = st.columns(2, gap="medium")
