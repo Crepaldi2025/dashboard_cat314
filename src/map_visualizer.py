@@ -20,7 +20,7 @@ import matplotlib.colors as mcolors
 from branca.colormap import StepColormap 
 from branca.element import Template, MacroElement 
 import folium 
-import gee_handler
+from src import gee_handler
 
 # ------------------------------------------------------------------
 # 0. MAPA DE SOBREPOSIÇÃO (OVERLAY + SPLIT MAP)

@@ -31,7 +31,7 @@ if EM_MANUTENCAO:
 # -----------------------------------------------------
 
 import ui
-import gee_handler
+from src import gee_handler
 from src import map_visualizer
 from src import charts_visualizer
 from src import utils
