@@ -616,7 +616,7 @@ def renderizar_resumo_selecao():
 def renderizar_pagina_sobre():
     st.title("Sobre o Clima-Cast-Crepaldi")
     st.markdown("---")
-    url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/sobre.docx"
+    url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/docs/sobre.docx"
     try:
         with st.spinner("Carregando documentação..."):
             r = requests.get(url)
