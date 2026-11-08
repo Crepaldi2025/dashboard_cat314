@@ -35,6 +35,7 @@ import gee_handler
 from src import map_visualizer
 from src import charts_visualizer
 from src import utils
+from src import skewt_handler
 import base64 
 import io
 import pandas as pd
@@ -43,7 +44,6 @@ import folium
 from folium.plugins import Draw 
 from streamlit_folium import st_folium
 from datetime import timedelta 
-import skewt_handler 
 from src import skewt_visualizer
 
 # --- CONFIGURAÇÃO INICIAL ---
