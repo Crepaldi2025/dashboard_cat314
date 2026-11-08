@@ -44,5 +44,5 @@ Dependendo da versão do aplicativo no repositório, o sistema pode incluir:
 
 1. Clone o repositório:
    ```bash
-   git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
-   cd SEU_REPOSITORIO
+   git clone https://github.com/Crepaldi2025/dashboard_cat314.git
+   cd dashboard_cat314
