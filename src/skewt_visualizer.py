@@ -121,14 +121,14 @@ def render_skewt_plot(df, lat, lon, date, hour):
     export_data.insert(3, "longitude_deg", float(lon))
     export_data.insert(4, "data_source", str(df.attrs.get("source", "Não informada")))
     csv_bytes = export_data.to_csv(index=False, na_rep="", float_format="%.5f").encode("utf-8-sig")
-    st.download_button(
-        "Exportar perfil vertical (CSV)",
-        data=csv_bytes,
-        file_name=f"climacast_perfil_{iso_date}.csv",
-        mime="text/csv",
-        help="Níveis originais do perfil modelado, sem interpolação. "
-             "Campos vazios representam dados indisponíveis.",
-    )
+    #    st.download_button(
+    #        "Exportar perfil vertical (CSV)",
+    #        data=csv_bytes,
+    #        file_name=f"climacast_perfil_{iso_date}.csv",
+    #        mime="text/csv",
+    #        help="Níveis originais do perfil modelado, sem interpolação. "
+    #             "Campos vazios representam dados indisponíveis.",
+    #    )
 
     # Para índices de parcela de superfície, todo o perfil deve ter T e Td válidos.
     complete_thermo = np.all(np.isfinite(Td_values))
