@@ -442,31 +442,14 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
             
             if not disable:
                 st.markdown(
-                    """
-            <div style="margin-top:14px; padding:16px 18px; border-radius:14px;
-            background:linear-gradient(135deg,#fff8e1,#fff3cd);
-            border-left:6px solid #f59e0b;
-            box-shadow:0 2px 10px rgba(0,0,0,0.10);
-            font-size:15.5px; line-height:1.55; color:#3f2f00;">
-            
-              <div style="display:flex; align-items:center; gap:10px;
-              font-weight:700; font-size:17px; margin-bottom:10px;">
-                
-                <span>Atenção antes de gerar</span>
-              </div>
-            
-              <p style="margin:0 0 10px 0;">
-                Confira se os filtros de <b>localização</b>, <b>variável</b> e <b>período</b> estão corretos antes de iniciar a consulta.
-              </p>
-            
-              <div style="margin-top:10px;">
-                <div style="margin-bottom:5px;">• Consultas com períodos longos podem demorar mais.</div>
-                <div style="margin-bottom:5px;">• Áreas muito grandes aumentam o tempo de processamento.</div>
-                <div>• Períodos sem dados disponíveis podem não gerar resultados.</div>
-              </div>
-            
-            </div>
-                    """,
+                    "<div style='margin-top:6px;padding:10px 12px;border-radius:8px;"
+                    "border-left:4px solid #d99a16;background:#fff6dc;"
+                    "font-size:0.86rem;line-height:1.45;color:#453400;'>"
+                    "<strong>Atenção antes de gerar</strong>"
+                    "<p style='margin:5px 0;'>Confira localização, variável e período antes de iniciar a consulta.</p>"
+                    "<p style='margin:0;'>Consultas longas ou áreas grandes exigem mais processamento; "
+                    "períodos sem dados podem não produzir resultados.</p>"
+                    "</div>",
                     unsafe_allow_html=True
                 )
             
@@ -499,16 +482,18 @@ def renderizar_pagina_principal(opcao):
     
     c1, c2 = st.columns([3, 1.5])
     with c1:
-        lc, tc = st.columns([1, 5])
-        with lc: 
-            if os.path.exists("assets/logo.png"): st.image("assets/logo.png", width=100)
-            else: st.write("🌐")
-        with tc:
-            st.markdown(f"### {opcao}")
+        st.markdown(
+            f"<div style='font-size:1.35rem;font-weight:650;line-height:1.2;"
+            f"margin:0;padding:0;'>{opcao}</div>",
+            unsafe_allow_html=True
+        )
     with c2:
         st.markdown(f"<div style='border:1px solid #e0e0e0;padding:8px;text-align:center;border-radius:8px;background-color:rgba(255,255,255,0.7);font-size:0.9rem;'><img src='https://flagcdn.com/24x18/br.png' style='vertical-align:middle;margin-bottom:2px;'> <b>BRT:</b> {agora.strftime('%d/%m/%Y %H:%M')}<br><span style='color:#666;font-size:0.8rem;'>🌐 UTC: {agora_utc.strftime('%d/%m/%Y %H:%M')}</span></div>", unsafe_allow_html=True)
-    
-    st.markdown("---")
+
+    st.markdown(
+        "<hr style='border:0;border-top:1px solid #d1d5db;margin:0.1rem 0 0.2rem 0;'>",
+        unsafe_allow_html=True
+    )
     
     # LÓGICA DE LIMPEZA ATUALIZADA
     has_results = st.session_state.get("analysis_results") is not None
