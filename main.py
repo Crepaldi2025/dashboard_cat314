@@ -34,7 +34,7 @@ import ui
 import gee_handler
 import map_visualizer
 import charts_visualizer
-import src utils
+from src import utils
 import base64 
 import io
 import pandas as pd
