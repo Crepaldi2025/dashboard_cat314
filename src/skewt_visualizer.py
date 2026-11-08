@@ -24,27 +24,25 @@ def render_skewt_plot(df, lat, lon, date, hour):
         st.warning("Sem dados para plotar.")
         return
 
-    # --- 1. SUPER RESOLUÇÃO (Para capturar cruzamentos finos) ---
-    try:
-        # Ordena corretamente (1000 -> 100)
-        df = df.sort_values("pressure", ascending=False).reset_index(drop=True)
-        
-        # Pega limites
-        p_max = int(df["pressure"].max())
-        p_min = int(df["pressure"].min())
-        
-        # Cria grade de 2 em 2 hPa (MUITO FINA)
-        new_levels = range(p_max, p_min - 2, -2) 
-        
-        # Interpolação linear segura
-        df_interp = df.set_index("pressure").reindex(new_levels)
-        df_interp = df_interp.interpolate(method='linear')
-        df_interp = df_interp.reset_index().rename(columns={'index': 'pressure'})
-        
-        data = df_interp # Usamos os dados finos para tudo agora
-        
-    except Exception as e:
-        data = df # Fallback
+    
+    # --- 1. PREPARAÇÃO DO PERFIL VERTICAL ---
+    # Preserva os níveis originais fornecidos pelo modelo.
+
+    data = df.sort_values(
+        "pressure",
+        ascending=False
+    ).reset_index(drop=True)
+
+    # Remove registros sem pressão ou temperatura válidas.
+    data = data.dropna(
+        subset=["pressure", "temperature"]
+    )
+
+    if len(data) < 2:
+        st.error(
+            "Perfil vertical insuficiente para gerar o Skew-T."
+        )
+        return
 
     # --- 2. DADOS FÍSICOS ---
     try:
