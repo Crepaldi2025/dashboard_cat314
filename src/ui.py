@@ -546,10 +546,12 @@ def renderizar_pagina_principal(opcao):
             **Skew-T/log-P** — Visualização de perfis atmosféricos modelados de temperatura, ponto de orvalho e vento, com parâmetros termodinâmicos.
             """)
         
-        st.info(
-            "ℹ️ **Nota sobre os Dados:** Por padrão, os resultados apresentam **médias agregadas** (diárias ou mensais). "
-            "Caso precise visualizar um momento exato nos mapas, utilize a opção **'Horário Específico'** para selecionar uma hora pontual (0-23h)."
-        )
+            st.info(
+            "ℹ️ **Sobre os dados:** Os resultados utilizam agregações temporais "
+            "que dependem da variável meteorológica, como médias ou acumulados. "
+            "Para consultar um horário específico, selecione **Horário Específico** "
+            "e informe a hora em UTC."
+            )
         st.markdown(
             "<div style='text-align: center; font-size: 1.2rem; color: #333; margin-top: 20px;'>"
             "👈 <b>Comece configurando os parâmetros na barra lateral.</b>"
