@@ -49,7 +49,7 @@ def get_municipios_ibge(uf_sigla):
             return sorted([m['nome'] for m in response.json()])
     except Exception as e:
     st.error(f"Falha na consulta ao IBGE: {type(e).__name__}: {e}")
-return []
+    return []
 
 # -----------------------
 # Apagar dados da memória
