@@ -47,8 +47,6 @@ import pandas as pd
 import time
 import folium
 
-set_background()
-
 # --- FUNDO METEOROLÓGICO LOCAL ---
 def set_background():
     imagem = Path(__file__).resolve().parent / "assets" / "fundo_climacast_otimizado.png"
@@ -84,6 +82,8 @@ def set_background():
         """,
         unsafe_allow_html=True,
     )
+
+set_background()
 
 def hide_fullscreen_button():
     st.markdown("""
