@@ -41,17 +41,39 @@ from folium.plugins import Draw
 from streamlit_folium import st_folium
 from datetime import timedelta 
 import base64 
+from pathlib import Path
 import io
 import pandas as pd
 import time
 import folium
 
-# --- CONFIGURAÇÃO INICIAL ---
+# --- FUNDO METEOROLÓGICO LOCAL ---
 def set_background():
-    image_url = "https://raw.githubusercontent.com/Crepaldi2025/dashboard_cat314/main/terrab.jpg"
-    opacity = 0.8
-    page_bg_img = f"""<style>.stApp {{background-image: linear-gradient(rgba(255, 255, 255, {opacity}), rgba(255, 255, 255, {opacity})), url("{image_url}"); background-size: cover; background-position: center center; background-repeat: no-repeat; background-attachment: fixed;}}</style>"""
-    st.markdown(page_bg_img, unsafe_allow_html=True)
+    imagem = Path(__file__).resolve().parent / "assets" / "fundo_climacast_otimizado.png"
+    if not imagem.is_file():
+        st.warning(f"Imagem de fundo não encontrada: {imagem}")
+        return
+
+    imagem_b64 = base64.b64encode(imagem.read_bytes()).decode("ascii")
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stAppViewContainer"] {{
+            background-image:
+                linear-gradient(rgba(255,255,255,0.58), rgba(255,255,255,0.58)),
+                url("data:image/png;base64,{imagem_b64}") !important;
+            background-size: cover !important;
+            background-position: center center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
+        }}
+        [data-testid="stHeader"] {{
+            background-color: transparent !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 set_background()
 
