@@ -5,7 +5,8 @@ pressure (hPa), temperature (°C), relative_humidity (%), u_component e
 v_component (m/s). O primeiro nível deve representar a superfície.
 """
 
-from datetime import date as Date, datetime
+from datetime import date as Date, datetime, time as ClockTime, timezone
+from zoneinfo import ZoneInfo
 import io
 
 import matplotlib.pyplot as plt
@@ -200,8 +201,25 @@ def render_skewt_plot(df, lat, lon, date, hour):
             for failure in failures:
                 st.write(failure)
 
+    # Aparência alinhada às caixas informativas da página inicial.
+    st.markdown("""
+    <style>
+    .st-key-skewt_indices_box {
+        background: rgba(255, 255, 255, 0.92) !important;
+        border: 1px solid rgba(180, 190, 200, 0.50) !important;
+        border-radius: 8px !important;
+        padding: 12px 16px !important;
+    }
+    .st-key-skewt_indices_box [data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.55);
+        border-radius: 6px;
+        padding: 5px 8px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.subheader("Índices termodinâmicos")
-    with st.container(border=True):
+    with st.container(border=True, key="skewt_indices_box"):
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("SBCAPE", _metric_value(cape, "J/kg"), help="CAPE de parcela iniciada na superfície modelada.")
         c2.metric("SBCIN", _metric_value(cin, "J/kg"), help="Inibição convectiva da parcela de superfície; valores usualmente negativos.")
@@ -213,10 +231,18 @@ def render_skewt_plot(df, lat, lon, date, hour):
         c7.metric("Água precipitável", _metric_value(pw, "mm", 1), help="Integral de vapor d'água apenas na camada vertical amostrada.")
         c8.metric("EL", _metric_value(el_p, "hPa"), help="Nível de equilíbrio, quando identificado no perfil disponível.")
 
-    st.caption(
-        "Índices de parcela de superfície calculados com MetPy a partir de perfis modelados. "
-        "Resultados não equivalem a uma radiossondagem e dependem da resolução vertical "
-        "e da disponibilidade de todos os níveis. '—' indica resultado indisponível ou indefinido."
+    st.markdown(
+        "<div style='background:rgba(255,255,255,0.88);"
+        "border:1px solid rgba(180,190,200,0.50);border-radius:8px;"
+        "padding:10px 16px;margin:10px 0 14px 0;"
+        "color:#526171;font-size:0.82rem;line-height:1.5;'>"
+        "<b>Nota científica:</b> Índices de parcela de superfície calculados "
+        "com MetPy a partir de perfis modelados. "
+        "Resultados não equivalem a uma radiossondagem e dependem da "
+        "resolução vertical e da disponibilidade de todos os níveis. "
+        "‘—’ indica resultado indisponível ou indefinido."
+        "</div>",
+        unsafe_allow_html=True,
     )
 
     fig = plt.figure(figsize=(9, 9))
@@ -260,16 +286,38 @@ def render_skewt_plot(df, lat, lon, date, hour):
         skew.ax.set_xlabel("Temperatura (°C)")
         skew.ax.grid(alpha=0.25)
 
+        # Cabeçalho: informação temporal, geográfica e proveniência do perfil.
         observed_date = df.attrs.get("real_date", date)
-        if isinstance(observed_date, (datetime, Date)):
-            date_str = observed_date.strftime("%d/%m/%Y")
+        if isinstance(observed_date, datetime):
+            day_utc = observed_date.date()
+        elif isinstance(observed_date, Date):
+            day_utc = observed_date
         else:
-            date_str = str(observed_date)
-        source = str(df.attrs.get("source", "Modelo não identificado"))
+            day_utc = datetime.fromisoformat(str(observed_date)).date()
+
+        moment_utc = datetime.combine(
+            day_utc, ClockTime(hour=int(hour)), tzinfo=timezone.utc
+        )
+        moment_brt = moment_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+        date_str = moment_utc.strftime("%d/%m/%Y")
+        local_str = moment_brt.strftime("%d/%m/%Y %H:%M")
+
+        def coordinate_label(value, positive, negative):
+            return f"{abs(float(value)):.2f}° {positive if value >= 0 else negative}"
+
+        lat_str = coordinate_label(lat, "N", "S")
+        lon_str = coordinate_label(lon, "L", "O")
+
+        # A fonte vem dos metadados do handler; nenhum modelo é inferido.
+        source = str(df.attrs.get("source") or "Fonte não informada")
+        source = source.replace("(modelo não fixado)", "").strip(" -|,")
+        source = source.replace("(Modelo não fixado)", "").strip(" -|,")
         fig.suptitle(
-            f"Skew-T | {date_str} {hour}:00 UTC\n"
-            f"{lat:.2f}, {lon:.2f} | {source}",
-            fontsize=12, x=0.12, ha="left",
+            "Diagrama Termodinâmico Skew-T/log-P\n"
+            f"{date_str} {int(hour):02d}:00 UTC | Horário local: {local_str}\n"
+            f"Lat.: {lat_str} | Lon.: {lon_str}\n"
+            f"Fonte: {source} | Perfil atmosférico modelado",
+            fontsize=10.5, x=0.12, y=0.99, ha="left", va="top",
         )
         skew.ax.legend(loc="upper right", fontsize=9)
         st.pyplot(fig)
