@@ -219,7 +219,7 @@ def render_skewt_plot(df, lat, lon, date, hour):
     """, unsafe_allow_html=True)
 
     st.subheader("Índices termodinâmicos")
-    with st.container(border=True, key="skewt_indices_box"):
+    with st.container(border=True):
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("SBCAPE", _metric_value(cape, "J/kg"), help="CAPE de parcela iniciada na superfície modelada.")
         c2.metric("SBCIN", _metric_value(cin, "J/kg"), help="Inibição convectiva da parcela de superfície; valores usualmente negativos.")
