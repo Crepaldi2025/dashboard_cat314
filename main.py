@@ -79,33 +79,41 @@ def set_background():
 
 set_background()
 
-background-image:
-    url("data:image/png;base64,{imagem_b64}") !important;
+# --- FUNDO METEOROLÓGICO LOCAL ---
+def set_background():
+    imagem = Path(__file__).resolve().parent / "assets" / "fundo_climacast_otimizado.png"
 
-st.markdown("""
-<style>
-[data-testid="stAppViewContainer"],
-.stApp,
-[data-testid="stMain"] {
-    background: red !important;
-}
-</style>
-""", unsafe_allow_html=True)
+    if not imagem.is_file():
+        st.warning(f"Imagem de fundo não encontrada: {imagem}")
+        return
 
-st.markdown(
-    """
-    <div style="
-        background-color: red;
-        color: white;
-        padding: 20px;
-        font-size: 20px;
-        font-weight: bold;
-    ">
-        TESTE DE CSS — CLIMACAST
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+    imagem_b64 = base64.b64encode(imagem.read_bytes()).decode("ascii")
+
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stAppViewContainer"],
+        .stApp {{
+            background-image: url("data:image/png;base64,{imagem_b64}") !important;
+            background-size: cover !important;
+            background-position: center center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
+        }}
+
+        [data-testid="stMain"] {{
+            background: transparent !important;
+        }}
+
+        [data-testid="stHeader"] {{
+            background-color: transparent !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+set_background()
 
 def hide_fullscreen_button():
     st.markdown("""
