@@ -58,7 +58,8 @@ def set_background():
     st.markdown(
         f"""
         <style>
-        [data-testid="stAppViewContainer"] {{
+        #[data-testid="stAppViewContainer"] {{
+        .stApp {{
             background-image:
                 #linear-gradient(rgba(255,255,255,0.60), rgba(255,255,255,0.60)),
                 linear-gradient(rgba(255,0,0,0.50), rgba(255,0,0,0.50)),
