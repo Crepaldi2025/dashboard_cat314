@@ -79,6 +79,21 @@ def set_background():
 
 set_background()
 
+st.markdown(
+    """
+    <div style="
+        background-color: red;
+        color: white;
+        padding: 20px;
+        font-size: 20px;
+        font-weight: bold;
+    ">
+        TESTE DE CSS — CLIMACAST
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 def hide_fullscreen_button():
     st.markdown("""
     <style>
