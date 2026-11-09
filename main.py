@@ -85,8 +85,6 @@ def set_background():
         unsafe_allow_html=True,
     )
 
-set_background()
-
 def hide_fullscreen_button():
     st.markdown("""
     <style>
