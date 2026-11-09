@@ -558,14 +558,24 @@ def renderizar_pagina_principal(opcao):
             **Skew-T/log-P** — Visualização de perfis atmosféricos modelados de temperatura, ponto de orvalho e vento, com parâmetros termodinâmicos.
             """)
         
-        st.info(
-            "ℹ️ **Sobre os dados:** Os resultados utilizam agregações temporais "
+        # Caixas informativas com contraste adequado ao fundo de satélite.
+        st.markdown(
+            "<div style='background:rgba(255,255,255,0.92);"
+            "border:1px solid rgba(170,185,200,0.65);border-radius:8px;"
+            "padding:12px 16px;margin:12px 0 10px 0;"
+            "color:#243447;font-size:0.91rem;line-height:1.5;'>"
+            "<b>ℹ️ Sobre os dados:</b> Os resultados utilizam agregações temporais "
             "que dependem da variável meteorológica, como médias ou acumulados. "
-            "Para consultar um horário específico, selecione **Horário Específico** "
+            "Para consultar um horário específico, selecione <b>Horário Específico</b> "
             "e informe a hora em UTC."
+            "</div>",
+            unsafe_allow_html=True
         )
         st.markdown(
-            "<div style='font-size:0.82rem; color:#64748b; margin:4px 0 0 0;'>"
+            "<div style='background:rgba(255,255,255,0.88);"
+            "border:1px solid rgba(170,185,200,0.60);border-radius:8px;"
+            "padding:10px 16px;margin:0 0 8px 0;"
+            "color:#475569;font-size:0.82rem;line-height:1.5;'>"
             "<b>Fontes de dados:</b> ERA5-Land/ECMWF, via Google Earth Engine, "
             "para mapas e séries temporais; Open-Meteo, para perfis atmosféricos "
             "modelados utilizados no Skew-T."
