@@ -47,36 +47,6 @@ import pandas as pd
 import time
 import folium
 
-# --- FUNDO METEOROLÓGICO LOCAL ---
-def set_background():
-    imagem = Path(__file__).resolve().parent / "assets" / "fundo_climacast_otimizado.png"
-    if not imagem.is_file():
-        st.warning(f"Imagem de fundo não encontrada: {imagem}")
-        return
-
-    imagem_b64 = base64.b64encode(imagem.read_bytes()).decode("ascii")
-    st.markdown(
-        f"""
-        <style>
-        #[data-testid="stAppViewContainer"] {{
-        .stApp {{
-            background-image:
-                #linear-gradient(rgba(255,255,255,0.60), rgba(255,255,255,0.60)),
-                linear-gradient(rgba(255,0,0,0.50), rgba(255,0,0,0.50)),
-                url("data:image/png;base64,{imagem_b64}") !important;
-            background-size: cover !important;
-            background-position: center center !important;
-            background-repeat: no-repeat !important;
-            background-attachment: fixed !important;
-        }}
-        [data-testid="stHeader"] {{
-            background-color: transparent !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
 set_background()
 
 # --- FUNDO METEOROLÓGICO LOCAL ---
@@ -94,7 +64,7 @@ def set_background():
         <style>
         [data-testid="stAppViewContainer"],
         .stApp {{
-            background-image: url("data:image/png;base64,{imagem_b64}") !important;
+            background-image:linear-gradient(rgba(255,255,255,0.20), rgba(255,255,255,0.20)),url("data:image/png;base64,{imagem_b64}") !important;
             background-size: cover !important;
             background-position: center center !important;
             background-repeat: no-repeat !important;
