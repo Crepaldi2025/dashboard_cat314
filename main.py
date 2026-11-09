@@ -63,7 +63,7 @@ def set_background():
         [data-testid="stAppViewContainer"],
         .stApp {{
             background-image:
-                linear-gradient(rgba(255,255,255,0.8), rgba(255,255,255,0.8)),
+                linear-gradient(rgba(255,255,255,0.3), rgba(255,255,255,0.3)),
                 url("data:image/png;base64,{imagem_b64}") !important;
 
             background-size: cover !important;
