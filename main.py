@@ -66,7 +66,6 @@ def set_background():
                 linear-gradient(rgba(255,255,255,0.7), rgba(255,255,255,0.7)),
                 url("data:image/png;base64,{imagem_b64}") !important;
             background-size: contain !important;
-            background-position: center top !important;
             background-position: center center !important;
             background-repeat: no-repeat !important;
             background-attachment: fixed !important;
