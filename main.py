@@ -79,6 +79,16 @@ def set_background():
 
 set_background()
 
+st.markdown("""
+<style>
+[data-testid="stAppViewContainer"],
+.stApp,
+[data-testid="stMain"] {
+    background: red !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     """
     <div style="
