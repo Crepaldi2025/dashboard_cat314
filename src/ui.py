@@ -466,7 +466,7 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                      st.markdown("<div style='font-size:14px;color:#d32f2f;margin-top:8px;'><b>Obrigatório:</b> Defina a localização.</div>", unsafe_allow_html=True)
             
             st.markdown("---")
-            st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v1.0.0 | 2025</div>", unsafe_allow_html=True)
+            st.markdown("<div style='text-align:center;color:grey;font-size:12px;'>Desenvolvido por <b>Paulo C. Crepaldi</b><br>v2.0 | 2026</div>", unsafe_allow_html=True)
         
         return opcao
 
@@ -564,7 +564,7 @@ def renderizar_pagina_principal(opcao):
             "border:1px solid rgba(170,185,200,0.65);border-radius:8px;"
             "padding:12px 16px;margin:12px 0 10px 0;"
             "color:#243447;font-size:0.91rem;line-height:1.5;'>"
-            "<b>ℹ️ Sobre os dados:</b> Os resultados utilizam agregações temporais "
+            "<b>Sobre os dados:</b> Os resultados utilizam agregações temporais "
             "que dependem da variável meteorológica, como médias ou acumulados. "
             "Para consultar um horário específico, selecione <b>Horário Específico</b> "
             "e informe a hora em UTC."
