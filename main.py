@@ -79,6 +79,9 @@ def set_background():
 
 set_background()
 
+background-image:
+    url("data:image/png;base64,{imagem_b64}") !important;
+
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"],
