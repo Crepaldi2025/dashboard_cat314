@@ -131,6 +131,99 @@ def create_interactive_map(ee_image: ee.Image, feature: ee.Feature, vis_params: 
 # 2. MAPA ESTÁTICO
 # ------------------------------------------------------------------
 
+
+def _add_vertical_colorbar(img, palette, vmin, vmax, unit):
+    """Acrescenta uma legenda vertical fora da área do mapa."""
+
+    from matplotlib import ticker
+
+    cmap = LinearSegmentedColormap.from_list(
+        "climacast_vertical", palette, N=256
+    )
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+
+    fig = plt.figure(figsize=(1.1, 3.0), dpi=150)
+    fig.patch.set_alpha(0)
+
+    ax = fig.add_axes([0.22, 0.12, 0.18, 0.77])
+
+    cb = ColorbarBase(
+        ax,
+        cmap=cmap,
+        norm=norm,
+        orientation="vertical"
+    )
+
+    cb.locator = ticker.MaxNLocator(
+        nbins=6,
+        steps=[1, 2, 2.5, 5, 10]
+    )
+    cb.update_ticks()
+
+    cb.ax.yaxis.set_minor_locator(ticker.NullLocator())
+
+    cb.ax.tick_params(
+        which="major",
+        labelsize=10,
+        length=3,
+        width=0.8
+    )
+
+    amplitude = vmax - vmin
+    formato = "%.1f" if amplitude < 10 else "%.0f"
+
+    cb.ax.yaxis.set_major_formatter(
+        ticker.FormatStrFormatter(formato)
+    )
+
+    cb.ax.set_title(unit, fontsize=11, pad=10)
+    cb.outline.set_linewidth(0.8)
+
+    buffer = io.BytesIO()
+    fig.savefig(
+        buffer,
+        format="png",
+        transparent=True,
+        dpi=150
+    )
+    plt.close(fig)
+
+    buffer.seek(0)
+    legenda = Image.open(buffer).convert("RGBA")
+
+    altura = max(1, int(img.height * 0.75))
+    largura = max(
+        1, round(legenda.width * altura / legenda.height)
+    )
+
+    legenda = legenda.resize(
+        (largura, altura),
+        Image.Resampling.LANCZOS
+    )
+
+    margem = 12
+    largura_painel = largura + 2 * margem
+
+    resultado = Image.new(
+        "RGBA",
+        (img.width + largura_painel, img.height),
+        (255, 255, 255, 255)
+    )
+
+    resultado.paste(img, (0, 0), img)
+
+    pos_x = img.width + margem
+    pos_y = (img.height - altura) // 2
+
+    resultado.paste(
+        legenda,
+        (pos_x, pos_y),
+        legenda
+    )
+
+    return resultado
+
+
 def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict, unit_label: str = "") -> tuple[str, str, str]:
     try:
         visualized_data = ee_image.visualize(min=vis_params["min"], max=vis_params["max"], palette=vis_params["palette"])
@@ -174,22 +267,59 @@ def create_static_map(ee_image: ee.Image, feature: ee.Feature, vis_params: dict,
                 draw.text((tx, ty), texto, font=font, fill="black")
             except Exception as e: print(f"Erro desenho: {e}")
 
+        
+        # Legenda vertical integrada à imagem
+        pal = vis_params.get(
+            "palette", ["#FFFFFF", "#000000"]
+        )
+
+        vmin = float(vis_params.get("min", 0))
+        vmax = float(vis_params.get("max", 1))
+
+        unidade = unit_label or ""
+
+        img = _add_vertical_colorbar(
+            img,
+            pal,
+            vmin,
+            vmax,
+            unidade
+        )
+
+        # JPEG com fundo branco
         bg = Image.new("RGBA", img.size, "WHITE")
         bg.paste(img, (0, 0), img)
-        
-        buf = io.BytesIO()
-        bg.convert('RGB').save(buf, format="JPEG")
-        jpg = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('ascii')}"
-        
+
+        buf_jpg = io.BytesIO()
+        bg.convert("RGB").save(
+            buf_jpg,
+            format="JPEG",
+            quality=95
+        )
+
+        jpg = (
+            "data:image/jpeg;base64,"
+            + base64.b64encode(
+                buf_jpg.getvalue()
+            ).decode("ascii")
+        )
+
+        # PNG com legenda incorporada
         buf_png = io.BytesIO()
         img.save(buf_png, format="PNG")
-        png = f"data:image/png;base64,{base64.b64encode(buf_png.getvalue()).decode('ascii')}"
 
-        lbl = vis_params.get("caption", unit_label)
-        pal = vis_params.get("palette", ["#FFF", "#000"])
-        cbar = _make_compact_colorbar(pal, vis_params.get("min", 0), vis_params.get("max", 1), lbl)
+        png = (
+            "data:image/png;base64,"
+            + base64.b64encode(
+                buf_png.getvalue()
+            ).decode("ascii")
+        )
+
+        # Não há legenda horizontal separada
+        cbar = None
 
         return png, jpg, cbar
+
     except Exception as e:
         st.error(f"Erro estático: {e}")
         return None, None, None
@@ -341,23 +471,77 @@ def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
         return buf.getvalue()
     except: return None
 
-def _stitch_images_to_bytes(title_bytes: bytes, map_bytes: bytes, colorbar_bytes: bytes, format: str = 'PNG') -> bytes:
+
+def _stitch_images_to_bytes(
+    title_bytes,
+    map_bytes,
+    colorbar_bytes,
+    format="PNG"
+):
     try:
-        t = Image.open(io.BytesIO(title_bytes)).convert("RGBA")
-        m = Image.open(io.BytesIO(map_bytes)).convert("RGBA")
-        c = Image.open(io.BytesIO(colorbar_bytes)).convert("RGBA")
-        w = m.width
-        def rz(im, tw): return im if im.width == tw else im.resize((tw, int(im.height * (tw/im.width))), Image.Resampling.LANCZOS)
-        t = rz(t, w)
-        c = rz(c, w)
-        final = Image.new('RGBA', (w, t.height + m.height + c.height), (255, 255, 255, 255))
-        final.paste(t, (0, 0), t)
-        final.paste(m, (0, t.height), m)
-        final.paste(c, (0, t.height + m.height), c)
+        m = Image.open(
+            io.BytesIO(map_bytes)
+        ).convert("RGBA")
+
+        partes = []
+
+        if title_bytes:
+            t = Image.open(
+                io.BytesIO(title_bytes)
+            ).convert("RGBA")
+            partes.append(t)
+
+        partes.append(m)
+
+        if colorbar_bytes:
+            c = Image.open(
+                io.BytesIO(colorbar_bytes)
+            ).convert("RGBA")
+            partes.append(c)
+
+        largura = m.width
+
+        def redimensionar(im):
+            if im.width == largura:
+                return im
+            altura = round(
+                im.height * largura / im.width
+            )
+            return im.resize(
+                (largura, altura),
+                Image.Resampling.LANCZOS
+            )
+
+        partes = [redimensionar(p) for p in partes]
+
+        altura_total = sum(p.height for p in partes)
+
+        final = Image.new(
+            "RGBA",
+            (largura, altura_total),
+            (255, 255, 255, 255)
+        )
+
+        y = 0
+        for parte in partes:
+            final.paste(parte, (0, y), parte)
+            y += parte.height
+
         buf = io.BytesIO()
-        final.convert('RGB').save(buf, format='JPEG', quality=95) if format.upper() == 'JPEG' else final.save(buf, format='PNG')
+
+        if format.upper() == "JPEG":
+            final.convert("RGB").save(
+                buf, format="JPEG", quality=95
+            )
+        else:
+            final.save(buf, format="PNG")
+
         return buf.getvalue()
-    except: return None
+
+    except Exception as e:
+        st.error(f"Erro ao exportar mapa: {e}")
+        return None
+
 
 
 
