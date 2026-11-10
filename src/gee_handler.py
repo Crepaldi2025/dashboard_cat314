@@ -603,6 +603,80 @@ def get_sampled_data_as_dataframe(
             {
                 'Latitude': f['geometry']['coordinates'][1],
                 'Longitude': f['geometry']['coordinates'][0],
+                variable: f['properties'][band_name]
+            }
+            for f in feats
+        ]
+        return pd.DataFrame(data)
+    except:
+        return pd.DataFrame()
+
+def get_time_series_data(
+    variable: str,
+    start_date: date,
+    end_date: date,
+    geometry: ee.Geometry
+) -> pd.DataFrame:
+    return _get_series_generic(variable, start_date, end_date, geometry)
+
+def _get_series_generic(variable, start, end, geom):
+    if variable not in ERA5_VARS:
+        return pd.DataFrame()
+    cfg = ERA5_VARS[variable]
+    col_id = 'ECMWF/ERA5_LAND/DAILY_AGGR'
+    bands = cfg.get('bands', cfg.get('band'))
+    try:
+        col = (
+            ee.ImageCollection(col_id)
+            .filterDate(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'))
+            .select(bands)
+        )
+        if col.size().getInfo() == 0:
+            return pd.DataFrame()
+        if variable == "Velocidade do Vento (10m)":
+            col = col.map(
+                lambda img: img.addBands(
+                    img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m'])
+                    .pow(2)
+                    .reduce(ee.Reducer.sum())
+                    .sqrt()
+                    .rename(cfg['result_band'])
+                )
+            )
+        elif variable == "Umidade Relativa (2m)":
+            col = col.map(_calc_rh)
+        elif variable == "Radiação Solar Incidente":
+            col = col.map(lambda img: _calc_rad(img, False))
+        else:
+            col = col.map(lambda img: img.rename(cfg['result_band']))
+        
+        def ext(img):
+            val = img.select(cfg['result_band']).reduceRegion(
+                ee.Reducer.mean(),
+                geom,
+                9000,
+                bestEffort=True,
+                maxPixels=1e9
+            ).get(cfg['result_band'])
+            val = ee.Number(val)
+            if cfg['unit'] == "°C":
+                val = val.subtract(273.15)
+            elif cfg['unit'] == "mm":
+                val = val.multiply(1000)
+            return img.set('date', img.date().format('YYYY-MM-dd')).set('value', val)
+
+        series = col.map(ext)
+        dates = series.aggregate_array('date').getInfo()
+        vals = series.aggregate_array('value').getInfo()
+        if not dates or not vals:
+            return pd.DataFrame()
+        df = pd.DataFrame({'date': dates, 'value': vals})
+        df['date'] = pd.to_datetime(df['date'])
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        return df.dropna().sort_values('date')
+    except:
+        return pd.DataFrame()
+
 
 def obter_vis_params_interativo(
     variavel: str,
@@ -718,20 +792,3 @@ def obter_vis_params_interativo(
 
     return nova_config
 
-def get_time_series_data(
-    variable: str,
-    start_date: date,
-    end_date: date,
-    geometry: ee.Geometry
-) -> pd.DataFrame:
-    return _get_series_generic(variable, start_date, end_date, geometry)
-
-def _get_series_generic(variable, start, end, geom):
-    if variable not in ERA5_VARS:
-        return pd.DataFrame()
-    cfg = ERA5_VARS[variable]
-  
-        
-    nova_config['min'] = novo_min
-    nova_config['max'] = novo_max
-    return nova_config
