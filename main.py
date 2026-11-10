@@ -339,8 +339,7 @@ def render_analysis_results():
                 2. Aguarde cerca de **1 minuto**.
                 3. Clique em **Gerar** mais uma vez.
                 """)
-            
-                                  
+                                             
             ui.renderizar_resumo_selecao()
             
             # --- ESTILOS CSS (VERSÃO DEFINITIVA) ---
@@ -559,7 +558,7 @@ def render_analysis_results():
     var_cfg = results["var_cfg"]
     
     # Mostra o título bonito na tela
-    st.subheader(titulo_completo)
+    #st.subheader(titulo_completo)
     
     if aba == "Shapefile":
         local_str = "na Área Personalizada (Shapefile)"
