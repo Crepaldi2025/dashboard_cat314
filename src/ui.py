@@ -588,7 +588,7 @@ def renderizar_resumo_selecao():
 
     # --- LÓGICA PARA SKEW-T ---
     if nav_option == "Skew-T":
-        with st.expander("📋 Resumo das Opções Selecionadas", expanded=False):
+        with st.expander("Resumo das Opções Selecionadas", expanded=False):
             c1, c2, c3 = st.columns(3)
             with c1: 
                 st.markdown("**Análise:**\nSondagem (Skew-T)")
