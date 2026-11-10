@@ -701,7 +701,7 @@ def obter_vis_params_interativo(
     unidade = ERA5_VARS[variavel].get("unit", "")
 
     with st.expander(
-        f"🎨 Ajustar Escala de Cores: {variavel}",
+        f"Ajustar Escala de Cores: {variavel}",
         expanded=False
     ):
         st.caption(
