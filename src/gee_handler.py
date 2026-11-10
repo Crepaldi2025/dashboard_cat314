@@ -734,7 +734,11 @@ def obter_vis_params_interativo(
                     ).getInfo()
 
                     chave = f"{banda.getInfo()}_p{percentil}"
-                    valor = estatisticas.get(chave)
+                    #valor = estatisticas.get(chave)
+                    # A imagem possui somente uma banda.
+                    # Recupera o valor estatístico independentemente
+                    # do nome atribuído pelo Earth Engine.
+                    valor = next(iter(estatisticas.values()), None)
 
                     if valor is not None and float(valor) > 0:
                         nova_config["min"] = 0.0
