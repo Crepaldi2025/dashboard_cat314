@@ -240,7 +240,25 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         formatter = ticker.FormatStrFormatter('%.2f' if (vmax - vmin) < 10 else '%.0f')
         cb.formatter = formatter
         cb.update_ticks()
-        cb.ax.tick_params(labelsize=4, length=2, pad=1)
+
+        # Remove completamente as divisões secundárias
+        cb.ax.xaxis.set_minor_locator(ticker.NullLocator())
+        cb.ax.tick_params(
+            axis="x",
+            which="minor",
+            bottom=False,
+            top=False
+        )
+        
+        # Mantém apenas as divisões principais
+        cb.ax.tick_params(
+            axis="x",
+            which="major",
+            labelsize=4,
+            length=3,
+            width=0.8,
+            pad=2
+        )
         buf = io.BytesIO()
         plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
         plt.close(fig)
