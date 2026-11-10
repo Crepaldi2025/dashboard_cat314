@@ -430,7 +430,7 @@ def render_analysis_results():
                         st.dataframe(df_display, use_container_width=True, hide_index=True)
                         
                         # Botões de Download
-                        st.markdown("##### 📥 Baixar Tabela")
+                        st.markdown("##### Baixar Tabela")
                         render_download_buttons(df_display, "sondagem_skewt", "sk")
                         
                     except Exception as e:
@@ -618,18 +618,55 @@ def render_analysis_results():
                         final_png = base64.b64decode(png.split(",")[1])
                         final_jpg = base64.b64decode(jpg.split(",")[1])
 
-                    st.markdown("##### 📥 Baixar Mapa (Imagem)")
-                    c1, c2 = st.columns(2)
-                    if final_png: c1.download_button("💾 Baixar PNG", final_png, "mapa.png", "image/png", use_container_width=True)
-                    if final_jpg: c2.download_button("💾 Baixar JPG", final_jpg, "mapa.jpeg", "image/jpeg", use_container_width=True)
+                    
+                    # Download dos mapas
+                    st.markdown("#### Baixar Mapa")
 
-            # --- DADOS E TABELA ---
-            if "map_dataframe" in results and not results["map_dataframe"].empty:
-                st.markdown("---")
-                with st.expander("##### 📊 Ver Tabela de Dados e Exportar", expanded=False):
-                    st.dataframe(results["map_dataframe"], use_container_width=True, hide_index=True, height=250)
-                    st.markdown("##### 📥 Baixar Dados da Tabela")
-                    render_download_buttons(results["map_dataframe"], "dados_climaticos", "map_export")
+                    col_png, col_jpg = st.columns(2, gap="small")
+
+                    with col_png:
+                        if final_png:
+                            st.download_button(
+                                "Baixar PNG",
+                                data=final_png,
+                                file_name="mapa.png",
+                                mime="image/png",
+                                use_container_width=True
+                            )
+
+                    with col_jpg:
+                        if final_jpg:
+                            st.download_button(
+                                "Baixar JPEG",
+                                data=final_jpg,
+                                file_name="mapa.jpeg",
+                                mime="image/jpeg",
+                                use_container_width=True
+                            )
+
+            # Tabela de dados
+            if (
+                "map_dataframe" in results
+                and not results["map_dataframe"].empty
+            ):
+                with st.expander(
+                    "Ver Tabela de Dados e Exportar",
+                    expanded=False
+                ):
+                    st.dataframe(
+                        results["map_dataframe"],
+                        use_container_width=True,
+                        hide_index=True,
+                        height=300
+                    )
+
+                    st.markdown("**Baixar Dados da Tabela**")
+
+                    render_download_buttons(
+                        results["map_dataframe"],
+                        "dados_climaticos",
+                        "map_export"
+                    )
 
     # --- 6. SÉRIES TEMPORAIS ---
     elif aba == "Séries Temporais":
