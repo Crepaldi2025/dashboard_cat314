@@ -236,6 +236,7 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
             steps=[1, 2, 2.5, 5, 10],
             min_n_ticks=5
         )
+        cb.ax.xaxis.set_minor_locator(ticker.NullLocator())
         formatter = ticker.FormatStrFormatter('%.2f' if (vmax - vmin) < 10 else '%.0f')
         cb.formatter = formatter
         cb.update_ticks()
