@@ -625,9 +625,18 @@ def renderizar_resumo_selecao():
 
         st.markdown("""
             <style>
-            div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p {
-                font-size: 16px;
-                line-height: 1.6;
+            /* Títulos dos quadros expansíveis */
+            div[data-testid="stExpander"] details > summary p {
+                font-size: 16px !important;
+                font-weight: 600 !important;
+                line-height: 1.5 !important;
+            }
+        
+            /* Informações dentro dos quadros */
+            div[data-testid="stExpander"] details > div
+            div[data-testid="stMarkdownContainer"] p {
+                font-size: 15px !important;
+                line-height: 1.6 !important;
             }
             </style>
         """, unsafe_allow_html=True)
