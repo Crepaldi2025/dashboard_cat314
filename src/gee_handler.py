@@ -548,16 +548,21 @@ def get_era5_image(
                 col = col.map(lambda img: _calc_rad(img, is_hourly))
         
         band_agg = config['result_band']
+
         if is_hourly and variable == "Precipitação Total":
             band_agg = "total_precipitation_hourly"
-        # Impede valores negativos espúrios de precipitação
+        
+        # Corrige valores negativos de precipitação
         if variable == "Precipitação Total":
-            col = col.map(
-                lambda img: img.addBands(
-                    img.select(band_agg).max(0),
-                    overwrite=True
+            def corrigir_precipitacao(img):
+                precipitacao = (
+                    img.select(band_agg)
+                    .max(ee.Image.constant(0))
+                    .rename(band_agg)
                 )
-            )
+                return img.addBands(precipitacao, overwrite=True)
+        
+            col = col.map(corrigir_precipitacao)
 
         if config['aggregation'] == 'mean':
             img_agg = col.select(band_agg).mean()
