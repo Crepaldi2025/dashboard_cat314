@@ -569,7 +569,12 @@ def render_analysis_results():
 
     if aba in ["Mapas", "Shapefile"]:
         if "ee_image" in results:
-            vis = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
+            #vis = gee_handler.obter_vis_params_interativo(st.session_state.variavel)
+            vis = gee_handler.obter_vis_params_interativo(
+                st.session_state.variavel,
+                ee_image=results["ee_image"],
+                geometry=results["feature"].geometry()
+            )
             tipo_mapa = st.session_state.get("map_type", "Interativo")
             
             # --- MODO INTERATIVO ---
