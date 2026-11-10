@@ -495,7 +495,8 @@ def get_era5_image(
     
     if is_hourly:
         if variable == "Precipitação Total":
-            band_raw = "total_precipitation"
+            #band_raw = "total_precipitation"
+            band_raw = "total_precipitation_hourly"
         elif variable == "Radiação Solar Incidente":
             collection_id = 'ECMWF/ERA5/HOURLY'
             band_raw = "mean_surface_downward_short_wave_radiation_flux"
@@ -504,7 +505,8 @@ def get_era5_image(
     bands_needed = config.get('bands', [band_raw])
     if is_hourly and not using_era5_global:
         if variable == "Precipitação Total":
-            bands_needed = ["total_precipitation"]
+            #bands_needed = ["total_precipitation"]
+            bands_needed = ["total_precipitation_hourly"]
         elif variable == "Radiação Solar Incidente":
             bands_needed = ["surface_solar_radiation_downwards"]
     elif using_era5_global:
@@ -547,7 +549,8 @@ def get_era5_image(
         
         band_agg = config['result_band']
         if is_hourly and variable == "Precipitação Total":
-            band_agg = "total_precipitation"
+            #band_agg = "total_precipitation"
+            band_agg = "total_precipitation_hourly"
         if config['aggregation'] == 'mean':
             img_agg = col.select(band_agg).mean()
         elif config['aggregation'] == 'sum':
