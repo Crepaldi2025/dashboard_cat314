@@ -477,13 +477,24 @@ def _make_title_image(
         fonte_bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
         fonte_regular = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
-        try:
-            fonte_titulo = ImageFont.truetype(fonte_bold, 24)
-            fonte_subtitulo = ImageFont.truetype(fonte_regular, 18)
-        except OSError:
-            fonte_titulo = ImageFont.load_default()
-            fonte_subtitulo = ImageFont.load_default()
+        from matplotlib import font_manager
 
+        fonte_bold = font_manager.findfont(
+            font_manager.FontProperties(
+                family="DejaVu Sans",
+                weight="bold"
+            )
+        )
+        
+        fonte_regular = font_manager.findfont(
+            font_manager.FontProperties(
+                family="DejaVu Sans",
+                weight="normal"
+            )
+        )
+        
+        fonte_titulo = ImageFont.truetype(fonte_bold, 28)
+        fonte_subtitulo = ImageFont.truetype(fonte_regular, 20)
         # Quebra o título conforme a largura real do texto
         palavras = titulo.split()
         linhas = []
