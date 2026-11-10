@@ -758,10 +758,7 @@ def obter_vis_params_interativo(
                             valor_p99 / passo
                         ) * passo
 
-                        st.caption(
-                            f"Autoescala: "
-                            f"0 a {float(valor):.1f} {unidade}"
-                        )
+                
                     else:
                         st.warning(
                             "Percentil indisponível. "
