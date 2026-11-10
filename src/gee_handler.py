@@ -704,7 +704,7 @@ def obter_vis_params_interativo(
 
         usar_autoescala = st.checkbox(
             "Usar autoescala",
-            value=True,
+            value=false,
             key=f"autoescala_{variavel}"
         )
 
