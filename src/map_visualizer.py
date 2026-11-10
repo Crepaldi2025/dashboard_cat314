@@ -459,89 +459,92 @@ def _make_compact_colorbar(
         return None
 
 
-
 def _make_title_image(
     title_text: str,
     width: int,
     height: int = 90
 ) -> bytes:
+    import textwrap
+
     try:
-        linhas = title_text.split("\n", 1)
+        partes = title_text.split("\n", 1)
+        titulo = partes[0].strip()
+        subtitulo = partes[1].strip() if len(partes) > 1 else ""
 
-        titulo = linhas[0].strip()
-        subtitulo = (
-            linhas[1].strip()
-            if len(linhas) > 1 else ""
-        )
+        imagem = Image.new("RGB", (width, height), "white")
+        draw = ImageDraw.Draw(imagem)
 
-        img = Image.new(
-            "RGB", (width, height), "white"
-        )
-        draw = ImageDraw.Draw(img)
-
-        fonte_path = (
-            "/usr/share/fonts/truetype/dejavu/"
-            "DejaVuSans.ttf"
-        )
-        fonte_bold_path = (
-            "/usr/share/fonts/truetype/dejavu/"
-            "DejaVuSans-Bold.ttf"
-        )
+        fonte_bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        fonte_regular = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
         try:
-            tamanho = 20
-
-            while tamanho >= 12:
-                fonte_titulo = ImageFont.truetype(
-                    fonte_bold_path, tamanho
-                )
-
-                largura_texto = draw.textbbox(
-                    (0, 0), titulo, font=fonte_titulo
-                )[2]
-
-                if largura_texto <= width - 40:
-                    break
-
-                tamanho -= 1
-
-            fonte_subtitulo = ImageFont.truetype(
-                fonte_path, 15
-            )
-
+            fonte_titulo = ImageFont.truetype(fonte_bold, 24)
+            fonte_subtitulo = ImageFont.truetype(fonte_regular, 18)
         except OSError:
             fonte_titulo = ImageFont.load_default()
             fonte_subtitulo = ImageFont.load_default()
 
-        cor_titulo = "#25364B"
-        cor_subtitulo = "#64748B"
+        # Quebra o título conforme a largura real do texto
+        palavras = titulo.split()
+        linhas = []
+        linha = ""
 
-        draw.text(
-            (width // 2, 18),
-            titulo,
-            font=fonte_titulo,
-            fill=cor_titulo,
-            anchor="mt"
+        for palavra in palavras:
+            tentativa = f"{linha} {palavra}".strip()
+
+            largura = draw.textbbox(
+                (0, 0), tentativa, font=fonte_titulo
+            )[2]
+
+            if largura <= width - 60:
+                linha = tentativa
+            else:
+                if linha:
+                    linhas.append(linha)
+                linha = palavra
+
+        if linha:
+            linhas.append(linha)
+
+        altura_linha = 30
+        altura_titulo = len(linhas) * altura_linha
+        altura_total = altura_titulo + (32 if subtitulo else 0) + 24
+
+        imagem = Image.new(
+            "RGB",
+            (width, max(height, altura_total)),
+            "white"
         )
+        draw = ImageDraw.Draw(imagem)
+
+        y = 12
+
+        for linha in linhas:
+            draw.text(
+                (width // 2, y),
+                linha,
+                font=fonte_titulo,
+                fill="#25364B",
+                anchor="mt"
+            )
+            y += altura_linha
 
         if subtitulo:
             draw.text(
-                (width // 2, 52),
+                (width // 2, y + 4),
                 subtitulo,
                 font=fonte_subtitulo,
-                fill=cor_subtitulo,
+                fill="#64748B",
                 anchor="mt"
             )
 
         buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-
+        imagem.save(buffer, format="PNG")
         return buffer.getvalue()
 
     except Exception as e:
         st.error(f"Erro ao gerar título: {e}")
         return None
-
 
 
 def _stitch_images_to_bytes(
