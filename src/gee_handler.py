@@ -579,7 +579,8 @@ def get_era5_image(
         if final.bandNames().size().getInfo() == 0:
             return None
         return final
-    except:
+    except Exception as e:
+        st.error(f"Erro ao processar ERA5-Land: {e}")
         return None
 
 def get_sampled_data_as_dataframe(
