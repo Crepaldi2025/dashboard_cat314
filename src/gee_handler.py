@@ -8,7 +8,8 @@ import ee
 import os
 import geobr
 import pandas as pd
-from datetime import date, datetime
+#from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import requests 
 import unicodedata
 from src import shapefile_handler
@@ -514,8 +515,7 @@ def get_era5_image(
             ee.ImageCollection(collection_id)
             .filterDate(
                 start_date.strftime('%Y-%m-%d'),
-                #end_date.strftime('%Y-%m-%d')
-                (end_date + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+                (end_date + timedelta(days=1)).strftime('%Y-%m-%d')
             )
         )
         if is_hourly:
