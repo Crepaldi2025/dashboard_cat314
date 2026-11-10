@@ -230,7 +230,12 @@ def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) 
         norm = mcolors.BoundaryNorm(boundaries, cmap.N)
         cb = ColorbarBase(ax, cmap=cmap, norm=norm, boundaries=boundaries, spacing='proportional', orientation="horizontal")
         cb.set_label(label, fontsize=6)
-        cb.locator = ticker.MaxNLocator(nbins=6)
+        #cb.locator = ticker.MaxNLocator(nbins=6)
+        cb.locator = ticker.MaxNLocator(
+            nbins=8,
+            steps=[1, 2, 2.5, 5, 10],
+            min_n_ticks=5
+        )
         formatter = ticker.FormatStrFormatter('%.2f' if (vmax - vmin) < 10 else '%.0f')
         cb.formatter = formatter
         cb.update_ticks()
