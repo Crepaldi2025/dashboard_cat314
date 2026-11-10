@@ -459,17 +459,89 @@ def _make_compact_colorbar(
         return None
 
 
-def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
+
+def _make_title_image(
+    title_text: str,
+    width: int,
+    height: int = 90
+) -> bytes:
     try:
-        fig = plt.figure(figsize=(width/100, height/100), dpi=100)
-        fig.patch.set_facecolor('white')
-        plt.text(0.5, 0.5, title_text, ha='center', va='center', fontsize=14, fontweight='bold', wrap=True)
-        plt.axis('off')
-        buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=100, bbox_inches="tight", pad_inches=0.05, facecolor='white')
-        plt.close(fig)
-        return buf.getvalue()
-    except: return None
+        linhas = title_text.split("\n", 1)
+
+        titulo = linhas[0].strip()
+        subtitulo = (
+            linhas[1].strip()
+            if len(linhas) > 1 else ""
+        )
+
+        img = Image.new(
+            "RGB", (width, height), "white"
+        )
+        draw = ImageDraw.Draw(img)
+
+        fonte_path = (
+            "/usr/share/fonts/truetype/dejavu/"
+            "DejaVuSans.ttf"
+        )
+        fonte_bold_path = (
+            "/usr/share/fonts/truetype/dejavu/"
+            "DejaVuSans-Bold.ttf"
+        )
+
+        try:
+            tamanho = 20
+
+            while tamanho >= 12:
+                fonte_titulo = ImageFont.truetype(
+                    fonte_bold_path, tamanho
+                )
+
+                largura_texto = draw.textbbox(
+                    (0, 0), titulo, font=fonte_titulo
+                )[2]
+
+                if largura_texto <= width - 40:
+                    break
+
+                tamanho -= 1
+
+            fonte_subtitulo = ImageFont.truetype(
+                fonte_path, 15
+            )
+
+        except OSError:
+            fonte_titulo = ImageFont.load_default()
+            fonte_subtitulo = ImageFont.load_default()
+
+        cor_titulo = "#25364B"
+        cor_subtitulo = "#64748B"
+
+        draw.text(
+            (width // 2, 18),
+            titulo,
+            font=fonte_titulo,
+            fill=cor_titulo,
+            anchor="mt"
+        )
+
+        if subtitulo:
+            draw.text(
+                (width // 2, 52),
+                subtitulo,
+                font=fonte_subtitulo,
+                fill=cor_subtitulo,
+                anchor="mt"
+            )
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+
+        return buffer.getvalue()
+
+    except Exception as e:
+        st.error(f"Erro ao gerar título: {e}")
+        return None
+
 
 
 def _stitch_images_to_bytes(
