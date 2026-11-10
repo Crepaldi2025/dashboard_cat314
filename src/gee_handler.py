@@ -549,8 +549,16 @@ def get_era5_image(
         
         band_agg = config['result_band']
         if is_hourly and variable == "Precipitação Total":
-            #band_agg = "total_precipitation"
             band_agg = "total_precipitation_hourly"
+        # Impede valores negativos espúrios de precipitação
+        if variable == "Precipitação Total":
+            col = col.map(
+                lambda img: img.addBands(
+                    img.select(band_agg).max(0),
+                    overwrite=True
+                )
+            )
+
         if config['aggregation'] == 'mean':
             img_agg = col.select(band_agg).mean()
         elif config['aggregation'] == 'sum':
