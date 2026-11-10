@@ -515,7 +515,7 @@ def get_era5_image(
             .filterDate(
                 start_date.strftime('%Y-%m-%d'),
                 #end_date.strftime('%Y-%m-%d')
-                end_date + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+                (end_date + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
             )
         )
         if is_hourly:
