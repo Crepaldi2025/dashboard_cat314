@@ -709,15 +709,8 @@ def obter_vis_params_interativo(
         )
 
         if usar_autoescala:
-            percentil = st.radio(
-                "Percentil espacial",
-                options=[95, 98],
-                index=1,
-                horizontal=True,
-                format_func=lambda p: f"P{p}",
-                key=f"percentil_{variavel}"
-            )
-
+            percentil = 99
+               
             if ee_image is not None and geometry is not None:
                 try:
                     banda = ee.String(
