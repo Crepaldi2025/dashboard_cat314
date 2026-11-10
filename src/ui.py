@@ -621,7 +621,7 @@ def renderizar_resumo_selecao():
         if "variavel" not in st.session_state: return
         var_text = st.session_state.variavel
 
-    with st.expander("📋 Resumo das Opções Selecionadas", expanded=False):
+    with st.expander("Resumo das Opções Selecionadas", expanded=False):
         c1, c2, c3 = st.columns(3)
         with c1: st.markdown(f"**{label_titulo}** \n{var_text}")
         with c2:
