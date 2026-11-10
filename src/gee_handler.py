@@ -121,8 +121,15 @@ ERA5_VARS = {
             "min": 0,
             "max": 500,
             "palette": [
-                '#FFFFFF', '#C7E9C0', '#A1D99B', '#74C476',
-                '#31A354', '#006D2C', '#08519C', '#08306B'
+                '#f7fcf0',
+                '#e0f3db',
+                '#ccebc5',
+                '#a8ddb5',
+                '#7bccc4',
+                '#4eb3d3',
+                '#2b8cbe',
+                '#0868ac',
+                '#084081'
             ],
             "caption": "Precipitação (mm)"
         }
