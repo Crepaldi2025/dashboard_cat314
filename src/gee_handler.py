@@ -745,7 +745,7 @@ def obter_vis_params_interativo(
                         nova_config["max"] = float(valor)
 
                         st.caption(
-                            f"Autoescala P{percentil}: "
+                            f"Autoescala: "
                             f"0 a {float(valor):.1f} {unidade}"
                         )
                     else:
