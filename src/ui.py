@@ -445,10 +445,14 @@ def renderizar_sidebar(dados_geo, mapa_nomes_uf):
                     "<div style='margin-top:6px;padding:10px 12px;border-radius:8px;"
                     "border-left:4px solid #d99a16;background:#fff6dc;"
                     "font-size:0.86rem;line-height:1.45;color:#453400;'>"
-                    "<strong>Atenção antes de gerar</strong>"
-                    "<p style='margin:5px 0;'>Confira localização, variável e período antes de iniciar a consulta.</p>"
-                    "<p style='margin:0;'>Consultas longas ou áreas grandes exigem mais processamento; "
-                    "períodos sem dados podem não produzir resultados.</p>"
+                    "<strong>Orientações para a análise</strong>"
+                    "<p style='margin:5px 0;'>Verifique a variável meteorológica, "
+                    "a região de interesse e o intervalo temporal selecionados.</p>"
+                    "<p style='margin:5px 0;'>A resolução espacial e temporal depende "
+                    "do produto utilizado. Consultas extensas podem exigir maior "
+                    "tempo de processamento.</p>"
+                    "<p style='margin:0;'>A disponibilidade dos dados está condicionada "
+                    "à cobertura temporal da base de reanálise.</p>"
                     "</div>",
                     unsafe_allow_html=True
                 )
