@@ -622,6 +622,16 @@ def renderizar_resumo_selecao():
         var_text = st.session_state.variavel
 
     with st.expander("Resumo das Opções Selecionadas", expanded=False):
+
+        st.markdown("""
+            <style>
+            div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p {
+                font-size: 16px;
+                line-height: 1.6;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+    
         c1, c2, c3 = st.columns(3)
         with c1: st.markdown(f"**{label_titulo}** \n{var_text}")
         with c2:
