@@ -219,52 +219,115 @@ def _add_colorbar_bottomleft(mapa: geemap.Map, vis_params: dict, unit_label: str
     macro._template = template
     mapa.get_root().add_child(macro)
 
-def _make_compact_colorbar(palette: list, vmin: float, vmax: float, label: str) -> str:
-    # Tamanho ajustado da colorbar estática (menor altura: 0.15)
-    fig = plt.figure(figsize=(2.0, 0.45), dpi=220)
-    ax = fig.add_axes([0.05, 0.45, 0.90, 0.20])
-    try:
-        N_STEPS = len(palette)
-        boundaries = np.linspace(vmin, vmax, N_STEPS + 1)
-        cmap = LinearSegmentedColormap.from_list("custom", palette, N=N_STEPS)
-        norm = mcolors.BoundaryNorm(boundaries, cmap.N)
-        cb = ColorbarBase(ax, cmap=cmap, norm=norm, boundaries=boundaries, spacing='proportional', orientation="horizontal")
-        cb.set_label(label, fontsize=6)
-        #cb.locator = ticker.MaxNLocator(nbins=6)
-        cb.locator = ticker.MaxNLocator(
-            nbins=8,
-            steps=[1, 2, 2.5, 5, 10],
-            min_n_ticks=5
-        )
-        cb.ax.xaxis.set_minor_locator(ticker.NullLocator())
-        formatter = ticker.FormatStrFormatter('%.2f' if (vmax - vmin) < 10 else '%.0f')
-        cb.formatter = formatter
-        cb.update_ticks()
 
-        # Remove completamente as divisões secundárias
-        cb.ax.xaxis.set_minor_locator(ticker.NullLocator())
+def _make_compact_colorbar(
+    palette: list,
+    vmin: float,
+    vmax: float,
+    label: str
+) -> str:
+
+    fig = plt.figure(figsize=(2.8, 0.55), dpi=220)
+    ax = fig.add_axes([0.07, 0.48, 0.86, 0.22])
+
+    try:
+        # Escala contínua com interpolação entre as cores
+        cmap = LinearSegmentedColormap.from_list(
+            "climacast_continuous",
+            palette,
+            N=256
+        )
+
+        norm = mcolors.Normalize(
+            vmin=vmin,
+            vmax=vmax
+        )
+
+        cb = ColorbarBase(
+            ax,
+            cmap=cmap,
+            norm=norm,
+            orientation="horizontal"
+        )
+
+        # Valores principais arredondados
+        locator = ticker.MaxNLocator(
+            nbins=7,
+            steps=[1, 2, 2.5, 5, 10]
+        )
+
+        ticks = locator.tick_values(vmin, vmax)
+        ticks = ticks[
+            (ticks >= vmin - 1e-9) &
+            (ticks <= vmax + 1e-9)
+        ]
+
+        cb.set_ticks(ticks)
+
+        cb.ax.xaxis.set_minor_locator(
+            ticker.NullLocator()
+        )
+
+        # Formatação dos números
+        amplitude = vmax - vmin
+
+        if amplitude < 10:
+            cb.ax.xaxis.set_major_formatter(
+                ticker.FormatStrFormatter("%.2f")
+            )
+        else:
+            cb.ax.xaxis.set_major_formatter(
+                ticker.FormatStrFormatter("%.0f")
+            )
+
+        cb.ax.tick_params(
+            axis="x",
+            which="major",
+            labelsize=6,
+            length=3,
+            width=0.7,
+            pad=2
+        )
+
         cb.ax.tick_params(
             axis="x",
             which="minor",
             bottom=False,
             top=False
         )
-        
-        # Mantém apenas as divisões principais
-        cb.ax.tick_params(
-            axis="x",
-            which="major",
-            labelsize=4,
-            length=3,
-            width=0.8,
-            pad=2
+
+        cb.set_label(
+            label,
+            fontsize=8,
+            labelpad=4
         )
+
+        cb.outline.set_linewidth(0.8)
+
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=220, bbox_inches="tight", pad_inches=0.05, transparent=True)
+
+        fig.savefig(
+            buf,
+            format="png",
+            dpi=220,
+            bbox_inches="tight",
+            pad_inches=0.08,
+            transparent=True
+        )
+
         plt.close(fig)
         buf.seek(0)
-        return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('ascii')}"
-    except: return None
+
+        return (
+            "data:image/png;base64,"
+            + base64.b64encode(buf.read()).decode("ascii")
+        )
+
+    except Exception as e:
+        plt.close(fig)
+        st.error(f"Erro na barra de cores: {e}")
+        return None
+
 
 def _make_title_image(title_text: str, width: int, height: int = 50) -> bytes:
     try:
