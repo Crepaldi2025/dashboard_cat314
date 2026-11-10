@@ -200,17 +200,51 @@ def render_map_tips():
         * `🗑️` **Lixeira:** Remove todos os desenhos ou o item selecionado.
         """)
 
+
 def render_download_buttons(df, filename_prefix, key_suffix):
-    if df is None or df.empty: return
-    try: df_export = df.astype(str)
-    except: df_export = df
-    csv = df_export.to_csv(index=False).encode('utf-8')
+    if df is None or df.empty:
+        return
+
+    df_export = df.copy()
+
+    csv_data = df_export.to_csv(
+        index=False
+    ).encode("utf-8-sig")
+
     buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer: df_export.to_excel(writer, index=False)
+
+    with pd.ExcelWriter(
+        buffer,
+        engine="openpyxl"
+    ) as writer:
+        df_export.to_excel(
+            writer,
+            index=False
+        )
+
     excel_data = buffer.getvalue()
-    c1, c2 = st.columns(2)
-    c1.download_button("💾 Baixar CSV", csv, f"{filename_prefix}.csv", "text/csv", key=f"btn_csv_{key_suffix}", use_container_width=True)
-    c2.download_button("💾 Baixar Excel", excel_data, f"{filename_prefix}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"btn_xlsx_{key_suffix}", use_container_width=True)
+
+    col_csv, col_excel = st.columns(2, gap="small")
+
+    with col_csv:
+        st.download_button(
+            "Baixar CSV",
+            data=csv_data,
+            file_name=f"{filename_prefix}.csv",
+            mime="text/csv",
+            key=f"btn_csv_{key_suffix}",
+            use_container_width=True
+        )
+
+    with col_excel:
+        st.download_button(
+            "Baixar Excel",
+            data=excel_data,
+            file_name=f"{filename_prefix}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"btn_xlsx_{key_suffix}",
+            use_container_width=True
+        )
 
 def get_geo_caching_key(session_state):
     loc_type = session_state.get('tipo_localizacao')
