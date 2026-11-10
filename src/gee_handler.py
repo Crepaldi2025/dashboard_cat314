@@ -603,13 +603,120 @@ def get_sampled_data_as_dataframe(
             {
                 'Latitude': f['geometry']['coordinates'][1],
                 'Longitude': f['geometry']['coordinates'][0],
-                variable: f['properties'][band_name]
-            }
-            for f in feats
-        ]
-        return pd.DataFrame(data)
-    except:
-        return pd.DataFrame()
+
+def obter_vis_params_interativo(
+    variavel: str,
+    ee_image=None,
+    geometry=None
+):
+    if variavel not in ERA5_VARS:
+        return {}
+
+    config_padrao = ERA5_VARS[variavel]["vis_params"]
+    nova_config = config_padrao.copy()
+
+    padrao_min = float(config_padrao.get("min", 0))
+    padrao_max = float(config_padrao.get("max", 100))
+    unidade = ERA5_VARS[variavel].get("unit", "")
+
+    with st.expander(
+        f"🎨 Ajustar Escala de Cores: {variavel}",
+        expanded=False
+    ):
+        st.caption(
+            f"Unidade: {unidade} | "
+            f"Escala padrão: {padrao_min:g} a {padrao_max:g}"
+        )
+
+        usar_autoescala = st.checkbox(
+            "Usar autoescala",
+            value=True,
+            key=f"autoescala_{variavel}"
+        )
+
+        if usar_autoescala:
+            percentil = st.radio(
+                "Percentil espacial",
+                options=[95, 98],
+                index=1,
+                horizontal=True,
+                format_func=lambda p: f"P{p}",
+                key=f"percentil_{variavel}"
+            )
+
+            if ee_image is not None and geometry is not None:
+                try:
+                    banda = ee.String(
+                        ee_image.bandNames().get(0)
+                    )
+
+                    estatisticas = ee_image.reduceRegion(
+                        reducer=ee.Reducer.percentile([percentil]),
+                        geometry=geometry,
+                        scale=11000,
+                        bestEffort=True,
+                        maxPixels=1e8,
+                        tileScale=4
+                    ).getInfo()
+
+                    chave = f"{banda.getInfo()}_p{percentil}"
+                    valor = estatisticas.get(chave)
+
+                    if valor is not None and float(valor) > 0:
+                        nova_config["min"] = 0.0
+                        nova_config["max"] = float(valor)
+
+                        st.caption(
+                            f"Autoescala P{percentil}: "
+                            f"0 a {float(valor):.1f} {unidade}"
+                        )
+                    else:
+                        st.warning(
+                            "Percentil indisponível. "
+                            "Utilizando escala padrão."
+                        )
+                except Exception as e:
+                    st.warning(
+                        "Não foi possível calcular a autoescala. "
+                        f"Utilizando escala padrão. Detalhe: {e}"
+                    )
+            else:
+                st.caption(
+                    "Autoescala disponível quando houver "
+                    "uma imagem e uma região definidas."
+                )
+
+        else:
+            col1, col2 = st.columns(2)
+
+            with col1:
+                novo_min = st.number_input(
+                    "Valor Mínimo",
+                    value=padrao_min,
+                    step=1.0,
+                    format="%.1f",
+                    key=f"min_{variavel}"
+                )
+
+            with col2:
+                novo_max = st.number_input(
+                    "Valor Máximo",
+                    value=padrao_max,
+                    step=1.0,
+                    format="%.1f",
+                    key=f"max_{variavel}"
+                )
+
+            if novo_max <= novo_min:
+                st.warning(
+                    "O valor máximo deve ser maior "
+                    "que o valor mínimo."
+                )
+            else:
+                nova_config["min"] = novo_min
+                nova_config["max"] = novo_max
+
+    return nova_config
 
 def get_time_series_data(
     variable: str,
@@ -623,87 +730,8 @@ def _get_series_generic(variable, start, end, geom):
     if variable not in ERA5_VARS:
         return pd.DataFrame()
     cfg = ERA5_VARS[variable]
-    col_id = 'ECMWF/ERA5_LAND/DAILY_AGGR'
-    bands = cfg.get('bands', cfg.get('band'))
-    try:
-        col = (
-            ee.ImageCollection(col_id)
-            .filterDate(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'))
-            .select(bands)
-        )
-        if col.size().getInfo() == 0:
-            return pd.DataFrame()
-        if variable == "Velocidade do Vento (10m)":
-            col = col.map(
-                lambda img: img.addBands(
-                    img.select(['u_component_of_wind_10m', 'v_component_of_wind_10m'])
-                    .pow(2)
-                    .reduce(ee.Reducer.sum())
-                    .sqrt()
-                    .rename(cfg['result_band'])
-                )
-            )
-        elif variable == "Umidade Relativa (2m)":
-            col = col.map(_calc_rh)
-        elif variable == "Radiação Solar Incidente":
-            col = col.map(lambda img: _calc_rad(img, False))
-        else:
-            col = col.map(lambda img: img.rename(cfg['result_band']))
+  
         
-        def ext(img):
-            val = img.select(cfg['result_band']).reduceRegion(
-                ee.Reducer.mean(),
-                geom,
-                9000,
-                bestEffort=True,
-                maxPixels=1e9
-            ).get(cfg['result_band'])
-            val = ee.Number(val)
-            if cfg['unit'] == "°C":
-                val = val.subtract(273.15)
-            elif cfg['unit'] == "mm":
-                val = val.multiply(1000)
-            return img.set('date', img.date().format('YYYY-MM-dd')).set('value', val)
-
-        series = col.map(ext)
-        dates = series.aggregate_array('date').getInfo()
-        vals = series.aggregate_array('value').getInfo()
-        if not dates or not vals:
-            return pd.DataFrame()
-        df = pd.DataFrame({'date': dates, 'value': vals})
-        df['date'] = pd.to_datetime(df['date'])
-        df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        return df.dropna().sort_values('date')
-    except:
-        return pd.DataFrame()
-
-def obter_vis_params_interativo(variavel: str):
-    if variavel not in ERA5_VARS:
-        return {}
-    config_padrao = ERA5_VARS[variavel]['vis_params']
-    padrao_min = float(config_padrao.get('min', 0))
-    padrao_max = float(config_padrao.get('max', 100))
-    with st.expander(f"🎨 Ajustar Escala de Cores: {variavel}", expanded=False):
-        unidade = ERA5_VARS[variavel].get('unit', '')
-        st.caption(f"Unidade: {unidade} | Valores Padrão: {padrao_min} a {padrao_max}")
-        col1, col2 = st.columns(2)
-        with col1:
-            novo_min = st.number_input(
-                "Valor Mínimo",
-                value=padrao_min,
-                step=1.0,
-                format="%.1f",
-                key=f"min_{variavel}"
-            )
-        with col2:
-            novo_max = st.number_input(
-                "Valor Máximo",
-                value=padrao_max,
-                step=1.0,
-                format="%.1f",
-                key=f"max_{variavel}"
-            )
-    nova_config = config_padrao.copy()
     nova_config['min'] = novo_min
     nova_config['max'] = novo_max
     return nova_config
