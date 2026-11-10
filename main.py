@@ -598,7 +598,16 @@ def render_analysis_results():
                     final_png, final_jpg = None, None
                     try:
                         # Usa o titulo_completo que geramos lá em cima!
-                        tb = map_visualizer._make_title_image(titulo_completo, 800)
+                        #tb = map_visualizer._make_title_image(titulo_completo, 800)
+                        titulo_exportacao = (
+                            f"{st.session_state.get('variavel')} — "
+                            f"{local_str.removeprefix('em ')}\n"
+                            f"{periodo_str.strip('()')}"
+                        )
+                        
+                        tb = map_visualizer._make_title_image(
+                            titulo_exportacao, 800
+                        )
                         mp, jp = base64.b64decode(png.split(",")[1]), base64.b64decode(jpg.split(",")[1])
                         cb = base64.b64decode(cbar.split(",")[1]) if cbar else None
                         
