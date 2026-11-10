@@ -742,7 +742,21 @@ def obter_vis_params_interativo(
 
                     if valor is not None and float(valor) > 0:
                         nova_config["min"] = 0.0
-                        nova_config["max"] = float(valor)
+                        #nova_config["max"] = float(valor)
+                        import math
+                        valor_p99 = float(valor)
+                        
+                        passos = [1, 2, 2.5, 5, 10]
+                        ordem = 10 ** math.floor(math.log10(valor_p99 / 7))
+                        
+                        passo = next(
+                            (p * ordem for p in passos if p * ordem >= valor_p99 / 7),
+                            10 * ordem
+                        )
+                        
+                        nova_config["max"] = math.ceil(
+                            valor_p99 / passo
+                        ) * passo
 
                         st.caption(
                             f"Autoescala: "
